@@ -43,37 +43,62 @@ module IMP
                 </T>
 
 
-  rule <k> X:Id => STATE[X] ... </k> <state> STATE </state> requires X in_keys(STATE)
+  rule [id-lookup]:
+    <k> X:Id => STATE[X] ... </k> <state> STATE </state> requires X in_keys(STATE)
 
-  rule <k> I1 / I2 => I1 /Int I2 ... </k>  requires I2 =/=Int 0
-  rule <k> I1 + I2 => I1 +Int I2 ... </k>
+  rule [div-nonzero]:
+    <k> I1 / I2 => I1 /Int I2 ... </k>  requires I2 =/=Int 0
 
-  rule <k> I1 <= I2   => I1 <=Int I2 ... </k>
-  rule <k> ! T        => notBool T   ... </k>
-  rule <k> true && B  => B           ... </k>
-  rule <k> false && _ => false       ... </k>
+  rule [add]:
+    <k> I1 + I2 => I1 +Int I2 ... </k>
 
-  rule <k> {}  => . ... </k>
-  rule <k> {S} => S ... </k>
+  rule [less-than-or-equal-to]:
+    <k> I1 <= I2   => I1 <=Int I2 ... </k>
 
-  rule <k> X = I:Int; => . ... </k> <state> STATE => STATE [ X <- I ] </state>
+  rule [negation]:
+    <k> ! T        => notBool T   ... </k>
 
-  rule <k> S1:Stmt S2:Stmt => S1 ~> S2 ... </k>
+  rule [andb-true]:
+    <k> true && B  => B           ... </k>
 
-  rule <k> if (true)  S else _ => S ... </k>
-  rule <k> if (false) _ else S => S ... </k>
+  rule [andb-false]:
+    <k> false && _ => false       ... </k>
 
-  rule <k> while (B) S => if (B) {S while (B) S} else {} ... </k>
+  rule [block-empty]:
+    <k> {}  => . ... </k>
 
-  rule <k> int (X , Xs => Xs) ; _ ... </k> <state> STATE => STATE [ X <- 0 ] </state>
+  rule [block-statement]:
+    <k> {S} => S ... </k>
+
+  rule [assignment]:
+    <k> X = I:Int; => . ... </k> <state> STATE => STATE [ X <- I ] </state>
+
+  rule [stmt-sequence]:
+    <k> S1:Stmt S2:Stmt => S1 ~> S2 ... </k>
+
+  rule [if-true]:
+    <k> if (true)  S else _ => S ... </k>
+
+  rule [if-false]:
+    <k> if (false) _ else S => S ... </k>
+
+  rule [while-unroll]:
+    <k> while (B) S => if (B) {S while (B) S} else {} ... </k>
+
+  rule [var-decl]:
+    <k> int (X , Xs => Xs) ; _ ... </k> <state> STATE => STATE [ X <- 0 ] </state>
     requires notBool (X in keys(STATE))
 
-  rule <k> int .Ids ; S => S ... </k>
+  rule [var-decls-empty]:
+    <k> int .Ids ; S => S ... </k>
 
 
   rule [halt]: <k> halt() => . ... </k>
 
+/*
 // verification ids
   syntax Id ::= "n"     [token]
               | "sum"   [token]
+*/
 endmodule
+
