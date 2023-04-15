@@ -4,10 +4,16 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     pyk.url = "github:runtimeverification/pyk/v0.1.238";
     k-framework.url = "github:runtimeverification/k/no-antileft";
-    k-haskell-backend.follows = "k-framework/haskell-backend";
+    #k-haskell-backend.follows = "k-framework/haskell-backend";
+    k-haskell-backend.url = "github:runtimeverification/haskell-backend/remove-rewrite-antileft";
+    k-llvm-backend.url = "github:runtimeverification/llvm-backend";
+    k-llvm-backend.inputs.nixpkgs.follows = "nixpkgs";
+    k-framework.inputs.nixpkgs.follows = "nixpkgs";
+    k-framework.inputs.llvm-backend.follows = "k-llvm-backend";
+    k-framework.inputs.haskell-backend.follows = "k-haskell-backend";
   };
 
-  outputs = { self, nixpkgs, pyk, k-framework, k-haskell-backend }:
+  outputs = { self, nixpkgs, pyk, k-framework, k-haskell-backend, k-llvm-backend }:
     let
       supportedSystems = [ "x86_64-linux" "x86_64-darwin" "aarch64-linux" "aarch64-darwin" ];
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
@@ -20,7 +26,7 @@
         stdenv = pkgs.${system}.stdenv;
         pythonPackages = pkgs.${system}.python310Packages;
         k = k-framework.packages.${system}.k;
-        kore-rpc = k-haskell-backend.projectGhc9.${system}.hsPkgs.kore.components.exes.kore-rpc;
+        kore-rpc = k-haskell-backend.project.${system}.hsPkgs.kore.components.exes.kore-rpc;
         python-pyk = pyk.packages.${system}.pyk-python310 ;
       in {
         kaipy = python.pkgs.buildPythonApplication {

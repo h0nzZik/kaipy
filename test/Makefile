@@ -15,4 +15,12 @@ IMP_TIMESTAMP := ${IMP_KOMPILED_DIR}/imp-kompiled/timestamp
 build-imp: ${IMP_TIMESTAMP}
 
 ${IMP_TIMESTAMP}: lang/imp/imp.k
-	kompile --emit-json --no-prelude --backend haskell --directory ${IMP_KOMPILED_DIR} $<
+	kompile --disable-kore-antileft --emit-json --no-prelude --backend haskell --directory ${IMP_KOMPILED_DIR} $<
+
+.PHONY: test-imp
+test-imp: ${IMP_TIMESTAMP}
+	kaipy --definition ${IMP_KOMPILED_DIR}/imp-kompiled/ analyze --input ./lang/imp/sum.k
+
+.PHONY: clean
+clean:
+	rm -rf ${TEMP_DIR}
