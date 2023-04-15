@@ -17,9 +17,13 @@ build-imp: ${IMP_TIMESTAMP}
 ${IMP_TIMESTAMP}: lang/imp/imp.k
 	kompile --disable-kore-antileft --emit-json --no-prelude --backend haskell --directory ${IMP_KOMPILED_DIR} $<
 
+.PHONY: run-sum
+run-sum: ${IMP_TIMESTAMP}
+	krun --definition ${IMP_KOMPILED_DIR}/imp-kompiled/ -cARGS="ListItem(5)" ./lang/imp/sum.imp
+
 .PHONY: test-imp
 test-imp: ${IMP_TIMESTAMP}
-	kaipy --definition ${IMP_KOMPILED_DIR}/imp-kompiled/ analyze --input ./lang/imp/sum.k
+	kaipy --definition ${IMP_KOMPILED_DIR}/imp-kompiled/ analyze --input ./lang/imp/sum.imp
 
 .PHONY: clean
 clean:

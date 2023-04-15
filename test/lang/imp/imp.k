@@ -8,9 +8,10 @@ requires "my-prelude.md"
 module IMP-SYNTAX
   imports DOMAINS-SYNTAX
   syntax AExp  ::= Int | Id
-                 | "-" Int
+                 | "-" Int                    [seqstrict(1)]
                  | AExp "/" AExp              [left, seqstrict]
                  | "(" AExp ")"               [bracket]
+                 | "getArg" "(" AExp ")"      [seqstrict(1)]
                  > AExp "+" AExp              [left, seqstrict]
   syntax BExp  ::= Bool
                  | AExp "<=" AExp             [seqstrict, latex({#1}\leq{#2})]
@@ -40,14 +41,22 @@ module IMP
   configuration <T color="yellow">
                   <k color="green"> $PGM:Pgm </k>
                   <state color="red"> .Map </state>
+                  <args color="blue"> $ARGS:List </args>
                 </T>
 
+  rule [getArg]:
+    <k> getArg(N:Int) => ARGS[N] ...</k>
+    <args> ARGS:List </args>
+    requires N >=Int 0 andBool size(ARGS) >Int N
 
   rule [id-lookup]:
     <k> X:Id => STATE[X] ... </k> <state> STATE </state> requires X in_keys(STATE)
 
   rule [div-nonzero]:
     <k> I1 / I2 => I1 /Int I2 ... </k>  requires I2 =/=Int 0
+
+  rule [unary-minus]:
+    <k> - X:Int => 0 -Int X ... </k>
 
   rule [add]:
     <k> I1 + I2 => I1 +Int I2 ... </k>
