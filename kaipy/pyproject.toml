@@ -1,0 +1,16 @@
+
+[project]
+name = "kaipy"
+version = "0.1.0"
+description = "An abstract interpreter for the K framework"
+
+authors = [
+    {name = "Jan Tušil", email = "jenda.tusil@gmail.com"},
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project.scripts]
+kaipy = "kaipy.__main__:main"
