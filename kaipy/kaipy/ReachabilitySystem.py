@@ -7,6 +7,7 @@ from typing import (
     Iterable,
     Optional,
     IO,
+    List
 )
 
 from pyk.kast.outer import (
@@ -27,11 +28,15 @@ from pyk.kore.parser import (
 )
 
 from pyk.kore.syntax import (
+    Axiom,
     Definition,
     Sort,
 )
 
 from .kcommands import KORE_RPC_COMMAND
+from .kore_utils import (
+    rewrite_axioms, get_symbol_sort, get_top_cell_initializer
+)
 
 class KoreClientServer:
     server: Optional[KoreServer]
@@ -101,5 +106,13 @@ class ReachabilitySystem:
         self.kcs.__exit__()
 
     @cached_property
+    def top_sort(self) -> Sort:
+        return get_symbol_sort(self.definition, self.main_module_name, get_top_cell_initializer(self.definition))
+
+    @cached_property
     def kast_definition(self) -> KDefinition:
         return self.kprint.definition
+    
+    @cached_property
+    def rewrite_rules(self) -> List[Axiom]:
+        return list(rewrite_axioms(self.definition, self.main_module_name))
