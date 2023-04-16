@@ -153,3 +153,20 @@ def get_fresh_evars_with_sorts(avoid: List[Kore.EVar], sorts: List[Kore.Sort], p
     nums = list(range(n, n + len(sorts)))
     fresh_evars : List[Kore.EVar] = list(map(lambda m: Kore.EVar(name=prefix + str(m), sort=sorts[m - n]), nums))
     return fresh_evars
+
+def get_attr(attrs: tuple[Kore.App, ...], attr: str, default_value):
+    for a in attrs:
+        if a.symbol == attr:
+            return a.args
+    return default_value
+
+def axiom_label(axiom: Kore.Axiom) -> str:
+    a1 = get_attr(axiom.attrs, 'label', None)
+    match a1:
+        case Kore.App(s, _, _):
+            return s
+    a2 = get_attr(axiom.attrs, "UNIQUE'Unds'ID", None)
+    match a2:
+        case Kore.App(s, _, _):
+            return s
+    raise ValueError("No unique id!")

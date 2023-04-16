@@ -28,6 +28,7 @@ from .kore_utils import (
     free_evars_of_pattern,
     get_fresh_evars_with_sorts,
     rename_vars,
+    axiom_label,
 )
 
 def get_input_kore(definition_dir: Path, program: Path) -> Kore.Pattern:
@@ -71,6 +72,8 @@ def may_transit(rs: ReachabilitySystem, patt_from: Kore.Pattern, patt_to: Kore.P
     lhs_match = rs.kcs.client.simplify(Kore.And(rs.top_sort, patt_from, axiom_left))
     if (Kore.Bottom == lhs_match):
         return False
+
+    #print(f"May transit from {patt_from} using {axiom} (simplification: {lhs_match}) ")
     return True
 
 class SCFG:
@@ -80,6 +83,7 @@ class SCFG:
     @dataclass(frozen=True)
     class Node:
         pattern: Kore.Pattern
+        original_rule_label: str
     
     @dataclass(frozen=True)
     class Edge:
@@ -92,7 +96,7 @@ class SCFG:
         for a in rs.rewrite_rules:
             match a:
                 case Kore.Axiom(_, Kore.Rewrites(_, lhs, _), _):
-                    self.graph.add_node(self.Node(lhs))
+                    self.graph.add_node(self.Node(lhs, axiom_label(a)))
         # Add edges
         for node_from in self.graph.nodes:
             for node_to in self.graph.nodes:
@@ -100,7 +104,8 @@ class SCFG:
                     match axiom:
                         case Kore.Axiom(_, Kore.Rewrites(_, _, _) as r, _):
                             if may_transit(self.rs, node_from.pattern, node_to.pattern, r):
-                                print(f"May transit from {node_from.pattern.text} using {axiom} ")
+                                print(f"May transit from {node_from.original_rule_label} using {axiom_label(axiom)} ")
+                                #print("(may transit)")
 
 
 def analyze(rs: ReachabilitySystem, args):
