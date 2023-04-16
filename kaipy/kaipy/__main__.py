@@ -79,10 +79,6 @@ class SemanticsPreGraph:
         pattern: Kore.Pattern
         original_rule_label: str
         applicable_rules: List[str]
-
-        # @property
-        # def json(self) -> str:
-        #     return json.dumps(self.dict, sort_keys=True)
         
         @property
         def dict(self) -> Dict[str, Any]:
@@ -98,6 +94,10 @@ class SemanticsPreGraph:
 
     
     nodes: List[Node]
+
+    @property
+    def dict(self) -> Dict[str, Any]:
+        return {'nodes': [ n.dict for n in self.nodes]}
 
     @staticmethod
     def from_dict(dct: Dict[str, Any]):
@@ -154,7 +154,7 @@ def analyze(rs: ReachabilitySystem, args) -> int:
 def generate_analyzer(rs: ReachabilitySystem, args) -> int:
     with open(args['analyzer'], mode="w") as fw:
         semantics_pregraph = compute_semantics_pregraph(rs)
-        fw.write(json.dumps(semantics_pregraph))
+        fw.write(json.dumps(semantics_pregraph.dict))
     return 0
 
 def create_argument_parser() -> argparse.ArgumentParser:
