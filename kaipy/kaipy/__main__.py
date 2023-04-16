@@ -125,27 +125,43 @@ def compute_semantics_pregraph(rs: ReachabilitySystem) -> SemanticsPreGraph:
 
     return SemanticsPreGraph(nodes)
         
-
+# The graph on which we do the analysis
 class SCFG:
-    rs: ReachabilitySystem
-    graph: nx.Graph
 
     @dataclass(frozen=True)
     class Node:
         pattern: Kore.Pattern
         original_rule_label: str
-        applicable_rules: Tuple[Kore.Axiom,...]
+        applicable_rules: Tuple[str,...]
     
     @dataclass(frozen=True)
-    class Edge:
-        axiom: Kore.Axiom
+    class NodeRule:
+        node: SCFG.Node
+        rule: str
+
+    @dataclass
+    class Substitution:
+        mapping: Dict[Kore.EVar, Kore.Pattern]
+
+    @dataclass
+    class NodeRuleInfo:
+        substitutions: Set[SCFG.Substitution]
+
+    rs: ReachabilitySystem
+    nodes: Set[SCFG.Node]    
+    node_rule_info: Dict[SCFG.NodeRule,SCFG.NodeRuleInfo]
+    #graph: nx.Graph
 
     def __init__(self, rs: ReachabilitySystem, spg: SemanticsPreGraph):
         self.rs = rs
         self.graph = nx.Graph()
-        for node in spg.nodes:
-            applicable_rules: Tuple[Kore.Axiom,...] = tuple(rs.rule_by_id(ruleid) for ruleid in node.applicable_rules)
-            self.graph.add_node(SCFG.Node(node.pattern, node.original_rule_label, applicable_rules))
+        self.nodes = {SCFG.Node(node.pattern, node.original_rule_label, tuple(node.applicable_rules)) for node in spg.nodes }
+        self.node_rule_info = {}
+        #for node in spg.nodes:
+        #    #applicable_rules: Tuple[Kore.Axiom,...] = tuple(rs.rule_by_id(ruleid) for ruleid in node.applicable_rules)
+        #    applicable_rules = node.applicable_rules
+    
+
 
 def analyze(rs: ReachabilitySystem, args) -> int:
     with open(args['analyzer'], mode='r') as fr:
