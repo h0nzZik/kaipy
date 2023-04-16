@@ -162,11 +162,13 @@ def get_attr(attrs: tuple[Kore.App, ...], attr: str, default_value):
 
 def axiom_label(axiom: Kore.Axiom) -> str:
     a1 = get_attr(axiom.attrs, 'label', None)
-    match a1:
-        case Kore.App(s, _, _):
-            return s
+    if a1 is not None:
+        match a1[0]:
+            case Kore.String(s):
+                return s
     a2 = get_attr(axiom.attrs, "UNIQUE'Unds'ID", None)
-    match a2:
-        case Kore.App(s, _, _):
-            return s
-    raise ValueError("No unique id!")
+    if a2 is not None:
+        match a2[0]:
+            case Kore.String(s):
+                return s
+    raise ValueError(f"No unique id! {axiom}")
