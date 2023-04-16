@@ -34,6 +34,7 @@ from .kore_utils import (
     rename_vars,
     axiom_uuid,
     axiom_label,
+    extract_equalities_from_witness,
 )
 
 def get_input_kore(definition_dir: Path, program: Path) -> Kore.Pattern:
@@ -52,7 +53,7 @@ def get_input_kore(definition_dir: Path, program: Path) -> Kore.Pattern:
     assert parser.eof
     return res
 
-def may_transit(rs: ReachabilitySystem, patt_from: Kore.Pattern, axiom: Kore.Rewrites) -> bool:
+def compute_match(rs: ReachabilitySystem, patt_from: Kore.Pattern, axiom: Kore.Rewrites) -> Tuple[Kore.Pattern,Dict[str,str]]:
     vars_to_rename = list(free_evars_of_pattern(axiom.left))
     vars_to_avoid = vars_to_rename + list(free_evars_of_pattern(patt_from))
     new_vars = get_fresh_evars_with_sorts(avoid=list(vars_to_avoid), sorts=list(map(lambda ev: ev.sort, vars_to_rename)))
@@ -60,19 +61,18 @@ def may_transit(rs: ReachabilitySystem, patt_from: Kore.Pattern, axiom: Kore.Rew
     vars_to : List[str] = list(map(lambda e: e.name, new_vars))
     renaming = dict(zip(vars_fr, vars_to))
     axiom_left = rename_vars(renaming, axiom.left)
-
     lhs_match = rs.kcs.client.simplify(Kore.And(rs.top_sort, patt_from, axiom_left))
-    match lhs_match:
-        case Kore.Bottom(_):
-            return False
-    #if (Kore.Bottom == lhs_match):
-    #    return False
+    return lhs_match,renaming
 
-    # We might try harder - checking whether the conjunction implies bottom. But I am not sure if it helps.
-    #if rs.kcs.client.implies()
-    #print(f"simplified: {lhs_match}")
-    #print(f"May transit from {patt_from} using {axiom} (simplification: {lhs_match}) ")
-    return True
+def is_bottom(pattern: Kore.Pattern) -> bool:
+    match pattern:
+        case Kore.Bottom(_):
+            return True
+    return False
+
+def may_transit(rs: ReachabilitySystem, patt_from: Kore.Pattern, axiom: Kore.Rewrites) -> bool:
+    lhs_match,_ = compute_match(rs, patt_from, axiom)
+    return not is_bottom(lhs_match)
 
 @dataclass(frozen=True)
 class SemanticsPreGraph:
@@ -124,7 +124,12 @@ def compute_semantics_pregraph(rs: ReachabilitySystem) -> SemanticsPreGraph:
                 nodes.append(SemanticsPreGraph.Node(pattern, original_rule_label, applicable_rules))
 
     return SemanticsPreGraph(nodes)
-        
+
+
+@dataclass
+class Substitution:
+    mapping: Dict[Kore.EVar, Kore.Pattern]
+
 # The graph on which we do the analysis
 class SCFG:
 
@@ -134,22 +139,13 @@ class SCFG:
         original_rule_label: str
         applicable_rules: Tuple[str,...]
     
-    @dataclass(frozen=True)
-    class NodeRule:
-        node: SCFG.Node
-        rule: str
-
-    @dataclass
-    class Substitution:
-        mapping: Dict[Kore.EVar, Kore.Pattern]
-
     @dataclass
     class NodeRuleInfo:
-        substitutions: Set[SCFG.Substitution]
+        substitutions: Set[Substitution]
 
     rs: ReachabilitySystem
-    nodes: Set[SCFG.Node]    
-    node_rule_info: Dict[SCFG.NodeRule,SCFG.NodeRuleInfo]
+    nodes: Set[Node]    
+    node_rule_info: Dict[Tuple[Node, str],NodeRuleInfo]
     #graph: nx.Graph
 
     def __init__(self, rs: ReachabilitySystem, spg: SemanticsPreGraph):
@@ -161,15 +157,40 @@ class SCFG:
         #    #applicable_rules: Tuple[Kore.Axiom,...] = tuple(rs.rule_by_id(ruleid) for ruleid in node.applicable_rules)
         #    applicable_rules = node.applicable_rules
     
+    def break_pattern(self, pattern: Kore.Pattern):
+        for node in self.nodes:
+            for ruleid in node.applicable_rules:
+                rule: Kore.Axiom = self.rs.rule_by_id(ruleid)
+                match rule:
+                    case Kore.Axiom(_, Kore.Rewrites(_, lhs, _) as rewrites, _):
+                        m,renaming = compute_match(self.rs, pattern, rewrites)
+                        if is_bottom(m):
+                            continue
+                        # Currently we rename variables in each rule as we try to apply it.
+                        # It would be much better if we instead renamed the (usually only one)
+                        # free variable of the input pattern (that is, ARGS for IMP).
+                        # Because the renaming we have may still cause problems, because if a rule has a variable ARGS,
+                        # it may be mapped to a term containing ARGS in the substitution...
+                        print(f"{node.original_rule_label}.{ruleid}: renaming {renaming}")
+                        eqs = extract_equalities_from_witness(set(renaming.values()), m)
+                        renaming_back = dict((v,k) for k,v in renaming.items())
+                        print(self.rs.kprint.kore_to_pretty(m))
+                        eqs_renamed = dict((Kore.EVar(renaming_back[renamed_var.name], renamed_var.sort), pattern) for renamed_var, pattern in eqs.items())
+                        substitution = Substitution(eqs_renamed)
+                        print(f"eqs: {eqs}")
+                        eqs_pretty = dict((k,self.rs.kprint.kore_to_pretty(v)) for k,v in eqs_renamed.items())
+                        print(f"eqs_pretty: {eqs_pretty}")
+                        #self.rs.kcs.client.implies()
 
 
 def analyze(rs: ReachabilitySystem, args) -> int:
     with open(args['analyzer'], mode='r') as fr:
         jsa = json.load(fr)
     spg: SemanticsPreGraph = SemanticsPreGraph.from_dict(jsa)
-    input_kore = get_input_kore(Path(args['definition']), Path(args['input']))
+    input_kore: Kore.Pattern = get_input_kore(Path(args['definition']), Path(args['input']))
     #print(input_kore)
     scfg = SCFG(rs, spg)
+    scfg.break_pattern(input_kore)
     print("SCFG constructed.")
     return 0
 

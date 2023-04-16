@@ -175,3 +175,26 @@ def axiom_label(axiom: Kore.Axiom) -> str:
             case Kore.String(s):
                 return s
     return axiom_uuid(axiom)
+
+
+def extract_equalities_from_witness(expected_vars : Set[str], witness : Kore.Pattern) -> Dict[Kore.EVar, Kore.Pattern]:
+    result : Dict[Kore.EVar, Kore.Pattern] = dict()
+    def go(w : Kore.Pattern):
+        match w:
+            case Kore.And(_, l, r):
+                go(l)
+                go(r)
+                return
+            case Kore.Equals(_, _, l, r):
+                if type(l) is Kore.EVar and l.name in expected_vars:
+                    result[l] = r
+                    return
+                if type(r) is Kore.EVar and r.name in expected_vars:
+                    result[r] = l
+                    return
+                raise ValueError(f"Unexpected equality '{l} = {r}' in the witness {witness}")
+            case _:
+                return
+
+    go(witness)
+    return result
