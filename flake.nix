@@ -36,12 +36,15 @@
             propagatedBuildInputs = [
               python-pyk
               python.pkgs.setuptools
+              python.pkgs.networkx
             ];
             postInstall = ''
               substituteInPlace $out/lib/*/site-packages/kaipy/kcommands.py \
                 --replace "\"kompile\"" "\"${k}/bin/kompile\""
               substituteInPlace $out/lib/*/site-packages/kaipy/kcommands.py \
                 --replace "\"kprove\"" "\"${k}/bin/kprove\""
+              substituteInPlace $out/lib/*/site-packages/kaipy/kcommands.py \
+                --replace "\"krun\"" "\"${k}/bin/krun\""
               substituteInPlace $out/lib/*/site-packages/kaipy/kcommands.py \
                 --replace "\"kore-rpc\"" "\"${kore-rpc}/bin/kore-rpc\""
             '';

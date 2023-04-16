@@ -21,8 +21,8 @@ ${IMP_TIMESTAMP}: lang/imp/imp.k
 run-sum: ${IMP_TIMESTAMP}
 	krun --definition ${IMP_KOMPILED_DIR}/imp-kompiled/ -cARGS="ListItem(5)" ./lang/imp/sum.imp
 
-.PHONY: test-imp
-test-imp: ${IMP_TIMESTAMP}
+.PHONY: test-imp.sum
+test-imp.sum: ${IMP_TIMESTAMP}
 	kaipy --definition ${IMP_KOMPILED_DIR}/imp-kompiled/ analyze --input ./lang/imp/sum.imp
 
 .PHONY: clean
