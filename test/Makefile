@@ -21,9 +21,14 @@ ${IMP_TIMESTAMP}: lang/imp/imp.k
 run-sum: ${IMP_TIMESTAMP}
 	krun --definition ${IMP_KOMPILED_DIR}/imp-kompiled/ -cARGS="ListItem(5)" ./lang/imp/sum.imp
 
+IMP_ANALYZER := ${IMP_KOMPILED_DIR}/analyzer.json
+
+${IMP_ANALYZER}: ${IMP_TIMESTAMP}
+	kaipy --definition ${IMP_KOMPILED_DIR}/imp-kompiled/ generate-analyzer --analyzer ${IMP_ANALYZER}
+
 .PHONY: test-imp.sum
-test-imp.sum: ${IMP_TIMESTAMP}
-	kaipy --definition ${IMP_KOMPILED_DIR}/imp-kompiled/ analyze --input ./lang/imp/sum.imp
+test-imp.sum: ${IMP_TIMESTAMP} ${IMP_ANALYZER}
+	kaipy --definition ${IMP_KOMPILED_DIR}/imp-kompiled/ analyze --analyzer ${IMP_ANALYZER} --input ./lang/imp/sum.imp
 
 .PHONY: clean
 clean:

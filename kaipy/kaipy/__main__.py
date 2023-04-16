@@ -1,6 +1,7 @@
 import argparse
 import logging
 import sys
+import json
 import argparse
 from dataclasses import dataclass
 
@@ -14,7 +15,8 @@ from typing import (
     Iterable,
     Optional,
     IO,
-    List
+    List,
+    Dict
 )
 
 
@@ -28,6 +30,7 @@ from .kore_utils import (
     free_evars_of_pattern,
     get_fresh_evars_with_sorts,
     rename_vars,
+    axiom_uuid,
     axiom_label,
 )
 
@@ -47,20 +50,7 @@ def get_input_kore(definition_dir: Path, program: Path) -> Kore.Pattern:
     assert parser.eof
     return res
 
-def create_argument_parser() -> argparse.ArgumentParser:
-    argument_parser = argparse.ArgumentParser(
-        prog="kaipy",
-        description="A K abstract interpreter"
-    )
-    argument_parser.add_argument('-d', '--definition', required=True)
-
-    subparsers = argument_parser.add_subparsers(dest='command')
-    
-    subparser_analyze = subparsers.add_parser('analyze', help='Analyze given input program')
-    subparser_analyze.add_argument('--input', required=True)
-    return argument_parser
-
-def may_transit(rs: ReachabilitySystem, patt_from: Kore.Pattern, patt_to: Optional[Kore.Pattern], axiom: Kore.Rewrites) -> bool:
+def may_transit(rs: ReachabilitySystem, patt_from: Kore.Pattern, axiom: Kore.Rewrites) -> bool:
     vars_to_rename = list(free_evars_of_pattern(axiom.left))
     vars_to_avoid = vars_to_rename + list(free_evars_of_pattern(patt_from))
     new_vars = get_fresh_evars_with_sorts(avoid=list(vars_to_avoid), sorts=list(map(lambda ev: ev.sort, vars_to_rename)))
@@ -82,6 +72,58 @@ def may_transit(rs: ReachabilitySystem, patt_from: Kore.Pattern, patt_to: Option
     #print(f"May transit from {patt_from} using {axiom} (simplification: {lhs_match}) ")
     return True
 
+@dataclass(frozen=True)
+class SemanticsPreGraph:
+    @dataclass(frozen=True)
+    class Node:
+        pattern: Kore.Pattern
+        original_rule_label: str
+        applicable_rules: List[str]
+
+        # @property
+        # def json(self) -> str:
+        #     return json.dumps(self.dict, sort_keys=True)
+        
+        @property
+        def dict(self) -> Dict[str, Any]:
+            return {
+                'pattern': self.pattern.json,
+                'original_rule_label': self.original_rule_label,
+                'applicable_rules': self.applicable_rules,
+            }
+        
+        @staticmethod
+        def from_dict(dct: Dict[str, Any]):
+            return SemanticsPreGraph.Node(dct['pattern'], dct['original_rule_label'], dct['applicable_rules'])
+
+    
+    nodes: List[Node]
+
+    @staticmethod
+    def from_dict(dct: Dict[str, Any]):
+        return SemanticsPreGraph([SemanticsPreGraph.Node.from_dict(n) for n in dct['nodes']])
+
+def compute_semantics_pregraph(rs: ReachabilitySystem) -> SemanticsPreGraph:
+    nodes: List[SemanticsPreGraph.Node] = []
+
+    for axiom in rs.rewrite_rules:
+        match axiom:
+            case Kore.Axiom(_, Kore.Rewrites(_, lhs, _), _):
+                pattern: Kore.Pattern = lhs
+                original_rule_label: str = axiom_label(axiom)
+                applicable_rules: List[str] = []
+                for rule_to_apply in rs.rewrite_rules:
+                    match rule_to_apply:
+                        case Kore.Axiom(_, Kore.Rewrites(_, _, _) as r, _):
+                            if may_transit(rs, pattern, r):
+                                applicable_rule: str = axiom_label(rule_to_apply)
+                                print(f"May transit from {original_rule_label} using {applicable_rule} ")
+                                applicable_rules.append(applicable_rule)
+                nodes.append(SemanticsPreGraph.Node(pattern, original_rule_label, applicable_rules))
+
+    return SemanticsPreGraph(nodes)
+        
+
 class SCFG:
     rs: ReachabilitySystem
     graph: nx.Graph
@@ -95,35 +137,44 @@ class SCFG:
     class Edge:
         axiom: Kore.Axiom
 
-    # This is like a preprocessing step for the semantics.
-    # Maybe we can have a command 'generate-compiler', 'generate-analyzer' or 'analyze-semantics'
-    # which stores the result of this analysis into a Json file.
-    # This currently takes a few minutes for IMP.
     def __init__(self, rs: ReachabilitySystem):
         self.rs = rs
         self.graph = nx.Graph()
-        # Add nodes
-        for a in rs.rewrite_rules:
-            match a:
-                case Kore.Axiom(_, Kore.Rewrites(_, lhs, _), _):
-                    self.graph.add_node(self.Node(lhs, axiom_label(a)))
-        # Add edges
-        for node_from in self.graph.nodes:
-            for axiom in rs.rewrite_rules:
-                match axiom:
-                    case Kore.Axiom(_, Kore.Rewrites(_, _, _) as r, _):
-                        if may_transit(self.rs, node_from.pattern, None, r):
-                            print(f"May transit from {node_from.original_rule_label} using {axiom_label(axiom)} ")
-                            #for node_to in self.graph.nodes:
-
-                            #print("(may transit)")
 
 
-def analyze(rs: ReachabilitySystem, args):
+def analyze(rs: ReachabilitySystem, args) -> int:
+    with open(args['analyzer'], mode='r') as fr:
+        jsa = json.load(fr)
+    spg: SemanticsPreGraph = SemanticsPreGraph.from_dict(jsa)
     input_kore = get_input_kore(Path(args['definition']), Path(args['input']))
     #print(input_kore)
     scfg = SCFG(rs)
     return 0
+
+def generate_analyzer(rs: ReachabilitySystem, args) -> int:
+    with open(args['analyzer'], mode="w") as fw:
+        semantics_pregraph = compute_semantics_pregraph(rs)
+        fw.write(json.dumps(semantics_pregraph))
+    return 0
+
+def create_argument_parser() -> argparse.ArgumentParser:
+    argument_parser = argparse.ArgumentParser(
+        prog="kaipy",
+        description="A K abstract interpreter"
+    )
+    argument_parser.add_argument('-d', '--definition', required=True)
+
+    subparsers = argument_parser.add_subparsers(dest='command')
+    
+    subparser_generate_analyzer = subparsers.add_parser('generate-analyzer', help='Create an analyzer from given semantics')
+    subparser_generate_analyzer.add_argument('--analyzer', required=True)
+
+    subparser_analyze = subparsers.add_parser('analyze', help='Analyze given input program')
+    subparser_analyze.add_argument('--analyzer', required=True)
+    subparser_analyze.add_argument('--input', required=True)
+
+    return argument_parser
+
 
 def main():
     argument_parser = create_argument_parser()
@@ -143,6 +194,8 @@ def main():
 
         if args['command'] == 'analyze':
             retval = analyze(rs, args)
+        elif args['command'] == 'generate-analyzer':
+            retval = generate_analyzer(rs, args)
         else:
             retval = 1
     
