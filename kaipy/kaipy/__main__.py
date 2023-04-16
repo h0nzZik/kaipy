@@ -16,7 +16,9 @@ from typing import (
     Optional,
     IO,
     List,
-    Dict
+    Dict,
+    Set,
+    Tuple,
 )
 
 
@@ -132,7 +134,7 @@ class SCFG:
     class Node:
         pattern: Kore.Pattern
         original_rule_label: str
-        applicable_rules: List[Kore.Axiom]
+        applicable_rules: Tuple[Kore.Axiom,...]
     
     @dataclass(frozen=True)
     class Edge:
@@ -142,7 +144,7 @@ class SCFG:
         self.rs = rs
         self.graph = nx.Graph()
         for node in spg.nodes:
-            applicable_rules: List[Kore.Axiom] = [rs.rule_by_id(ruleid) for ruleid in node.applicable_rules]
+            applicable_rules: Tuple[Kore.Axiom,...] = tuple(rs.rule_by_id(ruleid) for ruleid in node.applicable_rules)
             self.graph.add_node(SCFG.Node(node.pattern, node.original_rule_label, applicable_rules))
 
 def analyze(rs: ReachabilitySystem, args) -> int:
