@@ -132,15 +132,18 @@ class SCFG:
     class Node:
         pattern: Kore.Pattern
         original_rule_label: str
+        applicable_rules: List[Kore.Axiom]
     
     @dataclass(frozen=True)
     class Edge:
         axiom: Kore.Axiom
 
-    def __init__(self, rs: ReachabilitySystem):
+    def __init__(self, rs: ReachabilitySystem, spg: SemanticsPreGraph):
         self.rs = rs
         self.graph = nx.Graph()
-
+        for node in spg.nodes:
+            applicable_rules: List[Kore.Axiom] = [rs.rule_by_id(ruleid) for ruleid in node.applicable_rules]
+            self.graph.add_node(SCFG.Node(node.pattern, node.original_rule_label, applicable_rules))
 
 def analyze(rs: ReachabilitySystem, args) -> int:
     with open(args['analyzer'], mode='r') as fr:
@@ -148,7 +151,8 @@ def analyze(rs: ReachabilitySystem, args) -> int:
     spg: SemanticsPreGraph = SemanticsPreGraph.from_dict(jsa)
     input_kore = get_input_kore(Path(args['definition']), Path(args['input']))
     #print(input_kore)
-    scfg = SCFG(rs)
+    scfg = SCFG(rs, spg)
+    print("SCFG constructed.")
     return 0
 
 def generate_analyzer(rs: ReachabilitySystem, args) -> int:

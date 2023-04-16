@@ -35,7 +35,7 @@ from pyk.kore.syntax import (
 
 from .kcommands import KORE_RPC_COMMAND
 from .kore_utils import (
-    rewrite_axioms, get_symbol_sort, get_top_cell_initializer
+    rewrite_axioms, get_symbol_sort, get_top_cell_initializer, axiom_label
 )
 
 class KoreClientServer:
@@ -116,3 +116,9 @@ class ReachabilitySystem:
     @cached_property
     def rewrite_rules(self) -> List[Axiom]:
         return list(rewrite_axioms(self.definition, self.main_module_name))
+    
+    def rule_by_id(self, ruleid: str) -> Axiom:
+        for axiom in self.rewrite_rules:
+            if axiom_label(axiom) == ruleid:
+                return axiom
+        raise ValueError(f"Axiom with id {ruleid} not found.")
