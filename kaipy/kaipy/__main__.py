@@ -10,6 +10,7 @@ from pyk.kore.parser import KoreParser
 import pyk.kore.syntax as Kore
 
 from .kcommands import KRUN_COMMAND
+from .ReachabilitySystem import ReachabilitySystem
 
 def get_input_kore(definition_dir: Path, program: Path) -> Kore.Pattern:
     result = krun._krun(
@@ -40,7 +41,7 @@ def create_argument_parser() -> argparse.ArgumentParser:
     subparser_analyze.add_argument('--input', required=True)
     return argument_parser
 
-def analyze(args):
+def analyze(rs: ReachabilitySystem, args):
     input_kore = get_input_kore(Path(args['definition']), Path(args['input']))
     print(input_kore)
     return 0
@@ -55,10 +56,16 @@ def main():
     logging.getLogger('pyk.kast.inner').disabled = True 
     
 
-    if args['command'] == 'analyze':
-        retval = analyze(args)
-    else:
-        retval = 1
+    with ReachabilitySystem(
+        definition_dir=Path(args['definition']), 
+        kore_rpc_args=(), 
+        connect_to_port=None,
+        ) as rs:
+
+        if args['command'] == 'analyze':
+            retval = analyze(rs, args)
+        else:
+            retval = 1
     
     sys.exit(retval)
     
