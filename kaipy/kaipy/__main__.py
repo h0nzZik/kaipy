@@ -4,6 +4,7 @@ import sys
 import json
 import argparse
 from dataclasses import dataclass
+import frozendict
 
 from pathlib import Path
 import networkx as nx # type: ignore
@@ -19,6 +20,9 @@ from typing import (
     Dict,
     Set,
     Tuple,
+    Mapping,
+    Union,
+    Callable,
 )
 
 
@@ -35,6 +39,7 @@ from .kore_utils import (
     axiom_uuid,
     axiom_label,
     extract_equalities_from_witness,
+    some_subpatterns_of,
 )
 
 def get_input_kore(definition_dir: Path, program: Path) -> Kore.Pattern:
@@ -137,10 +142,9 @@ def compute_semantics_pregraph(rs: ReachabilitySystem) -> SemanticsPreGraph:
 
     return SemanticsPreGraph(nodes)
 
-
-@dataclass
+@dataclass(frozen=True)
 class Substitution:
-    mapping: Dict[Kore.EVar, Kore.Pattern]
+    mapping: Mapping[Kore.EVar, Kore.Pattern]
 
 # The graph on which we do the analysis
 class SCFG:
@@ -154,6 +158,7 @@ class SCFG:
     @dataclass
     class NodeRuleInfo:
         substitutions: Set[Substitution]
+        new_substitutions: Set[Substitution]
 
     rs: ReachabilitySystem
     nodes: Set[Node]    
@@ -165,11 +170,11 @@ class SCFG:
         self.graph = nx.Graph()
         self.nodes = {SCFG.Node(node.pattern, node.original_rule_label, tuple(node.applicable_rules)) for node in spg.nodes }
         self.node_rule_info = {}
-        #for node in spg.nodes:
-        #    #applicable_rules: Tuple[Kore.Axiom,...] = tuple(rs.rule_by_id(ruleid) for ruleid in node.applicable_rules)
-        #    applicable_rules = node.applicable_rules
+        for n in self.nodes:
+            for rl in n.applicable_rules:
+                self.node_rule_info[(n,rl)] = SCFG.NodeRuleInfo(set(), set())
     
-    def break_pattern(self, pattern: Kore.Pattern):
+    def break_pattern(self, pattern: Kore.Pattern, normalize: Callable[[Substitution],Substitution]):
         for node in self.nodes:
             for ruleid in node.applicable_rules:
                 rule: Kore.Axiom = self.rs.rule_by_id(ruleid)
@@ -180,12 +185,33 @@ class SCFG:
                             continue
                         print(f"{node.original_rule_label}.{ruleid}:")
                         eqs = extract_equalities_from_witness({ v.name for v in free_evars_of_pattern(rewrites)}, m)
-                        print(self.rs.kprint.kore_to_pretty(m))
+                        #print(self.rs.kprint.kore_to_pretty(m))
                         
-                        substitution = Substitution(eqs)
-                        eqs_pretty = dict((k,self.rs.kprint.kore_to_pretty(v)) for k,v in eqs.items())
-                        print(f"eqs_pretty: {eqs_pretty}")
+                        substitution = Substitution(frozendict.frozendict(eqs))
+                        normalized_substitution = normalize(substitution)
+                        if normalized_substitution not in self.node_rule_info[(node, ruleid)].substitutions:
+                            print(f"New substitution: {normalized_substitution}")
+                            self.node_rule_info[(node, ruleid)].substitutions.add(normalized_substitution)
+                            self.node_rule_info[(node, ruleid)].new_substitutions.add(normalized_substitution)
+                        #eqs_pretty = dict((k,self.rs.kprint.kore_to_pretty(v)) for k,v in eqs.items())
+                        #print(f"eqs_pretty: {eqs_pretty}")
 
+    def choose(self) -> Optional[Tuple[Node,str,Substitution]]:
+        for (node, ruleid),nri in self.node_rule_info.items():
+            if list(nri.new_substitutions) != []:
+                substitution = list(nri.new_substitutions)[0]
+                nri.new_substitutions.remove(substitution)
+                return (node, ruleid, substitution)
+        return None
+
+def make_normalizer(pattern: Kore.Pattern) -> Callable[[Substitution],Substitution]:
+    subpatterns = some_subpatterns_of(pattern)
+    #print(subpatterns)
+
+    def f(s: Substitution):
+        return Substitution(frozendict.frozendict({k : v for k,v in s.mapping.items() if v in subpatterns}))
+
+    return f
 
 def analyze(rs: ReachabilitySystem, args) -> int:
     with open(args['analyzer'], mode='r') as fr:
@@ -196,7 +222,8 @@ def analyze(rs: ReachabilitySystem, args) -> int:
     input_kore_renamed: Kore.Pattern = rename_vars(compute_renaming(input_kore, list(rs.rules_variables)), input_kore)
     #print(input_kore)
     scfg = SCFG(rs, spg)
-    scfg.break_pattern(input_kore_renamed)
+    normalize = make_normalizer(input_kore_renamed)
+    scfg.break_pattern(input_kore_renamed, normalize=normalize)
     print("SCFG constructed.")
     return 0
 

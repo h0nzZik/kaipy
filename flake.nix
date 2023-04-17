@@ -37,6 +37,7 @@
               python-pyk
               python.pkgs.setuptools
               python.pkgs.networkx
+              python.pkgs.frozendict
             ];
             postInstall = ''
               substituteInPlace $out/lib/*/site-packages/kaipy/kcommands.py \
