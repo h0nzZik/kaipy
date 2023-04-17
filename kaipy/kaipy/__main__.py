@@ -222,18 +222,8 @@ def make_normalizer(pattern: Kore.Pattern) -> Callable[[Substitution],Substituti
 
     return f
 
-def analyze(rs: ReachabilitySystem, args) -> int:
-    with open(args['analyzer'], mode='r') as fr:
-        jsa = json.load(fr)
-    spg: SemanticsPreGraph = SemanticsPreGraph.from_dict(jsa)
-    input_kore: Kore.Pattern = get_input_kore(Path(args['definition']), Path(args['input']))
-
-    normalize = make_normalizer(input_kore)
-    #vars_to_avoid = list(rs.rules_variables)
-    #input_kore_renamed: Kore.Pattern = rename_vars(compute_renaming(input_kore, vars_to_avoid), input_kore)
-    #print(input_kore)
+def perform_analysis(rs: ReachabilitySystem, spg, normalize, input_kore):
     scfg = SCFG(rs, spg)
-    print("SCFG constructed.")
     scfg.break_pattern(input_kore, normalize=normalize)
     while(True):
         x = scfg.choose()
@@ -251,6 +241,26 @@ def analyze(rs: ReachabilitySystem, args) -> int:
         for new_pattern in next_patterns:
             #print("Breaking a pattern")
             scfg.break_pattern(new_pattern, normalize=normalize)
+    return scfg
+
+def print_analyze_results(scfg: SCFG):
+    for node in scfg.nodes:
+        for ruleid in node.applicable_rules:
+            ri = scfg.node_rule_info[(node, ruleid)]
+            print(f"{node.original_rule_label}/{ruleid}")
+            for sub in ri.substitutions:
+                print(f"  {sub}")
+
+
+def analyze(rs: ReachabilitySystem, args) -> int:
+    with open(args['analyzer'], mode='r') as fr:
+        jsa = json.load(fr)
+    spg: SemanticsPreGraph = SemanticsPreGraph.from_dict(jsa)
+    input_kore: Kore.Pattern = get_input_kore(Path(args['definition']), Path(args['input']))
+
+    normalize = make_normalizer(input_kore)
+    scfg = perform_analysis(rs, spg, normalize, input_kore)
+    print_analyze_results(scfg)
 
     return 0
 
