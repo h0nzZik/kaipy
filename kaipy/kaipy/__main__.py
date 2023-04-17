@@ -296,10 +296,38 @@ def print_analyze_results(scfg: SCFG):
             if not has_empty:
                 print(f"{node.original_rule_label}/{ruleid}")
 
+def next_patterns_of(rs: ReachabilitySystem, pattern: Kore.Pattern):
+            exec_result = rs.kcs.client.execute(pattern, max_depth=1)
+            next_patterns: List[Kore.Pattern] = [exec_result.state.kore] if exec_result.next_states is None else [s.kore for s in exec_result.next_states]    
+            return next_patterns
+
+def get_lhs(rule: Kore.Axiom) -> Kore.Pattern:
+    match rule:
+        case Kore.Axiom(vs, Kore.Rewrites(sort, lhs, rhs) as rewrites, _):
+            return lhs
+    raise RuntimeError("Not a rewrite rule")
+
+def get_rhs(rule: Kore.Axiom) -> Kore.Pattern:
+    match rule:
+        case Kore.Axiom(vs, Kore.Rewrites(sort, lhs, rhs) as rewrites, _):
+            return rhs
+    raise RuntimeError("Not a rewrite rule")
+
+def can_self_loop(rs: ReachabilitySystem, rule: Kore.Axiom):
+    match rule:
+        case Kore.Axiom(vs, Kore.Rewrites(sort, lhs, rhs) as rewrites, _):
+            lhs_renamed: Kore.Pattern = rename_vars(compute_renaming(lhs, list(free_evars_of_pattern(lhs))), lhs)
+            if not is_bottom(rs.kcs.client.simplify(Kore.And(rs.top_sort, rhs, lhs))):
+                return True
+            return False
+
+    raise RuntimeError("Not a rewrite rule")
+
 def optimize(rs: ReachabilitySystem, scfg: SCFG):
     rewrite_axioms: List[Kore.Axiom] = []
     for node in scfg.nodes:
-        assert(len(node.applicable_rules) == 1)
+        if (len(node.applicable_rules) != 1):
+            print(f"warn: applicable rules = {node.applicable_rules}")
         for rule_id in node.applicable_rules:
             rule: Kore.Axiom = rs.rule_by_id(rule_id)
             match rule:
@@ -307,7 +335,38 @@ def optimize(rs: ReachabilitySystem, scfg: SCFG):
                     ri = scfg.node_rule_info[(node, rule_id)]
                     for sub in ri.substitutions:
                         rewrite_axioms.append(Kore.Axiom(vs, Kore.Rewrites(sort, Kore.And(sort, lhs, subst_to_pattern(rs, sub)), rhs),()))
+    
     print(f"Total axioms: {len(rewrite_axioms)} (original was: {len(rs.rewrite_rules)})")
+    looping_axioms: List[Kore.Axiom] = []
+    non_looping_axioms: List[Kore.Axiom] = []
+    for axiom in rewrite_axioms:
+        if can_self_loop(rs, axiom):
+            looping_axioms.append(axiom)
+        else:
+            non_looping_axioms.append(axiom)
+
+    while non_looping_axioms != []:
+        axiom = non_looping_axioms[0]
+        non_looping_axioms = non_looping_axioms[1:]
+        all_other_axioms = looping_axioms + non_looping_axioms
+        curr_lhs = get_lhs(axiom)
+        curr_rhs = get_rhs(axiom)
+        for other_axiom in all_other_axioms:
+            other_lhs = get_lhs(other_axiom)
+            other_rhs = get_rhs(other_axiom)
+            other_lhs_renaming = compute_renaming(other_lhs, list(free_evars_of_pattern(curr_rhs)))
+            other_lhs_renamed: Kore.Pattern = rename_vars(other_lhs_renaming, other_lhs)
+            simplified_conj = rs.kcs.client.simplify(Kore.And(rs.top_sort, curr_rhs, other_lhs))
+            if not is_bottom(simplified_conj):
+                eqs = extract_equalities_from_witness({ v.name for v in free_evars_of_pattern(curr_lhs)}, simplified_conj)
+                print(f"Axiom1 lhs: {rs.kprint.kore_to_pretty(curr_lhs)}")
+                print(f"Axiom1 rhs: {rs.kprint.kore_to_pretty(curr_rhs)}")
+                print(f"Axiom2 lhs {rs.kprint.kore_to_pretty(other_lhs)}")
+                print(f"Axiom2 rhs {rs.kprint.kore_to_pretty(other_rhs)}")
+                print(f"Equalities: {eqs}")
+                print("Exiting")
+                sys.exit(0)
+            pass
 
 
 def analyze(rs: ReachabilitySystem, args) -> int:
@@ -320,6 +379,7 @@ def analyze(rs: ReachabilitySystem, args) -> int:
     normalize = make_normalizer(input_kore_simplified)
     scfg = perform_analysis(rs, spg, normalize, input_kore_simplified)
     print_analyze_results(scfg)
+    optimize(rs, scfg)
 
     return 0
 
