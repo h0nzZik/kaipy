@@ -102,14 +102,14 @@ class SemanticsPreGraph:
         @property
         def dict(self) -> Dict[str, Any]:
             return {
-                'pattern': self.pattern.json,
+                'pattern': self.pattern.dict,
                 'original_rule_label': self.original_rule_label,
                 'applicable_rules': self.applicable_rules,
             }
         
         @staticmethod
         def from_dict(dct: Dict[str, Any]):
-            return SemanticsPreGraph.Node(dct['pattern'], dct['original_rule_label'], dct['applicable_rules'])
+            return SemanticsPreGraph.Node(Kore.Pattern.from_dict(dct['pattern']), dct['original_rule_label'], dct['applicable_rules'])
 
     
     nodes: List[Node]
@@ -146,6 +146,13 @@ def compute_semantics_pregraph(rs: ReachabilitySystem) -> SemanticsPreGraph:
 class Substitution:
     mapping: Mapping[Kore.EVar, Kore.Pattern]
 
+
+def subst_to_pattern(rs: ReachabilitySystem, subst: Substitution) -> Kore.Pattern:
+    result: Kore.Pattern = Kore.Top(rs.top_sort)
+    for lhs,rhs in subst.mapping.items():
+        result = Kore.And(rs.top_sort, result, Kore.Equals(lhs.sort, rs.top_sort, lhs, rhs))
+    return result
+
 # The graph on which we do the analysis
 class SCFG:
 
@@ -168,19 +175,21 @@ class SCFG:
     def __init__(self, rs: ReachabilitySystem, spg: SemanticsPreGraph):
         self.rs = rs
         self.graph = nx.Graph()
-        self.nodes = {SCFG.Node(node.pattern, node.original_rule_label, tuple(node.applicable_rules)) for node in spg.nodes }
+        self.nodes = {SCFG.Node(pattern=node.pattern, original_rule_label=node.original_rule_label, applicable_rules=tuple(node.applicable_rules)) for node in spg.nodes }
         self.node_rule_info = {}
         for n in self.nodes:
             for rl in n.applicable_rules:
                 self.node_rule_info[(n,rl)] = SCFG.NodeRuleInfo(set(), set())
     
     def break_pattern(self, pattern: Kore.Pattern, normalize: Callable[[Substitution],Substitution]):
+        input_kore_renamed: Kore.Pattern = rename_vars(compute_renaming(pattern, list(self.rs.rules_variables)), pattern)
+        print(f"Breaking: {input_kore_renamed.text}")
         for node in self.nodes:
             for ruleid in node.applicable_rules:
                 rule: Kore.Axiom = self.rs.rule_by_id(ruleid)
                 match rule:
                     case Kore.Axiom(_, Kore.Rewrites(_, lhs, _) as rewrites, _):
-                        m = compute_conjunction(self.rs, pattern, lhs)
+                        m = compute_conjunction(self.rs, input_kore_renamed, lhs)
                         if is_bottom(m):
                             continue
                         print(f"{node.original_rule_label}.{ruleid}:")
@@ -205,8 +214,8 @@ class SCFG:
         return None
 
 def make_normalizer(pattern: Kore.Pattern) -> Callable[[Substitution],Substitution]:
-    subpatterns = some_subpatterns_of(pattern)
-    #print(subpatterns)
+    subpatterns = [s for s in some_subpatterns_of(pattern) if type(s) is not Kore.EVar]
+    print(subpatterns)
 
     def f(s: Substitution):
         return Substitution(frozendict.frozendict({k : v for k,v in s.mapping.items() if v in subpatterns}))
@@ -219,12 +228,30 @@ def analyze(rs: ReachabilitySystem, args) -> int:
     spg: SemanticsPreGraph = SemanticsPreGraph.from_dict(jsa)
     input_kore: Kore.Pattern = get_input_kore(Path(args['definition']), Path(args['input']))
 
-    input_kore_renamed: Kore.Pattern = rename_vars(compute_renaming(input_kore, list(rs.rules_variables)), input_kore)
+    normalize = make_normalizer(input_kore)
+    #vars_to_avoid = list(rs.rules_variables)
+    #input_kore_renamed: Kore.Pattern = rename_vars(compute_renaming(input_kore, vars_to_avoid), input_kore)
     #print(input_kore)
     scfg = SCFG(rs, spg)
-    normalize = make_normalizer(input_kore_renamed)
-    scfg.break_pattern(input_kore_renamed, normalize=normalize)
     print("SCFG constructed.")
+    scfg.break_pattern(input_kore, normalize=normalize)
+    while(True):
+        x = scfg.choose()
+        if x is None:
+            return 0
+        (node,ruleid,substitution) = x
+        print(f"Choosing node {node.original_rule_label}")
+        sp = subst_to_pattern(rs, substitution)
+        patt: Kore.Pattern = Kore.And(rs.top_sort, node.pattern, sp)
+        print(f"pattern: {patt.text}")
+        exec_result = rs.kcs.client.execute(pattern=patt, max_depth=1)
+        
+        next_patterns: List[Kore.Pattern] = [exec_result.state.kore] if exec_result.next_states is None else [s.kore for s in exec_result.next_states]
+        print(f"Has {len(next_patterns)} successors")
+        for new_pattern in next_patterns:
+            #print("Breaking a pattern")
+            scfg.break_pattern(new_pattern, normalize=normalize)
+
     return 0
 
 def generate_analyzer(rs: ReachabilitySystem, args) -> int:
@@ -255,7 +282,7 @@ def create_argument_parser() -> argparse.ArgumentParser:
 def main():
     argument_parser = create_argument_parser()
     args = vars(argument_parser.parse_args())
-    print(f"args: {args}")
+    #print(f"args: {args}")
     logging.basicConfig(encoding='utf-8', level=logging.DEBUG)
     logging.getLogger('pyk.kore.rpc').disabled = True
     logging.getLogger('pyk.ktool.kprint').disabled = True

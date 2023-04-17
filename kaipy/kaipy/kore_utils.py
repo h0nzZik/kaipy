@@ -192,7 +192,7 @@ def extract_equalities_from_witness(expected_vars : Set[str], witness : Kore.Pat
                 if type(r) is Kore.EVar and r.name in expected_vars:
                     result[r] = l
                     return
-                raise ValueError(f"Unexpected equality '{l} = {r}' in the witness {witness}")
+                #raise ValueError(f"Unexpected equality '{l} = {r}' in the witness {witness}")
             case _:
                 return
 

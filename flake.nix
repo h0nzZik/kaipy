@@ -2,7 +2,7 @@
   description = "An abstract interpreter based on the K framework";
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-    pyk.url = "github:runtimeverification/pyk/v0.1.238";
+    pyk.url = "github:runtimeverification/pyk/v0.1.239";
     k-framework.url = "github:runtimeverification/k/no-antileft";
     #k-haskell-backend.follows = "k-framework/haskell-backend";
     k-haskell-backend.url = "github:runtimeverification/haskell-backend/remove-rewrite-antileft";
