@@ -62,6 +62,14 @@ def rewrite_axioms(definition: Kore.Definition, main_module_name: str) -> Iterab
             case Kore.Axiom(_, Kore.Rewrites(_, _, _), _):
                 yield a
 
+def other_than_rewrite_axioms(definition: Kore.Definition, main_module_name: str) -> Iterable[Kore.Axiom]:
+    for a in axioms(definition, main_module_name):
+        match a:
+            case Kore.Axiom(_, Kore.Rewrites(_, _, _), _):
+                continue
+        yield a
+
+
 def get_symbol_decl_from_definition(definition: Kore.Definition, main_module_name: str, symbol_name: str) -> Kore.SymbolDecl:
     module_names = {main_module_name}.union(get_all_imported_module_names(definition, main_module_name))
     modules = map(lambda name: get_module_by_name(definition, name), module_names)

@@ -296,6 +296,19 @@ def print_analyze_results(scfg: SCFG):
             if not has_empty:
                 print(f"{node.original_rule_label}/{ruleid}")
 
+def optimize(rs: ReachabilitySystem, scfg: SCFG):
+    rewrite_axioms: List[Kore.Axiom] = []
+    for node in scfg.nodes:
+        assert(len(node.applicable_rules) == 1)
+        for rule_id in node.applicable_rules:
+            rule: Kore.Axiom = rs.rule_by_id(rule_id)
+            match rule:
+                case Kore.Axiom(vs, Kore.Rewrites(sort, lhs, rhs) as rewrites, _):
+                    ri = scfg.node_rule_info[(node, rule_id)]
+                    for sub in ri.substitutions:
+                        rewrite_axioms.append(Kore.Axiom(vs, Kore.Rewrites(sort, Kore.And(sort, lhs, subst_to_pattern(rs, sub)), rhs),()))
+    print(f"Total axioms: {len(rewrite_axioms)} (original was: {len(rs.rewrite_rules)})")
+
 
 def analyze(rs: ReachabilitySystem, args) -> int:
     with open(args['analyzer'], mode='r') as fr:
