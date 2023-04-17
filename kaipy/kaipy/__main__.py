@@ -183,7 +183,7 @@ class SCFG:
     
     def break_pattern(self, pattern: Kore.Pattern, normalize: Callable[[Substitution],Substitution]):
         input_kore_renamed: Kore.Pattern = rename_vars(compute_renaming(pattern, list(self.rs.rules_variables)), pattern)
-        print(f"Breaking {self.rs.kprint.kore_to_pretty(input_kore_renamed)}")
+        #print(f"Breaking {self.rs.kprint.kore_to_pretty(input_kore_renamed)}")
         #print(f"Breaking: {input_kore_renamed.text}")
         for node in self.nodes:
             for ruleid in node.applicable_rules:
@@ -194,7 +194,7 @@ class SCFG:
                         if is_bottom(m):
                             continue
                         print(f"{node.original_rule_label}.{ruleid}:")
-                        print(f"Matched rule's lhs: {self.rs.kprint.kore_to_pretty(lhs)}")
+                        #print(f"Matched rule's lhs: {self.rs.kprint.kore_to_pretty(lhs)}")
                         eqs = extract_equalities_from_witness({ v.name for v in free_evars_of_pattern(rewrites)}, m)
                         #print(self.rs.kprint.kore_to_pretty(m))
                         
@@ -205,10 +205,10 @@ class SCFG:
                             print(f"New substitution: {normalized_substitution_pretty}")
                             self.node_rule_info[(node, ruleid)].substitutions.add(normalized_substitution)
                             self.node_rule_info[(node, ruleid)].new_substitutions.add(normalized_substitution)
-                            if not bool(normalized_substitution.mapping):
-                                print(f"**Empty substitution for pattern {self.rs.kprint.kore_to_pretty(input_kore_renamed)}")
-                                print(f"** Original substitution: {substitution}")
-                                print(f"** Conjunction: {self.rs.kprint.kore_to_pretty(m)}")
+                            #if not bool(normalized_substitution.mapping):
+                                #print(f"**Empty substitution for pattern {self.rs.kprint.kore_to_pretty(input_kore_renamed)}")
+                                #print(f"** Original substitution: {substitution}")
+                                #print(f"** Conjunction: {self.rs.kprint.kore_to_pretty(m)}")
                         #eqs_pretty = dict((k,self.rs.kprint.kore_to_pretty(v)) for k,v in eqs.items())
                         #print(f"eqs_pretty: {eqs_pretty}")
 
@@ -225,8 +225,10 @@ def is_linear_kseq_combination_of(subpatterns: List[Kore.Pattern], candidate: Ko
         return True,[candidate]
     
     match candidate:
-        case Kore.app('dotk', _, _):
+        case Kore.App('dotk', _, _):
             return (True,[])
+        case Kore.App('inj', _, (arg,)):
+            return is_linear_kseq_combination_of(subpatterns, arg)
         case Kore.App('kseq', _, (arg1, arg2)):
             b1,u1 = is_linear_kseq_combination_of(subpatterns, arg1)
             if not b1:
