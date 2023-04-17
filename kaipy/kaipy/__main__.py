@@ -183,6 +183,7 @@ class SCFG:
     
     def break_pattern(self, pattern: Kore.Pattern, normalize: Callable[[Substitution],Substitution]):
         input_kore_renamed: Kore.Pattern = rename_vars(compute_renaming(pattern, list(self.rs.rules_variables)), pattern)
+        print(f"Breaking {self.rs.kprint.kore_to_pretty(input_kore_renamed)}")
         #print(f"Breaking: {input_kore_renamed.text}")
         for node in self.nodes:
             for ruleid in node.applicable_rules:
@@ -193,19 +194,21 @@ class SCFG:
                         if is_bottom(m):
                             continue
                         print(f"{node.original_rule_label}.{ruleid}:")
+                        print(f"Matched rule's lhs: {self.rs.kprint.kore_to_pretty(lhs)}")
                         eqs = extract_equalities_from_witness({ v.name for v in free_evars_of_pattern(rewrites)}, m)
                         #print(self.rs.kprint.kore_to_pretty(m))
                         
                         substitution = Substitution(frozendict.frozendict(eqs))
                         normalized_substitution = normalize(substitution)
                         if normalized_substitution not in self.node_rule_info[(node, ruleid)].substitutions:
-                            print(f"New substitution: {normalized_substitution}")
+                            normalized_substitution_pretty = dict((k,self.rs.kprint.kore_to_pretty(v)) for k,v in normalized_substitution.mapping.items())
+                            print(f"New substitution: {normalized_substitution_pretty}")
                             self.node_rule_info[(node, ruleid)].substitutions.add(normalized_substitution)
                             self.node_rule_info[(node, ruleid)].new_substitutions.add(normalized_substitution)
                             if not bool(normalized_substitution.mapping):
-                                print(f"**Empty substitution for pattern {input_kore_renamed.text}")
+                                print(f"**Empty substitution for pattern {self.rs.kprint.kore_to_pretty(input_kore_renamed)}")
                                 print(f"** Original substitution: {substitution}")
-                                print(f"** Conjunction: {m}")
+                                print(f"** Conjunction: {self.rs.kprint.kore_to_pretty(m)}")
                         #eqs_pretty = dict((k,self.rs.kprint.kore_to_pretty(v)) for k,v in eqs.items())
                         #print(f"eqs_pretty: {eqs_pretty}")
 
@@ -217,12 +220,36 @@ class SCFG:
                 return (node, ruleid, substitution)
         return None
 
+def is_linear_kseq_combination_of(subpatterns: List[Kore.Pattern], candidate: Kore.Pattern) -> Tuple[bool, List[Kore.Pattern]]:
+    if candidate in subpatterns:
+        return True,[candidate]
+    
+    match candidate:
+        case Kore.app('dotk', _, _):
+            return (True,[])
+        case Kore.App('kseq', _, (arg1, arg2)):
+            b1,u1 = is_linear_kseq_combination_of(subpatterns, arg1)
+            if not b1:
+                return (False,[])
+            b2,u2 = is_linear_kseq_combination_of([s for s in subpatterns if s not in u1], arg2)
+            if not b2:
+                return (False,[])
+            return (True, (u1+u2))
+    return False,[]
+
 def make_normalizer(pattern: Kore.Pattern) -> Callable[[Substitution],Substitution]:
     subpatterns = [s for s in some_subpatterns_of(pattern) if type(s) is not Kore.EVar]
     #print(subpatterns)
 
+    def is_there(candidate: Kore.Pattern) -> bool:
+        b,u = is_linear_kseq_combination_of(subpatterns, candidate)
+        if b:
+            return True
+        print(f"Filtering out {candidate}")
+        return False
+
     def f(s: Substitution):
-        return Substitution(frozendict.frozendict({k : v for k,v in s.mapping.items() if v in subpatterns}))
+        return Substitution(frozendict.frozendict({k : v for k,v in s.mapping.items() if is_there(v)}))
 
     return f
 
@@ -274,8 +301,9 @@ def analyze(rs: ReachabilitySystem, args) -> int:
     spg: SemanticsPreGraph = SemanticsPreGraph.from_dict(jsa)
     input_kore: Kore.Pattern = get_input_kore(Path(args['definition']), Path(args['input']))
 
-    normalize = make_normalizer(input_kore)
-    scfg = perform_analysis(rs, spg, normalize, input_kore)
+    input_kore_simplified = rs.kcs.client.simplify(input_kore)
+    normalize = make_normalizer(input_kore_simplified)
+    scfg = perform_analysis(rs, spg, normalize, input_kore_simplified)
     print_analyze_results(scfg)
 
     return 0
