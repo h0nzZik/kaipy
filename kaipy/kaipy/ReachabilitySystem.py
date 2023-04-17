@@ -7,7 +7,8 @@ from typing import (
     Iterable,
     Optional,
     IO,
-    List
+    List,
+    Set,
 )
 
 from pyk.kast.outer import (
@@ -31,11 +32,12 @@ from pyk.kore.syntax import (
     Axiom,
     Definition,
     Sort,
+    EVar,
 )
 
 from .kcommands import KORE_RPC_COMMAND
 from .kore_utils import (
-    rewrite_axioms, get_symbol_sort, get_top_cell_initializer, axiom_label
+    rewrite_axioms, get_symbol_sort, get_top_cell_initializer, axiom_label, free_evars_of_pattern,
 )
 
 class KoreClientServer:
@@ -122,3 +124,11 @@ class ReachabilitySystem:
             if axiom_label(axiom) == ruleid:
                 return axiom
         raise ValueError(f"Axiom with id {ruleid} not found.")
+    
+    @cached_property
+    def rules_variables(self) -> Set[EVar]:
+        evars: Set[EVar] = set()
+        for axiom in self.rewrite_rules:
+            evars = evars.union(free_evars_of_pattern(axiom.pattern))
+        return evars
+

@@ -53,6 +53,18 @@ def get_input_kore(definition_dir: Path, program: Path) -> Kore.Pattern:
     assert parser.eof
     return res
 
+def compute_renaming(patt: Kore.Pattern, vars_to_avoid: List[Kore.EVar]) -> Dict[str, str]:
+    vars_to_rename = list(free_evars_of_pattern(patt))
+    vars_to_avoid = vars_to_rename + vars_to_avoid
+    new_vars = get_fresh_evars_with_sorts(avoid=list(vars_to_avoid), sorts=list(map(lambda ev: ev.sort, vars_to_rename)))
+    vars_fr : List[str] = list(map(lambda e: e.name, vars_to_rename))
+    vars_to : List[str] = list(map(lambda e: e.name, new_vars))
+    renaming = dict(zip(vars_fr, vars_to))
+    return renaming
+
+def compute_conjunction(rs: ReachabilitySystem, a: Kore.Pattern, b: Kore.Pattern) -> Kore.Pattern:
+    return rs.kcs.client.simplify(Kore.And(rs.top_sort, a, b))
+
 def compute_match(rs: ReachabilitySystem, patt_from: Kore.Pattern, axiom: Kore.Rewrites) -> Tuple[Kore.Pattern,Dict[str,str]]:
     vars_to_rename = list(free_evars_of_pattern(axiom.left))
     vars_to_avoid = vars_to_rename + list(free_evars_of_pattern(patt_from))
@@ -61,7 +73,7 @@ def compute_match(rs: ReachabilitySystem, patt_from: Kore.Pattern, axiom: Kore.R
     vars_to : List[str] = list(map(lambda e: e.name, new_vars))
     renaming = dict(zip(vars_fr, vars_to))
     axiom_left = rename_vars(renaming, axiom.left)
-    lhs_match = rs.kcs.client.simplify(Kore.And(rs.top_sort, patt_from, axiom_left))
+    lhs_match = compute_conjunction(rs, patt_from, axiom_left)
     return lhs_match,renaming
 
 def is_bottom(pattern: Kore.Pattern) -> bool:
@@ -163,24 +175,16 @@ class SCFG:
                 rule: Kore.Axiom = self.rs.rule_by_id(ruleid)
                 match rule:
                     case Kore.Axiom(_, Kore.Rewrites(_, lhs, _) as rewrites, _):
-                        m,renaming = compute_match(self.rs, pattern, rewrites)
+                        m = compute_conjunction(self.rs, pattern, lhs)
                         if is_bottom(m):
                             continue
-                        # Currently we rename variables in each rule as we try to apply it.
-                        # It would be much better if we instead renamed the (usually only one)
-                        # free variable of the input pattern (that is, ARGS for IMP).
-                        # Because the renaming we have may still cause problems, because if a rule has a variable ARGS,
-                        # it may be mapped to a term containing ARGS in the substitution...
-                        print(f"{node.original_rule_label}.{ruleid}: renaming {renaming}")
-                        eqs = extract_equalities_from_witness(set(renaming.values()), m)
-                        renaming_back = dict((v,k) for k,v in renaming.items())
+                        print(f"{node.original_rule_label}.{ruleid}:")
+                        eqs = extract_equalities_from_witness({ v.name for v in free_evars_of_pattern(rewrites)}, m)
                         print(self.rs.kprint.kore_to_pretty(m))
-                        eqs_renamed = dict((Kore.EVar(renaming_back[renamed_var.name], renamed_var.sort), pattern) for renamed_var, pattern in eqs.items())
-                        substitution = Substitution(eqs_renamed)
-                        print(f"eqs: {eqs}")
-                        eqs_pretty = dict((k,self.rs.kprint.kore_to_pretty(v)) for k,v in eqs_renamed.items())
+                        
+                        substitution = Substitution(eqs)
+                        eqs_pretty = dict((k,self.rs.kprint.kore_to_pretty(v)) for k,v in eqs.items())
                         print(f"eqs_pretty: {eqs_pretty}")
-                        #self.rs.kcs.client.implies()
 
 
 def analyze(rs: ReachabilitySystem, args) -> int:
@@ -188,9 +192,11 @@ def analyze(rs: ReachabilitySystem, args) -> int:
         jsa = json.load(fr)
     spg: SemanticsPreGraph = SemanticsPreGraph.from_dict(jsa)
     input_kore: Kore.Pattern = get_input_kore(Path(args['definition']), Path(args['input']))
+
+    input_kore_renamed: Kore.Pattern = rename_vars(compute_renaming(input_kore, list(rs.rules_variables)), input_kore)
     #print(input_kore)
     scfg = SCFG(rs, spg)
-    scfg.break_pattern(input_kore)
+    scfg.break_pattern(input_kore_renamed)
     print("SCFG constructed.")
     return 0
 
