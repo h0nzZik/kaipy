@@ -183,7 +183,7 @@ class SCFG:
     
     def break_pattern(self, pattern: Kore.Pattern, normalize: Callable[[Substitution],Substitution]):
         input_kore_renamed: Kore.Pattern = rename_vars(compute_renaming(pattern, list(self.rs.rules_variables)), pattern)
-        print(f"Breaking: {input_kore_renamed.text}")
+        #print(f"Breaking: {input_kore_renamed.text}")
         for node in self.nodes:
             for ruleid in node.applicable_rules:
                 rule: Kore.Axiom = self.rs.rule_by_id(ruleid)
@@ -202,6 +202,10 @@ class SCFG:
                             print(f"New substitution: {normalized_substitution}")
                             self.node_rule_info[(node, ruleid)].substitutions.add(normalized_substitution)
                             self.node_rule_info[(node, ruleid)].new_substitutions.add(normalized_substitution)
+                            if not bool(normalized_substitution.mapping):
+                                print(f"**Empty substitution for pattern {input_kore_renamed.text}")
+                                print(f"** Original substitution: {substitution}")
+                                print(f"** Conjunction: {m}")
                         #eqs_pretty = dict((k,self.rs.kprint.kore_to_pretty(v)) for k,v in eqs.items())
                         #print(f"eqs_pretty: {eqs_pretty}")
 
@@ -215,7 +219,7 @@ class SCFG:
 
 def make_normalizer(pattern: Kore.Pattern) -> Callable[[Substitution],Substitution]:
     subpatterns = [s for s in some_subpatterns_of(pattern) if type(s) is not Kore.EVar]
-    print(subpatterns)
+    #print(subpatterns)
 
     def f(s: Substitution):
         return Substitution(frozendict.frozendict({k : v for k,v in s.mapping.items() if v in subpatterns}))
@@ -228,12 +232,12 @@ def perform_analysis(rs: ReachabilitySystem, spg, normalize, input_kore):
     while(True):
         x = scfg.choose()
         if x is None:
-            return 0
+            return scfg
         (node,ruleid,substitution) = x
         print(f"Choosing node {node.original_rule_label}")
         sp = subst_to_pattern(rs, substitution)
         patt: Kore.Pattern = Kore.And(rs.top_sort, node.pattern, sp)
-        print(f"pattern: {patt.text}")
+        #print(f"pattern: {patt.text}")
         exec_result = rs.kcs.client.execute(pattern=patt, max_depth=1)
         
         next_patterns: List[Kore.Pattern] = [exec_result.state.kore] if exec_result.next_states is None else [s.kore for s in exec_result.next_states]
@@ -244,12 +248,24 @@ def perform_analysis(rs: ReachabilitySystem, spg, normalize, input_kore):
     return scfg
 
 def print_analyze_results(scfg: SCFG):
+    print("****** ANALYSIS RESULTS *********")
     for node in scfg.nodes:
         for ruleid in node.applicable_rules:
             ri = scfg.node_rule_info[(node, ruleid)]
             print(f"{node.original_rule_label}/{ruleid}")
             for sub in ri.substitutions:
                 print(f"  {sub}")
+    
+    print("States/rules without empty substitution")
+    for node in scfg.nodes:
+        for ruleid in node.applicable_rules:
+            ri = scfg.node_rule_info[(node, ruleid)]
+            has_empty = False
+            for sub in ri.substitutions:
+                if not bool(sub.mapping):
+                    has_empty = True
+            if not has_empty:
+                print(f"{node.original_rule_label}/{ruleid}")
 
 
 def analyze(rs: ReachabilitySystem, args) -> int:
