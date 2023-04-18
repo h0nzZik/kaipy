@@ -147,7 +147,13 @@ def compute_semantics_pregraph(rs: ReachabilitySystem) -> SemanticsPreGraph:
 class Substitution:
     mapping: Mapping[Kore.EVar, Kore.Pattern]
 
+def make_conjunction(rs: ReachabilitySystem, l: List[Kore.Pattern]) -> Kore.Pattern:
+    result: Kore.Pattern = Kore.Top(rs.top_sort)
+    for x in l:
+        result = Kore.And(rs.top_sort, result, x)
+    return result
 
+# TODO use make_conjunction
 def mapping_to_pattern(rs: ReachabilitySystem, m: Mapping[Kore.EVar, Kore.Pattern]) -> Kore.Pattern:
     result: Kore.Pattern = Kore.Top(rs.top_sort)
     for lhs,rhs in m.items():
@@ -375,24 +381,27 @@ def generate_analyzer(rs: ReachabilitySystem, args) -> int:
         fw.write(json.dumps(semantics_pregraph.dict))
     return 0
 
-def filter_out_predicates(phi: Kore.Pattern) -> Optional[Kore.Pattern]:
+def filter_out_predicates(phi: Kore.Pattern) -> Tuple[Optional[Kore.Pattern], List[Kore.Pattern]]:
     if issubclass(type(phi), Kore.MLPred):
-        return None
+        return None,[phi]
     match phi:
         case Kore.And(sort, left, right):
-            lf = filter_out_predicates(left)
-            rf = filter_out_predicates(right)
+            lf,ps1 = filter_out_predicates(left)
+            rf,ps2 = filter_out_predicates(right)
             if lf is None:
-                return rf
+                return rf,(ps1+ps2)
             if rf is None:
-                return lf
-            return Kore.And(sort, lf, rf)
+                return lf,(ps1+ps2)
+            return Kore.And(sort, lf, rf),(ps1+ps2)
         case _:
-            return phi
+            return phi,[]
 
+def get_predicates(phi: Kore.Pattern) -> List[Kore.Pattern]:
+    _, preds = filter_out_predicates(phi)
+    return preds
 
 def cleanup_pattern(rs: ReachabilitySystem, phi: Kore.Pattern) -> Kore.Pattern:
-    main_part = filter_out_predicates(phi)
+    main_part,_ = filter_out_predicates(phi)
     assert(main_part is not None)
     fvphi = free_evars_of_pattern(phi)
     eqs, rest = extract_equalities_and_rest_from_witness({v.name for v in fvphi}, phi)
@@ -429,21 +438,26 @@ def optimize(rs: ReachabilitySystem, rewrite_axioms: List[Kore.Axiom]):
             if not is_bottom(simplified_conj):
                 print(f"not bottom: {rs.kprint.kore_to_pretty(simplified_conj)}")
                 print(f"Axiom1 lhs: {rs.kprint.kore_to_pretty(curr_lhs)}")
-                print(f"Axiom1 rhs: {rs.kprint.kore_to_pretty(curr_rhs)}")
-                print(f"Axiom2 lhs {rs.kprint.kore_to_pretty(other_lhs_renamed)}")
+                #print(f"Axiom1 rhs: {rs.kprint.kore_to_pretty(curr_rhs)}")
+                #print(f"Axiom2 lhs {rs.kprint.kore_to_pretty(other_lhs_renamed)}")
                 print(f"Axiom2 rhs {rs.kprint.kore_to_pretty(other_rhs_renamed)}")
-                eqs1 = extract_equalities_from_witness({ v.name for v in free_evars_of_pattern(curr_lhs)}, simplified_conj)
-                print(f"lhs1 equalities: {eqs1}")
+                eqs1,rest1 = extract_equalities_and_rest_from_witness({ v.name for v in free_evars_of_pattern(curr_lhs)}, simplified_conj)
+                preds1 = get_predicates(rest1) if rest1 is not None else []
+                #print(f"lhs1 equalities: {eqs1}")
                 eqs2 = extract_equalities_from_witness({ v.name for v in free_evars_of_pattern(other_rhs_renamed)}, simplified_conj)
-                print(f"lhs1 equalities: {eqs2}")
+                #print(f"lhs1 equalities: {eqs2}")
                 # TODO new lhs has to have all the side conditions, not only equalities
                 # TODO we also should mark some nodes initial, during the analysis, and then during the optimization phase we can
                 #      maybe target only the reachable nodes from the initial ones...
-                new_lhs = rs.kcs.client.simplify(Kore.And(rs.top_sort, curr_lhs, mapping_to_pattern(rs, eqs1))) # FIXME I know this is not enough
+
+                preds1_conj = make_conjunction(rs, preds1)
+                print(f"preds1_conj: {rs.kprint.kore_to_pretty(preds1_conj)}")
+                new_lhs = rs.kcs.client.simplify(Kore.And(rs.top_sort, curr_lhs, Kore.And(rs.top_sort, mapping_to_pattern(rs, eqs1), preds1_conj)))
+                #new_lhs = rs.kcs.client.simplify(Kore.And(rs.top_sort, curr_lhs, mapping_to_pattern(rs, eqs1))) # FIXME I know this is not enough
                 new_rhs = rs.kcs.client.simplify(Kore.And(rs.top_sort, other_rhs_renamed, mapping_to_pattern(rs, eqs2)))
                 # After the simplification, the intermediate variables (from 'other_renaming') should disappear
-                print(f"New lhs {rs.kprint.kore_to_pretty(new_lhs)}")
-                print(f"New rhs {rs.kprint.kore_to_pretty(new_rhs)}")
+                #print(f"New lhs {rs.kprint.kore_to_pretty(new_lhs)}")
+                #print(f"New rhs {rs.kprint.kore_to_pretty(new_rhs)}")
                 new_lhs_clean = cleanup_pattern(rs, new_lhs)
                 new_rhs_clean = cleanup_pattern(rs, new_rhs)
                 print(f"New lhs (clean) {rs.kprint.kore_to_pretty(new_lhs_clean)}")
