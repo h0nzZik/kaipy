@@ -412,6 +412,45 @@ def cleanup_pattern(rs: ReachabilitySystem, phi: Kore.Pattern) -> Kore.Pattern:
         return evs2_p
     return Kore.And(rs.top_sort, rest, evs2_p)
 
+def combine_rules(rs: ReachabilitySystem, first_rule: Kore.Axiom, second_rule: Kore.Axiom) -> Optional[Kore.Axiom]:
+    curr_lhs = get_lhs(first_rule)
+    curr_rhs = get_rhs(first_rule)
+    other_lhs = get_lhs(second_rule)
+    other_rhs = get_rhs(second_rule)
+    other_renaming = compute_renaming(other_lhs, list(free_evars_of_pattern(curr_rhs)))
+    other_lhs_renamed: Kore.Pattern = rename_vars(other_renaming, other_lhs)
+    other_rhs_renamed: Kore.Pattern = rename_vars(other_renaming, other_rhs)
+    simplified_conj = rs.kcs.client.simplify(Kore.And(rs.top_sort, curr_rhs, other_lhs_renamed))
+    if is_bottom(simplified_conj):
+        return None
+    #print(f"not bottom: {rs.kprint.kore_to_pretty(simplified_conj)}")
+    #print(f"Axiom1 lhs: {rs.kprint.kore_to_pretty(curr_lhs)}")
+    #print(f"Axiom1 rhs: {rs.kprint.kore_to_pretty(curr_rhs)}")
+    #print(f"Axiom2 lhs {rs.kprint.kore_to_pretty(other_lhs_renamed)}")
+    #print(f"Axiom2 rhs {rs.kprint.kore_to_pretty(other_rhs_renamed)}")
+    eqs1,rest1 = extract_equalities_and_rest_from_witness({ v.name for v in free_evars_of_pattern(curr_lhs)}, simplified_conj)
+    preds1 = get_predicates(rest1) if rest1 is not None else []
+    #print(f"lhs1 equalities: {eqs1}")
+    eqs2 = extract_equalities_from_witness({ v.name for v in free_evars_of_pattern(other_rhs_renamed)}, simplified_conj)
+    #print(f"lhs1 equalities: {eqs2}")
+    # TODO new lhs has to have all the side conditions, not only equalities
+    # TODO we also should mark some nodes initial, during the analysis, and then during the optimization phase we can
+    #      maybe target only the reachable nodes from the initial ones...
+
+    preds1_conj = make_conjunction(rs, preds1)
+    #print(f"preds1_conj: {rs.kprint.kore_to_pretty(preds1_conj)}")
+    new_lhs = rs.kcs.client.simplify(Kore.And(rs.top_sort, curr_lhs, Kore.And(rs.top_sort, mapping_to_pattern(rs, eqs1), preds1_conj)))
+    #new_lhs = rs.kcs.client.simplify(Kore.And(rs.top_sort, curr_lhs, mapping_to_pattern(rs, eqs1))) # FIXME I know this is not enough
+    new_rhs = rs.kcs.client.simplify(Kore.And(rs.top_sort, other_rhs_renamed, mapping_to_pattern(rs, eqs2)))
+    # After the simplification, the intermediate variables (from 'other_renaming') should disappear
+    #print(f"New lhs {rs.kprint.kore_to_pretty(new_lhs)}")
+    #print(f"New rhs {rs.kprint.kore_to_pretty(new_rhs)}")
+    new_lhs_clean = cleanup_pattern(rs, new_lhs)
+    new_rhs_clean = cleanup_pattern(rs, new_rhs)
+    rewrite = Kore.Rewrites(rs.top_sort, new_lhs_clean, new_rhs_clean)
+    print(f"rewrite: {rs.kprint.kore_to_pretty(rewrite)}")
+    return Kore.Axiom((), rewrite, ())
+
 def optimize(rs: ReachabilitySystem, rewrite_axioms: List[Kore.Axiom]):
     print(f"Total axioms: {len(rewrite_axioms)} (original was: {len(rs.rewrite_rules)})")
     looping_axioms: List[Kore.Axiom] = []
@@ -423,48 +462,18 @@ def optimize(rs: ReachabilitySystem, rewrite_axioms: List[Kore.Axiom]):
             non_looping_axioms.append(axiom)
 
     while non_looping_axioms != []:
+        print(f"Non looping axioms: {len(non_looping_axioms)}")
         axiom = non_looping_axioms[0]
         non_looping_axioms = non_looping_axioms[1:]
         all_other_axioms = looping_axioms + non_looping_axioms
-        curr_lhs = get_lhs(axiom)
-        curr_rhs = get_rhs(axiom)
         for other_axiom in all_other_axioms:
-            other_lhs = get_lhs(other_axiom)
-            other_rhs = get_rhs(other_axiom)
-            other_renaming = compute_renaming(other_lhs, list(free_evars_of_pattern(curr_rhs)))
-            other_lhs_renamed: Kore.Pattern = rename_vars(other_renaming, other_lhs)
-            other_rhs_renamed: Kore.Pattern = rename_vars(other_renaming, other_rhs)
-            simplified_conj = rs.kcs.client.simplify(Kore.And(rs.top_sort, curr_rhs, other_lhs_renamed))
-            if not is_bottom(simplified_conj):
-                print(f"not bottom: {rs.kprint.kore_to_pretty(simplified_conj)}")
-                print(f"Axiom1 lhs: {rs.kprint.kore_to_pretty(curr_lhs)}")
-                #print(f"Axiom1 rhs: {rs.kprint.kore_to_pretty(curr_rhs)}")
-                #print(f"Axiom2 lhs {rs.kprint.kore_to_pretty(other_lhs_renamed)}")
-                print(f"Axiom2 rhs {rs.kprint.kore_to_pretty(other_rhs_renamed)}")
-                eqs1,rest1 = extract_equalities_and_rest_from_witness({ v.name for v in free_evars_of_pattern(curr_lhs)}, simplified_conj)
-                preds1 = get_predicates(rest1) if rest1 is not None else []
-                #print(f"lhs1 equalities: {eqs1}")
-                eqs2 = extract_equalities_from_witness({ v.name for v in free_evars_of_pattern(other_rhs_renamed)}, simplified_conj)
-                #print(f"lhs1 equalities: {eqs2}")
-                # TODO new lhs has to have all the side conditions, not only equalities
-                # TODO we also should mark some nodes initial, during the analysis, and then during the optimization phase we can
-                #      maybe target only the reachable nodes from the initial ones...
-
-                preds1_conj = make_conjunction(rs, preds1)
-                print(f"preds1_conj: {rs.kprint.kore_to_pretty(preds1_conj)}")
-                new_lhs = rs.kcs.client.simplify(Kore.And(rs.top_sort, curr_lhs, Kore.And(rs.top_sort, mapping_to_pattern(rs, eqs1), preds1_conj)))
-                #new_lhs = rs.kcs.client.simplify(Kore.And(rs.top_sort, curr_lhs, mapping_to_pattern(rs, eqs1))) # FIXME I know this is not enough
-                new_rhs = rs.kcs.client.simplify(Kore.And(rs.top_sort, other_rhs_renamed, mapping_to_pattern(rs, eqs2)))
-                # After the simplification, the intermediate variables (from 'other_renaming') should disappear
-                #print(f"New lhs {rs.kprint.kore_to_pretty(new_lhs)}")
-                #print(f"New rhs {rs.kprint.kore_to_pretty(new_rhs)}")
-                new_lhs_clean = cleanup_pattern(rs, new_lhs)
-                new_rhs_clean = cleanup_pattern(rs, new_rhs)
-                print(f"New lhs (clean) {rs.kprint.kore_to_pretty(new_lhs_clean)}")
-                print(f"New rhs (clean) {rs.kprint.kore_to_pretty(new_rhs_clean)}")
-                print("Exiting")
-                sys.exit(0)
-            pass
+            combined = combine_rules(rs, axiom, other_axiom)
+            if combined is None:
+                continue
+            if (can_self_loop(rs, combined)):
+                looping_axioms.append(combined)
+            else:
+                non_looping_axioms.append(combined)
     return 0
 
 def do_optimize(rs: ReachabilitySystem, args) -> int:
