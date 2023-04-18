@@ -412,12 +412,15 @@ def cleanup_pattern(rs: ReachabilitySystem, phi: Kore.Pattern) -> Kore.Pattern:
         return evs2_p
     return Kore.And(rs.top_sort, rest, evs2_p)
 
+# TODO duplication with combine_rules
 def rules_can_consecute(rs: ReachabilitySystem, first_rule: Kore.Axiom, second_rule: Kore.Axiom) -> bool:
+    curr_lhs = get_lhs(first_rule)
     curr_rhs = get_rhs(first_rule)
     other_lhs = get_lhs(second_rule)
     other_renaming = compute_renaming(other_lhs, list(free_evars_of_pattern(curr_rhs)))
     other_lhs_renamed: Kore.Pattern = rename_vars(other_renaming, other_lhs)
-    simplified_conj = rs.kcs.client.simplify(Kore.And(rs.top_sort, curr_rhs, other_lhs_renamed))
+    #simplified_conj = rs.kcs.client.simplify(Kore.And(rs.top_sort, curr_rhs, other_lhs_renamed))
+    simplified_conj = rs.kcs.client.simplify(Kore.And(rs.top_sort, Kore.And(rs.top_sort, curr_rhs, make_conjunction(rs, get_predicates(curr_lhs))), other_lhs_renamed))
     return not is_bottom(simplified_conj)
 
 def exactly_one_can_consecute(rs: ReachabilitySystem, axiom: Kore.Axiom, other: List[Kore.Axiom]) -> Optional[Kore.Axiom]:
@@ -439,7 +442,8 @@ def combine_rules(rs: ReachabilitySystem, first_rule: Kore.Axiom, second_rule: K
     other_renaming = compute_renaming(other_lhs, list(free_evars_of_pattern(curr_rhs)))
     other_lhs_renamed: Kore.Pattern = rename_vars(other_renaming, other_lhs)
     other_rhs_renamed: Kore.Pattern = rename_vars(other_renaming, other_rhs)
-    simplified_conj = rs.kcs.client.simplify(Kore.And(rs.top_sort, curr_rhs, other_lhs_renamed))
+    #simplified_conj = rs.kcs.client.simplify(Kore.And(rs.top_sort, curr_rhs, other_lhs_renamed))
+    simplified_conj = rs.kcs.client.simplify(Kore.And(rs.top_sort, Kore.And(rs.top_sort, curr_rhs, make_conjunction(rs, get_predicates(curr_lhs))), other_lhs_renamed))
     if is_bottom(simplified_conj):
         return None
     #print(f"not bottom: {rs.kprint.kore_to_pretty(simplified_conj)}")
@@ -459,15 +463,22 @@ def combine_rules(rs: ReachabilitySystem, first_rule: Kore.Axiom, second_rule: K
     preds1_conj = make_conjunction(rs, preds1)
     #print(f"preds1_conj: {rs.kprint.kore_to_pretty(preds1_conj)}")
     new_lhs = rs.kcs.client.simplify(Kore.And(rs.top_sort, curr_lhs, Kore.And(rs.top_sort, mapping_to_pattern(rs, eqs1), preds1_conj)))
+    if is_bottom(new_lhs):
+        print(f"Axiom1 lhs: {rs.kprint.kore_to_pretty(curr_lhs)}")
+        print(f"Axiom1 rhs: {rs.kprint.kore_to_pretty(curr_rhs)}")
+        print(f"Axiom2 lhs {rs.kprint.kore_to_pretty(other_lhs_renamed)}")
+        print(f"Axiom2 rhs {rs.kprint.kore_to_pretty(other_rhs_renamed)}")
+        raise RuntimeError("new_lhs is unexpectedly bottom.")
     #new_lhs = rs.kcs.client.simplify(Kore.And(rs.top_sort, curr_lhs, mapping_to_pattern(rs, eqs1))) # FIXME I know this is not enough
     new_rhs = rs.kcs.client.simplify(Kore.And(rs.top_sort, other_rhs_renamed, mapping_to_pattern(rs, eqs2)))
     # After the simplification, the intermediate variables (from 'other_renaming') should disappear
     #print(f"New lhs {rs.kprint.kore_to_pretty(new_lhs)}")
     #print(f"New rhs {rs.kprint.kore_to_pretty(new_rhs)}")
     new_lhs_clean = cleanup_pattern(rs, new_lhs)
+
     new_rhs_clean = cleanup_pattern(rs, new_rhs)
-    print(f"New lhs clean {rs.kprint.kore_to_pretty(new_lhs_clean)}")
-    print(f"New rhs clean {rs.kprint.kore_to_pretty(new_rhs_clean)}")
+    #print(f"New lhs clean {rs.kprint.kore_to_pretty(new_lhs_clean)}")
+    #print(f"New rhs clean {rs.kprint.kore_to_pretty(new_rhs_clean)}")
     rewrite = Kore.Rewrites(rs.top_sort, new_lhs_clean, new_rhs_clean)
     print(f"rewrite: {rs.kprint.kore_to_pretty(rewrite)}")
     return Kore.Axiom((), rewrite, ())
