@@ -420,14 +420,16 @@ def rules_can_consecute(rs: ReachabilitySystem, first_rule: Kore.Axiom, second_r
     simplified_conj = rs.kcs.client.simplify(Kore.And(rs.top_sort, curr_rhs, other_lhs_renamed))
     return not is_bottom(simplified_conj)
 
-def exactly_one_can_consecute(rs: ReachabilitySystem, axiom: Kore.Axiom, other: List[Kore.Axiom]) -> bool:
+def exactly_one_can_consecute(rs: ReachabilitySystem, axiom: Kore.Axiom, other: List[Kore.Axiom]) -> Optional[Kore.Axiom]:
     cnt = 0
+    the_one: Optional[Kore.Axiom] = None
     for a in other:
         if rules_can_consecute(rs, axiom, a):
             cnt = cnt + 1
             if cnt >= 2:
-                return False
-    return cnt == 1
+                return None
+            the_one = a
+    return the_one
 
 def combine_rules(rs: ReachabilitySystem, first_rule: Kore.Axiom, second_rule: Kore.Axiom) -> Optional[Kore.Axiom]:
     curr_lhs = get_lhs(first_rule)
@@ -464,9 +466,19 @@ def combine_rules(rs: ReachabilitySystem, first_rule: Kore.Axiom, second_rule: K
     #print(f"New rhs {rs.kprint.kore_to_pretty(new_rhs)}")
     new_lhs_clean = cleanup_pattern(rs, new_lhs)
     new_rhs_clean = cleanup_pattern(rs, new_rhs)
+    print(f"New lhs clean {rs.kprint.kore_to_pretty(new_lhs_clean)}")
+    print(f"New rhs clean {rs.kprint.kore_to_pretty(new_rhs_clean)}")
     rewrite = Kore.Rewrites(rs.top_sort, new_lhs_clean, new_rhs_clean)
     print(f"rewrite: {rs.kprint.kore_to_pretty(rewrite)}")
     return Kore.Axiom((), rewrite, ())
+
+def choose_axiom_with_only_single_successive_axiom(rs: ReachabilitySystem, looping_axioms, non_looping_axioms):
+    for axiom in non_looping_axioms:
+        other_axioms = looping_axioms = [a for a in non_looping_axioms if a != axiom]
+        the_one = exactly_one_can_consecute(rs, axiom, other_axioms)
+        if the_one is not None:
+            return axiom,the_one,other_axioms
+    return None
 
 def optimize(rs: ReachabilitySystem, rewrite_axioms: List[Kore.Axiom]):
     print(f"Total axioms: {len(rewrite_axioms)} (original was: {len(rs.rewrite_rules)})")
@@ -482,22 +494,46 @@ def optimize(rs: ReachabilitySystem, rewrite_axioms: List[Kore.Axiom]):
     while non_looping_axioms != []:
         print(f"Non looping axioms: {len(non_looping_axioms)}")
         print(f"Looping or final axioms: {len(looping_or_final_axioms)}")
-        axiom = non_looping_axioms[0]
-        non_looping_axioms = non_looping_axioms[1:]
-        all_other_axioms = looping_or_final_axioms + non_looping_axioms
-        if not exactly_one_can_consecute(rs, axiom, all_other_axioms):
-            print("Too many can consecute. Not merging")
-            looping_or_final_axioms.append(axiom)
+        choice = choose_axiom_with_only_single_successive_axiom(rs, looping_or_final_axioms, non_looping_axioms)
+        if not choice:
+            print(f"Cannot choose single axiom, stopping")
+            break
+        axiom, successive, all_other_axioms = choice
+
+        combined = combine_rules(rs, axiom, successive)
+        print(f"succeeded: {combined is not None}")
+        if combined is None:
             continue
-        print("Exactly one can consecute. Merging.")
-        for other_axiom in all_other_axioms:
-            combined = combine_rules(rs, axiom, other_axiom)
-            if combined is None:
-                continue
-            if (can_self_loop(rs, combined)):
-                looping_or_final_axioms.append(combined)
-            else:
-                non_looping_axioms.append(combined)
+        if (can_self_loop(rs, combined)):
+            print("Combined can self-loop.")
+            looping_or_final_axioms.append(combined)
+        else:
+            print("Combined cannot self-loop.")
+            non_looping_axioms.append(combined)
+
+        #newly_combined.append(combined)
+        #axiom = non_looping_axioms[0]
+        #non_looping_axioms = non_looping_axioms[1:]
+        #all_other_axioms = looping_or_final_axioms + non_looping_axioms
+        #if not exactly_one_can_consecute(rs, axiom, all_other_axioms):
+        #    print("Too many can consecute. Not merging")
+        #    looping_or_final_axioms.append(axiom)
+        #    continue
+        #print("Exactly one can consecute. Merging.")
+        # newly_combined: List[Kore.Axiom] = []
+        # for idx, other_axiom in enumerate(all_other_axioms):
+        #     print(f"Combining with {idx}-th other")
+        #     combined = combine_rules(rs, axiom, other_axiom)
+        #     print(f"succeeded: {combined is not None}")
+        #     if combined is None:
+        #         continue
+        #     newly_combined.append(combined)
+        
+        # for combined in newly_combined:
+        #     if (can_self_loop(rs, combined)):
+        #         looping_or_final_axioms.append(combined)
+        #     else:
+        #         non_looping_axioms.append(combined)
     
     print(f"Looping or final axioms ({len(looping_or_final_axioms)})")
     for a in looping_or_final_axioms:
