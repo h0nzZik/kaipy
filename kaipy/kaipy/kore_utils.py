@@ -11,6 +11,7 @@ from typing import (
     List,
     Iterable,
     Dict,
+    Tuple,
 )
 
 import pyk.kore.syntax as Kore
@@ -185,8 +186,16 @@ def axiom_label(axiom: Kore.Axiom) -> str:
     return axiom_uuid(axiom)
 
 
-def extract_equalities_from_witness(expected_vars : Set[str], witness : Kore.Pattern) -> Dict[Kore.EVar, Kore.Pattern]:
+def extract_equalities_and_rest_from_witness(expected_vars : Set[str], witness : Kore.Pattern) -> Tuple[Dict[Kore.EVar, Kore.Pattern], Optional[Kore.Pattern]]:
     result : Dict[Kore.EVar, Kore.Pattern] = dict()
+    rest: Optional[Kore.Pattern] = None
+
+    def add_to_rest(p: Kore.Pattern):
+        if rest is None:
+            rest = p
+            return
+        rest = Kore.And(p.sort, rest, p) # type: ignore
+
     def go(w : Kore.Pattern):
         match w:
             case Kore.And(_, l, r):
@@ -200,12 +209,19 @@ def extract_equalities_from_witness(expected_vars : Set[str], witness : Kore.Pat
                 if type(r) is Kore.EVar and r.name in expected_vars:
                     result[r] = l
                     return
+                add_to_rest(w)
                 #raise ValueError(f"Unexpected equality '{l} = {r}' in the witness {witness}")
             case _:
+                add_to_rest(w)
                 return
 
     go(witness)
-    return result
+    return result,rest
+
+
+def extract_equalities_from_witness(expected_vars : Set[str], witness : Kore.Pattern) -> Dict[Kore.EVar, Kore.Pattern]:
+    equalities, rest = extract_equalities_and_rest_from_witness(expected_vars, witness)
+    return equalities
 
 
 
