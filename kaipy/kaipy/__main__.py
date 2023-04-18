@@ -412,6 +412,23 @@ def cleanup_pattern(rs: ReachabilitySystem, phi: Kore.Pattern) -> Kore.Pattern:
         return evs2_p
     return Kore.And(rs.top_sort, rest, evs2_p)
 
+def rules_can_consecute(rs: ReachabilitySystem, first_rule: Kore.Axiom, second_rule: Kore.Axiom) -> bool:
+    curr_rhs = get_rhs(first_rule)
+    other_lhs = get_lhs(second_rule)
+    other_renaming = compute_renaming(other_lhs, list(free_evars_of_pattern(curr_rhs)))
+    other_lhs_renamed: Kore.Pattern = rename_vars(other_renaming, other_lhs)
+    simplified_conj = rs.kcs.client.simplify(Kore.And(rs.top_sort, curr_rhs, other_lhs_renamed))
+    return not is_bottom(simplified_conj)
+
+def exactly_one_can_consecute(rs: ReachabilitySystem, axiom: Kore.Axiom, other: List[Kore.Axiom]) -> bool:
+    cnt = 0
+    for a in other:
+        if rules_can_consecute(rs, axiom, a):
+            cnt = cnt + 1
+            if cnt >= 2:
+                return False
+    return cnt == 1
+
 def combine_rules(rs: ReachabilitySystem, first_rule: Kore.Axiom, second_rule: Kore.Axiom) -> Optional[Kore.Axiom]:
     curr_lhs = get_lhs(first_rule)
     curr_rhs = get_rhs(first_rule)
@@ -461,19 +478,32 @@ def optimize(rs: ReachabilitySystem, rewrite_axioms: List[Kore.Axiom]):
         else:
             non_looping_axioms.append(axiom)
 
+    looping_or_final_axioms = looping_axioms
     while non_looping_axioms != []:
         print(f"Non looping axioms: {len(non_looping_axioms)}")
+        print(f"Looping or final axioms: {len(looping_or_final_axioms)}")
         axiom = non_looping_axioms[0]
         non_looping_axioms = non_looping_axioms[1:]
-        all_other_axioms = looping_axioms + non_looping_axioms
+        all_other_axioms = looping_or_final_axioms + non_looping_axioms
+        if not exactly_one_can_consecute(rs, axiom, all_other_axioms):
+            print("Too many can consecute. Not merging")
+            looping_or_final_axioms.append(axiom)
+            continue
+        print("Exactly one can consecute. Merging.")
         for other_axiom in all_other_axioms:
             combined = combine_rules(rs, axiom, other_axiom)
             if combined is None:
                 continue
             if (can_self_loop(rs, combined)):
-                looping_axioms.append(combined)
+                looping_or_final_axioms.append(combined)
             else:
                 non_looping_axioms.append(combined)
+    
+    print(f"Looping or final axioms ({len(looping_or_final_axioms)})")
+    for a in looping_or_final_axioms:
+        match a:
+            case Kore.Axiom(_, rewrite, _):
+                print(rs.kprint.kore_to_pretty(rewrite))
     return 0
 
 def do_optimize(rs: ReachabilitySystem, args) -> int:
