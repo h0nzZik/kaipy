@@ -415,6 +415,9 @@ def cleanup_pattern(rs: ReachabilitySystem, phi: Kore.Pattern) -> Kore.Pattern:
 # TODO duplication with combine_rules
 def rules_can_consecute(rs: ReachabilitySystem, first_rule: Kore.Axiom, second_rule: Kore.Axiom) -> bool:
     curr_lhs = get_lhs(first_rule)
+    # For some reason, we can se a non-normalized curr_lhs here.
+    # Maybe we are doing something wrong in the analysis phase?
+    curr_lhs = rs.kcs.client.simplify(curr_lhs)
     curr_rhs = get_rhs(first_rule)
     other_lhs = get_lhs(second_rule)
     other_renaming = compute_renaming(other_lhs, list(free_evars_of_pattern(curr_rhs)))
@@ -436,6 +439,7 @@ def exactly_one_can_consecute(rs: ReachabilitySystem, axiom: Kore.Axiom, other: 
 
 def combine_rules(rs: ReachabilitySystem, first_rule: Kore.Axiom, second_rule: Kore.Axiom) -> Optional[Kore.Axiom]:
     curr_lhs = get_lhs(first_rule)
+    curr_lhs = rs.kcs.client.simplify(curr_lhs)
     curr_rhs = get_rhs(first_rule)
     other_lhs = get_lhs(second_rule)
     other_rhs = get_rhs(second_rule)
@@ -464,6 +468,7 @@ def combine_rules(rs: ReachabilitySystem, first_rule: Kore.Axiom, second_rule: K
     #print(f"preds1_conj: {rs.kprint.kore_to_pretty(preds1_conj)}")
     new_lhs = rs.kcs.client.simplify(Kore.And(rs.top_sort, curr_lhs, Kore.And(rs.top_sort, mapping_to_pattern(rs, eqs1), preds1_conj)))
     if is_bottom(new_lhs):
+        print(f"not bottom: {rs.kprint.kore_to_pretty(simplified_conj)}")
         print(f"Axiom1 lhs: {rs.kprint.kore_to_pretty(curr_lhs)}")
         print(f"Axiom1 rhs: {rs.kprint.kore_to_pretty(curr_rhs)}")
         print(f"Axiom2 lhs {rs.kprint.kore_to_pretty(other_lhs_renamed)}")
@@ -510,6 +515,10 @@ def optimize(rs: ReachabilitySystem, rewrite_axioms: List[Kore.Axiom]):
             print(f"Cannot choose single axiom, stopping")
             break
         axiom, successive, all_other_axioms = choice
+        non_looping_axioms = all_other_axioms
+
+        print(f"Chosen 1: {rs.kprint.kore_to_pretty(axiom.pattern)}")
+        print(f"Chosen 2: {rs.kprint.kore_to_pretty(successive.pattern)}")
 
         combined = combine_rules(rs, axiom, successive)
         print(f"succeeded: {combined is not None}")
