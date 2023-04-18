@@ -201,8 +201,8 @@ class SCFG:
                         substitution = Substitution(frozendict.frozendict(eqs))
                         normalized_substitution = normalize(substitution)
                         if normalized_substitution not in self.node_rule_info[(node, ruleid)].substitutions:
-                            normalized_substitution_pretty = dict((k,self.rs.kprint.kore_to_pretty(v)) for k,v in normalized_substitution.mapping.items())
-                            print(f"New substitution: {normalized_substitution_pretty}")
+                            #normalized_substitution_pretty = dict((k,self.rs.kprint.kore_to_pretty(v)) for k,v in normalized_substitution.mapping.items())
+                            #print(f"New substitution: {normalized_substitution_pretty}")
                             self.node_rule_info[(node, ruleid)].substitutions.add(normalized_substitution)
                             self.node_rule_info[(node, ruleid)].new_substitutions.add(normalized_substitution)
                             #if not bool(normalized_substitution.mapping):
@@ -220,6 +220,7 @@ class SCFG:
                 return (node, ruleid, substitution)
         return None
 
+# TODO maybe we could allow constants of sort Bool, since there are only two of them
 def is_linear_kseq_combination_of(subpatterns: List[Kore.Pattern], candidate: Kore.Pattern) -> Tuple[bool, List[Kore.Pattern]]:
     if candidate in subpatterns:
         return True,[candidate]
@@ -323,11 +324,11 @@ def can_self_loop(rs: ReachabilitySystem, rule: Kore.Axiom):
 
     raise RuntimeError("Not a rewrite rule")
 
-def optimize(rs: ReachabilitySystem, scfg: SCFG):
+def to_axiom_list(rs: ReachabilitySystem, scfg: SCFG) -> List[Kore.Axiom]:
     rewrite_axioms: List[Kore.Axiom] = []
     for node in scfg.nodes:
         if (len(node.applicable_rules) != 1):
-            print(f"warn: applicable rules = {node.applicable_rules}")
+            print(f"warn: applicable rules = {node.applicable_rules} for {node.original_rule_label}")
         for rule_id in node.applicable_rules:
             rule: Kore.Axiom = rs.rule_by_id(rule_id)
             match rule:
@@ -335,7 +336,41 @@ def optimize(rs: ReachabilitySystem, scfg: SCFG):
                     ri = scfg.node_rule_info[(node, rule_id)]
                     for sub in ri.substitutions:
                         rewrite_axioms.append(Kore.Axiom(vs, Kore.Rewrites(sort, Kore.And(sort, lhs, subst_to_pattern(rs, sub)), rhs),()))
-    
+    return rewrite_axioms
+
+def axiom_list_to_json(rewrite_axioms: List[Kore.Axiom]) -> str:
+    return json.dumps([a.text for a in rewrite_axioms])
+
+def parse_axiom(s: str) -> Kore.Axiom:
+    parser = KoreParser(s)
+    return parser.axiom()
+
+def json_to_axiom_list(s: str) -> List[Kore.Axiom]:
+    return [parse_axiom(a) for a in json.loads(s)]
+
+def analyze(rs: ReachabilitySystem, args) -> int:
+    with open(args['analyzer'], mode='r') as fr:
+        jsa = json.load(fr)
+    spg: SemanticsPreGraph = SemanticsPreGraph.from_dict(jsa)
+    input_kore: Kore.Pattern = get_input_kore(Path(args['definition']), Path(args['input']))
+
+    input_kore_simplified = rs.kcs.client.simplify(input_kore)
+    normalize = make_normalizer(input_kore_simplified)
+    scfg = perform_analysis(rs, spg, normalize, input_kore_simplified)
+    print_analyze_results(scfg)
+    axiom_list: List[Kore.Axiom] = to_axiom_list(rs, scfg)
+    with open(args['output'], mode='w') as fw:
+        fw.write(axiom_list_to_json(axiom_list))
+
+    return 0
+
+def generate_analyzer(rs: ReachabilitySystem, args) -> int:
+    with open(args['analyzer'], mode="w") as fw:
+        semantics_pregraph = compute_semantics_pregraph(rs)
+        fw.write(json.dumps(semantics_pregraph.dict))
+    return 0
+
+def optimize(rs: ReachabilitySystem, rewrite_axioms: List[Kore.Axiom]):
     print(f"Total axioms: {len(rewrite_axioms)} (original was: {len(rs.rewrite_rules)})")
     looping_axioms: List[Kore.Axiom] = []
     non_looping_axioms: List[Kore.Axiom] = []
@@ -356,37 +391,25 @@ def optimize(rs: ReachabilitySystem, scfg: SCFG):
             other_rhs = get_rhs(other_axiom)
             other_lhs_renaming = compute_renaming(other_lhs, list(free_evars_of_pattern(curr_rhs)))
             other_lhs_renamed: Kore.Pattern = rename_vars(other_lhs_renaming, other_lhs)
-            simplified_conj = rs.kcs.client.simplify(Kore.And(rs.top_sort, curr_rhs, other_lhs))
+            other_rhs_renamed: Kore.Pattern = rename_vars(other_lhs_renaming, other_rhs)
+            simplified_conj = rs.kcs.client.simplify(Kore.And(rs.top_sort, curr_rhs, other_lhs_renamed))
             if not is_bottom(simplified_conj):
+                print(f"not bottom: {rs.kprint.kore_to_pretty(simplified_conj)}")
                 eqs = extract_equalities_from_witness({ v.name for v in free_evars_of_pattern(curr_lhs)}, simplified_conj)
                 print(f"Axiom1 lhs: {rs.kprint.kore_to_pretty(curr_lhs)}")
                 print(f"Axiom1 rhs: {rs.kprint.kore_to_pretty(curr_rhs)}")
-                print(f"Axiom2 lhs {rs.kprint.kore_to_pretty(other_lhs)}")
-                print(f"Axiom2 rhs {rs.kprint.kore_to_pretty(other_rhs)}")
+                print(f"Axiom2 lhs {rs.kprint.kore_to_pretty(other_lhs_renamed)}")
+                print(f"Axiom2 rhs {rs.kprint.kore_to_pretty(other_rhs_renamed)}")
                 print(f"Equalities: {eqs}")
                 print("Exiting")
                 sys.exit(0)
             pass
-
-
-def analyze(rs: ReachabilitySystem, args) -> int:
-    with open(args['analyzer'], mode='r') as fr:
-        jsa = json.load(fr)
-    spg: SemanticsPreGraph = SemanticsPreGraph.from_dict(jsa)
-    input_kore: Kore.Pattern = get_input_kore(Path(args['definition']), Path(args['input']))
-
-    input_kore_simplified = rs.kcs.client.simplify(input_kore)
-    normalize = make_normalizer(input_kore_simplified)
-    scfg = perform_analysis(rs, spg, normalize, input_kore_simplified)
-    print_analyze_results(scfg)
-    optimize(rs, scfg)
-
     return 0
 
-def generate_analyzer(rs: ReachabilitySystem, args) -> int:
-    with open(args['analyzer'], mode="w") as fw:
-        semantics_pregraph = compute_semantics_pregraph(rs)
-        fw.write(json.dumps(semantics_pregraph.dict))
+def do_optimize(rs: ReachabilitySystem, args) -> int:
+    with open(args['analysis_result'], mode="r") as fr:
+        axiom_list : List[Kore.Axiom] = json_to_axiom_list(fr.read())
+    optimize(rs, axiom_list)
     return 0
 
 def create_argument_parser() -> argparse.ArgumentParser:
@@ -404,6 +427,10 @@ def create_argument_parser() -> argparse.ArgumentParser:
     subparser_analyze = subparsers.add_parser('analyze', help='Analyze given input program')
     subparser_analyze.add_argument('--analyzer', required=True)
     subparser_analyze.add_argument('--input', required=True)
+    subparser_analyze.add_argument('--output', required=True)
+
+    subparser_optimize = subparsers.add_parser('optimize')
+    subparser_optimize.add_argument('--analysis-result', required=True)
 
     return argument_parser
 
@@ -428,6 +455,8 @@ def main():
             retval = analyze(rs, args)
         elif args['command'] == 'generate-analyzer':
             retval = generate_analyzer(rs, args)
+        elif args['command'] == 'optimize':
+            retval = do_optimize(rs, args)
         else:
             retval = 1
     
