@@ -191,10 +191,11 @@ def extract_equalities_and_rest_from_witness(expected_vars : Set[str], witness :
     rest: Optional[Kore.Pattern] = None
 
     def add_to_rest(p: Kore.Pattern):
-        if rest is None:
+        nonlocal rest
+        if rest is not None:
+            rest = Kore.And(p.sort, rest, p) # type: ignore
+        else:
             rest = p
-            return
-        rest = Kore.And(p.sort, rest, p) # type: ignore
 
     def go(w : Kore.Pattern):
         match w:

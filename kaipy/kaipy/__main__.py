@@ -385,7 +385,7 @@ def filter_out_predicates(phi: Kore.Pattern) -> Optional[Kore.Pattern]:
             if lf is None:
                 return rf
             if rf is None:
-                return None
+                return lf
             return Kore.And(sort, lf, rf)
         case _:
             return phi
@@ -394,10 +394,9 @@ def filter_out_predicates(phi: Kore.Pattern) -> Optional[Kore.Pattern]:
 def cleanup_pattern(rs: ReachabilitySystem, phi: Kore.Pattern) -> Kore.Pattern:
     main_part = filter_out_predicates(phi)
     assert(main_part is not None)
+    fvphi = free_evars_of_pattern(phi)
+    eqs, rest = extract_equalities_and_rest_from_witness({v.name for v in fvphi}, phi)
     fvs = free_evars_of_pattern(main_part)
-    tmp = extract_equalities_and_rest_from_witness({v.name for v in fvs}, phi)
-    eqs: Dict[Kore.EVar, Kore.Pattern] = tmp[0]
-    rest = tmp[1]
     evs2 = {k:v for k,v in eqs.items() if (k in fvs)}
     evs2_p = mapping_to_pattern(rs, evs2)
     if rest is None:
