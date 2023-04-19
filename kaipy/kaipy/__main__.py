@@ -176,6 +176,7 @@ class SCFG:
     
     @dataclass
     class NodeRuleInfo:
+        initial: bool
         substitutions: Set[Substitution]
         new_substitutions: Set[Substitution]
 
@@ -191,9 +192,9 @@ class SCFG:
         self.node_rule_info = {}
         for n in self.nodes:
             for rl in n.applicable_rules:
-                self.node_rule_info[(n,rl)] = SCFG.NodeRuleInfo(set(), set())
+                self.node_rule_info[(n,rl)] = SCFG.NodeRuleInfo(initial=False, substitutions=set(), new_substitutions=set())
     
-    def break_pattern(self, pattern: Kore.Pattern, normalize: Callable[[Substitution],Substitution]):
+    def break_pattern(self, pattern: Kore.Pattern, normalize: Callable[[Substitution],Substitution], mark_initial: bool):
         input_kore_renamed: Kore.Pattern = rename_vars(compute_renaming(pattern, list(self.rs.rules_variables)), pattern)
         #print(f"Breaking {self.rs.kprint.kore_to_pretty(input_kore_renamed)}")
         #print(f"Breaking: {input_kore_renamed.text}")
@@ -206,6 +207,8 @@ class SCFG:
                         if is_bottom(m):
                             continue
                         print(f"{node.original_rule_label}.{ruleid}:")
+                        if mark_initial:
+                            self.node_rule_info[(node, ruleid)].initial = True
                         #print(f"Matched rule's lhs: {self.rs.kprint.kore_to_pretty(lhs)}")
                         eqs = extract_equalities_from_witness({ v.name for v in free_evars_of_pattern(rewrites)}, m)
                         #print(self.rs.kprint.kore_to_pretty(m))
@@ -270,7 +273,7 @@ def make_normalizer(pattern: Kore.Pattern) -> Callable[[Substitution],Substituti
 
 def perform_analysis(rs: ReachabilitySystem, spg, normalize, input_kore):
     scfg = SCFG(rs, spg)
-    scfg.break_pattern(input_kore, normalize=normalize)
+    scfg.break_pattern(input_kore, normalize=normalize, mark_initial=True)
     while(True):
         x = scfg.choose()
         if x is None:
@@ -286,7 +289,7 @@ def perform_analysis(rs: ReachabilitySystem, spg, normalize, input_kore):
         print(f"Has {len(next_patterns)} successors")
         for new_pattern in next_patterns:
             #print("Breaking a pattern")
-            scfg.break_pattern(new_pattern, normalize=normalize)
+            scfg.break_pattern(new_pattern, normalize=normalize, mark_initial=False)
     return scfg
 
 def print_analyze_results(scfg: SCFG):
@@ -310,9 +313,9 @@ def print_analyze_results(scfg: SCFG):
                 print(f"{node.original_rule_label}/{ruleid}")
 
 def next_patterns_of(rs: ReachabilitySystem, pattern: Kore.Pattern):
-            exec_result = rs.kcs.client.execute(pattern, max_depth=1)
-            next_patterns: List[Kore.Pattern] = [exec_result.state.kore] if exec_result.next_states is None else [s.kore for s in exec_result.next_states]    
-            return next_patterns
+    exec_result = rs.kcs.client.execute(pattern, max_depth=1)
+    next_patterns: List[Kore.Pattern] = [exec_result.state.kore] if exec_result.next_states is None else [s.kore for s in exec_result.next_states]    
+    return next_patterns
 
 def get_lhs(rule: Kore.Axiom) -> Kore.Pattern:
     match rule:
@@ -336,8 +339,8 @@ def can_self_loop(rs: ReachabilitySystem, rule: Kore.Axiom):
 
     raise RuntimeError("Not a rewrite rule")
 
-def to_axiom_list(rs: ReachabilitySystem, scfg: SCFG) -> List[Kore.Axiom]:
-    rewrite_axioms: List[Kore.Axiom] = []
+def to_axiom_list(rs: ReachabilitySystem, scfg: SCFG) -> List[Tuple[Kore.Axiom, bool]]:
+    rewrite_axioms: List[Tuple[Kore.Axiom, bool]] = []
     for node in scfg.nodes:
         if (len(node.applicable_rules) != 1):
             print(f"warn: applicable rules = {node.applicable_rules} for {node.original_rule_label}")
@@ -348,18 +351,18 @@ def to_axiom_list(rs: ReachabilitySystem, scfg: SCFG) -> List[Kore.Axiom]:
                     ri = scfg.node_rule_info[(node, rule_id)]
                     for sub in ri.substitutions:
                         conjunction = rs.kcs.client.simplify(Kore.And(sort, lhs, subst_to_pattern(rs, sub)))
-                        rewrite_axioms.append(Kore.Axiom(vs, Kore.Rewrites(sort, conjunction, rhs),()))
+                        rewrite_axioms.append((Kore.Axiom(vs, Kore.Rewrites(sort, conjunction, rhs),()), ri.initial))
     return rewrite_axioms
 
-def axiom_list_to_json(rewrite_axioms: List[Kore.Axiom]) -> str:
-    return json.dumps([a.text for a in rewrite_axioms])
+def axiom_list_to_json(rewrite_axioms: List[Tuple[Kore.Axiom, bool]]) -> str:
+    return json.dumps([(a.text,b) for a,b in rewrite_axioms])
 
 def parse_axiom(s: str) -> Kore.Axiom:
     parser = KoreParser(s)
     return parser.axiom()
 
-def json_to_axiom_list(s: str) -> List[Kore.Axiom]:
-    return [parse_axiom(a) for a in json.loads(s)]
+def json_to_axiom_list(s: str) -> List[Tuple[Kore.Axiom, bool]]:
+    return [(parse_axiom(x[0]),x[1]) for x in json.loads(s)]
 
 def analyze(rs: ReachabilitySystem, args) -> int:
     with open(args['analyzer'], mode='r') as fr:
@@ -371,7 +374,7 @@ def analyze(rs: ReachabilitySystem, args) -> int:
     normalize = make_normalizer(input_kore_simplified)
     scfg = perform_analysis(rs, spg, normalize, input_kore_simplified)
     print_analyze_results(scfg)
-    axiom_list: List[Kore.Axiom] = to_axiom_list(rs, scfg)
+    axiom_list: List[Tuple[Kore.Axiom,bool]] = to_axiom_list(rs, scfg)
     with open(args['output'], mode='w') as fw:
         fw.write(axiom_list_to_json(axiom_list))
 
@@ -477,6 +480,7 @@ class AxiomInfo:
     axiom_id: int
     is_looping: bool
     is_terminal: bool
+    is_initial: bool
     is_exploding: bool
     non_successors: List[Kore.Axiom]
 
@@ -489,14 +493,17 @@ def pick_non_looping_non_terminal_axiom(axioms: Mapping[Kore.Axiom, AxiomInfo]) 
 @dataclass
 class AxiomStats:
     total: int
+    n_initial: int
     n_looping: int
     n_terminal: int
     n_exploding: int
 
 def compute_stats(axioms: Mapping[Kore.Axiom, AxiomInfo]) -> AxiomStats:
-    stats = AxiomStats(0,0,0,0)
+    stats = AxiomStats(0,0,0,0,0)
     for _,ai in axioms.items():
         stats.total = stats.total + 1
+        if ai.is_initial:
+            stats.n_initial = stats.n_initial + 1
         if ai.is_looping:
             stats.n_looping = stats.n_looping + 1
         if ai.is_terminal:
@@ -505,18 +512,18 @@ def compute_stats(axioms: Mapping[Kore.Axiom, AxiomInfo]) -> AxiomStats:
             stats.n_exploding = stats.n_exploding + 1
     return stats
 
-def optimize(rs: ReachabilitySystem, rewrite_axioms: List[Kore.Axiom], treshold=2) -> List[Kore.Axiom]:
+def optimize(rs: ReachabilitySystem, rewrite_axioms: List[Tuple[Kore.Axiom, bool]], treshold=2) -> List[Tuple[Kore.Axiom, bool]]:
     print(f"Total axioms: {len(rewrite_axioms)} (original was: {len(rs.rewrite_rules)})")
 
-    axiom_map = { ax: AxiomInfo(axiom_id=i, is_looping=can_self_loop(rs, ax), is_terminal=False, non_successors=[], is_exploding=False) for i,ax in enumerate(rewrite_axioms)}
+    axiom_map = { ax: AxiomInfo(axiom_id=i, is_looping=can_self_loop(rs, ax), is_initial=b, is_terminal=False, non_successors=[], is_exploding=False) for i,(ax,b) in enumerate(rewrite_axioms)}
     next_id = 1 + len(rewrite_axioms)
 
     non_edges : Set[Tuple[int,int]] = set()
 
     while True:
         print(f"Stats: {compute_stats(axiom_map)}")
-        print(f"non-edges: {len(list(non_edges))}")
-        print(f"non-edges: {non_edges}")
+        #print(f"non-edges: {len(list(non_edges))}")
+        #print(f"non-edges: {non_edges}")
         choice = pick_non_looping_non_terminal_axiom(axiom_map)
         if choice is None:
             print("No reasonable candidate; finishing")
@@ -536,8 +543,8 @@ def optimize(rs: ReachabilitySystem, rewrite_axioms: List[Kore.Axiom], treshold=
             if axiom_info2.is_looping:
                 continue
             print(f"Trying edge {(axiom_info.axiom_id,axiom_info2.axiom_id)}")
-            if (axiom_info.axiom_id,axiom_info2.axiom_id) in non_edges:
-                print("Skipping a non-edge")
+            #if (axiom_info.axiom_id,axiom_info2.axiom_id) in non_edges:
+            #    print("Skipping a non-edge")
             #if axiom2 in axiom_info.non_successors:
             #    print("Filtering out an impossiblec combination")
             #    continue
@@ -579,9 +586,10 @@ def optimize(rs: ReachabilitySystem, rewrite_axioms: List[Kore.Axiom], treshold=
             print(f"Residual lhs is bottom")
         else:
             #print(f"Residual lhs is not bottom: {rs.kprint.kore_to_pretty(resulting_lhs)}")
-            print(f"Residual lhs is not bottom:")
+            print(f"Residual lhs is not bottom.")
             axiom_map[Kore.Axiom((), Kore.Rewrites(rs.top_sort, resulting_lhs, get_rhs(axiom)), ())] = AxiomInfo(
                 axiom_id=next_id,
+                is_initial=True,
                 is_looping=False,
                 is_terminal=True,
                 non_successors=[],
@@ -594,20 +602,22 @@ def optimize(rs: ReachabilitySystem, rewrite_axioms: List[Kore.Axiom], treshold=
             next_id = next_id + 1
             new_ai = AxiomInfo(
                 axiom_id=combined_id,
+                is_initial=axiom_info1.is_initial,
                 is_looping=can_self_loop(rs, combined),
                 is_terminal=axiom_info2.is_terminal,
                 non_successors=axiom_info2.non_successors,
                 is_exploding=axiom_info2.is_exploding,
             )
+            #print(rs.kprint.kore_to_pretty(combined.pattern))
             axiom_map[combined] = new_ai
             ne1 = {(combined_id, to) for (fr, to) in non_edges if fr == axiom_info2.axiom_id}
             ne2 = {(fr, combined_id) for (fr, to) in non_edges if to == axiom_info.axiom_id}
             new_ne = ne1.union(ne2)
-            print(f"Added {len(list(new_ne))} non-edges")
-            print(f"Added {new_ne} non-edges")
+            #print(f"Added {len(list(new_ne))} non-edges")
+            #print(f"Added {new_ne} non-edges")
             non_edges = non_edges.union(new_ne)
 
-    return [ax for ax,_ in axiom_map.items()]
+    return [(ax, ai.is_initial) for ax,ai in axiom_map.items()]
     # print(f"Resulting axioms: ({compute_stats(axiom_map)})")
     # for ax,ai in axiom_map.items():
     #     print(f"ai: {ai}")
@@ -616,21 +626,21 @@ def optimize(rs: ReachabilitySystem, rewrite_axioms: List[Kore.Axiom], treshold=
     #             print(rs.kprint.kore_to_pretty(rewrite))
     #return 0
 
-def print_rewrite_axioms(rs: ReachabilitySystem, rewrite_axioms: List[Kore.Axiom]) -> None:
-    for ax in rewrite_axioms:
-        print(rs.kprint.kore_to_pretty(ax.pattern))
+def print_rewrite_axioms(rs: ReachabilitySystem, rewrite_axioms: List[Tuple[Kore.Axiom, bool]]) -> None:
+    for ax,b in rewrite_axioms:
+        print(f"initial={b}, {rs.kprint.kore_to_pretty(ax.pattern)}")
 
 def do_optimize(rs: ReachabilitySystem, args) -> int:
     with open(args['analysis_result'], mode="r") as fr:
         with open(args['output'], mode="w") as fw:
-            axiom_list : List[Kore.Axiom] = json_to_axiom_list(fr.read())
+            axiom_list : List[Tuple[Kore.Axiom, bool]] = json_to_axiom_list(fr.read())
             new_axiom_list = optimize(rs, axiom_list, treshold=int(args['max_branching']))
             fw.write(axiom_list_to_json(new_axiom_list))
     return 0
 
 def do_print(rs: ReachabilitySystem, args) -> int:
     with open(args['input'], mode="r") as fr:
-        axiom_list : List[Kore.Axiom] = json_to_axiom_list(fr.read())
+        axiom_list : List[Tuple[Kore.Axiom, bool]] = json_to_axiom_list(fr.read())
         print_rewrite_axioms(rs, axiom_list)
     return 0
 
