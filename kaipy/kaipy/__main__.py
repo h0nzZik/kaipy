@@ -508,9 +508,11 @@ def choose_axiom_with_only_single_successive_axiom(rs: ReachabilitySystem, loopi
 class AxiomInfo:
     is_looping: bool
     is_terminal: bool
+    is_exploding: bool
+    non_successors: List[Kore.Axiom]
 
 def pick_non_looping_non_terminal_axiom(axioms: Mapping[Kore.Axiom, AxiomInfo]) -> Optional[Tuple[Kore.Axiom, AxiomInfo]]:
-    non_looping = [(ax, ai) for ax,ai in axioms.items() if (not ai.is_looping) and (not ai.is_terminal)]
+    non_looping = [(ax, ai) for ax,ai in axioms.items() if (not ai.is_looping) and (not ai.is_terminal) and (not ai.is_exploding)]
     if len(non_looping) >= 1:
         return non_looping[0]
     return None
@@ -520,21 +522,24 @@ class AxiomStats:
     total: int
     n_looping: int
     n_terminal: int
+    n_exploding: int
 
 def compute_stats(axioms: Mapping[Kore.Axiom, AxiomInfo]) -> AxiomStats:
-    stats = AxiomStats(0,0,0)
+    stats = AxiomStats(0,0,0,0)
     for _,ai in axioms.items():
         stats.total = stats.total + 1
         if ai.is_looping:
             stats.n_looping = stats.n_looping + 1
         if ai.is_terminal:
             stats.n_terminal = stats.n_terminal + 1
+        if ai.is_exploding:
+            stats.n_exploding = stats.n_exploding + 1
     return stats
 
-def optimize(rs: ReachabilitySystem, rewrite_axioms: List[Kore.Axiom]):
+def optimize(rs: ReachabilitySystem, rewrite_axioms: List[Kore.Axiom], treshold=10):
     print(f"Total axioms: {len(rewrite_axioms)} (original was: {len(rs.rewrite_rules)})")
 
-    axiom_map = { ax: AxiomInfo(is_looping=can_self_loop(rs, ax), is_terminal=False) for ax in rewrite_axioms}
+    axiom_map = { ax: AxiomInfo(is_looping=can_self_loop(rs, ax), is_terminal=False, non_successors=[], is_exploding=False) for ax in rewrite_axioms}
     while True:
         print(f"Stats: {compute_stats(axiom_map)}")
         choice = pick_non_looping_non_terminal_axiom(axiom_map)
@@ -543,14 +548,20 @@ def optimize(rs: ReachabilitySystem, rewrite_axioms: List[Kore.Axiom]):
             break
         axiom,axiom_info = choice
         axiom_map.pop(axiom)
-        newly_combined: List[Kore.Axiom] = []
+        newly_combined: List[Tuple[Kore.Axiom, AxiomInfo]] = []
         negated_sides: Kore.Pattern = Kore.Top(rs.top_sort)
         vars_to_avoid: Set[Kore.EVar] = set()
+        some_failed: bool = False
         # For each other axiom2
         for idx,(axiom2,axiom_info2) in enumerate(axiom_map.items()):
+            if (len(newly_combined) >= treshold):
+                break
             if axiom == axiom2:
                 continue
             if axiom_info2.is_looping:
+                continue
+            if axiom2 in axiom_info.non_successors:
+                print("Filtering out an impossiblec combination")
                 continue
             print(f"Combining with {idx}-th other")
             try:
@@ -558,15 +569,29 @@ def optimize(rs: ReachabilitySystem, rewrite_axioms: List[Kore.Axiom]):
             except pyk.kore.rpc.KoreClientError:
                 print(f"Got an exception when combining axioms")
                 print("Continuing as if the two axioms cannot be combined.")
+                some_failed = True
+                axiom_info.non_successors.append(axiom2)
                 continue
             print(f"succeeded: {result is not None}")
             if result is None:
+                some_failed = True
+                axiom_info.non_successors.append(axiom2)
                 continue
             combined,side_cond = result
             vars_to_avoid = vars_to_avoid.union(free_evars_of_pattern(side_cond))
             negated_sides = Kore.And(rs.top_sort, negated_sides, Kore.Not(rs.top_sort, side_cond))
-            newly_combined.append(combined)
-        
+            newly_combined.append((combined,axiom_info2))
+
+        if not some_failed:
+            print("A suspicuous rule can be combined with any other one")
+            print(rs.kprint.kore_to_pretty(axiom.pattern))
+
+        if len(newly_combined) >= treshold:
+            print(f"Too many ({len(newly_combined)}) combinations - marking as exploding")
+            axiom_info.is_exploding = True
+            axiom_map[axiom] = axiom_info
+            continue
+
         resulting_lhs_before_simplification = Kore.And(rs.top_sort, get_lhs(axiom), negated_sides)
         #print(rs.kprint.kore_to_pretty(resulting_lhs_before_simplification))
         resulting_lhs = rs.kcs.client.simplify(resulting_lhs_before_simplification)
@@ -575,10 +600,20 @@ def optimize(rs: ReachabilitySystem, rewrite_axioms: List[Kore.Axiom]):
         else:
             #print(f"Residual lhs is not bottom: {rs.kprint.kore_to_pretty(resulting_lhs)}")
             print(f"Residual lhs is not bottom:")
-            axiom_map[Kore.Axiom((), Kore.Rewrites(rs.top_sort, resulting_lhs, get_rhs(axiom)), ())] = AxiomInfo(is_looping=False, is_terminal=True)
+            axiom_map[Kore.Axiom((), Kore.Rewrites(rs.top_sort, resulting_lhs, get_rhs(axiom)), ())] = AxiomInfo(
+                is_looping=False,
+                is_terminal=True,
+                non_successors=[],
+                is_exploding=False,
+            )
 
-        for combined in newly_combined:
-            new_ai = AxiomInfo(is_looping=can_self_loop(rs, combined), is_terminal=axiom_info2.is_terminal)
+        for combined,axiom_info2 in newly_combined:
+            new_ai = AxiomInfo(
+                is_looping=can_self_loop(rs, combined),
+                is_terminal=axiom_info2.is_terminal,
+                non_successors=axiom_info2.non_successors,
+                is_exploding=axiom_info2.is_exploding,
+            )
             axiom_map[combined] = new_ai
 
     print(f"Resulting axioms: ({compute_stats(axiom_map)})")
