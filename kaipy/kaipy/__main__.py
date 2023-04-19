@@ -28,6 +28,7 @@ from typing import (
 
 from pyk.ktool import krun
 from pyk.kore.parser import KoreParser
+import pyk.kore.rpc
 import pyk.kore.syntax as Kore
 
 from .kcommands import KRUN_COMMAND
@@ -552,7 +553,12 @@ def optimize(rs: ReachabilitySystem, rewrite_axioms: List[Kore.Axiom]):
             if axiom_info2.is_looping:
                 continue
             print(f"Combining with {idx}-th other")
-            result = combine_rules(rs, axiom, axiom2, vars_to_avoid=vars_to_avoid)
+            try:
+                result = combine_rules(rs, axiom, axiom2, vars_to_avoid=vars_to_avoid)
+            except pyk.kore.rpc.KoreClientError:
+                print(f"Got an exception when combining axioms")
+                print("Continuing as if the two axioms cannot be combined.")
+                continue
             print(f"succeeded: {result is not None}")
             if result is None:
                 continue
