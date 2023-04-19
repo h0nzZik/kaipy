@@ -31,7 +31,7 @@ analyzed_sum.json: ${IMP_TIMESTAMP} ${IMP_ANALYZER}
 
 .PHONY: test-imp.sum
 test-imp.sum: analyzed_sum.json
-	kaipy --definition ${IMP_KOMPILED_DIR}/imp-kompiled/ optimize --analysis-result $<
+	kaipy --definition ${IMP_KOMPILED_DIR}/imp-kompiled/ optimize --max-branching=1 --analysis-result $< --output optimized.json
 
 .PHONY: clean
 clean:

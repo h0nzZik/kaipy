@@ -537,7 +537,7 @@ def compute_stats(axioms: Mapping[Kore.Axiom, AxiomInfo]) -> AxiomStats:
             stats.n_exploding = stats.n_exploding + 1
     return stats
 
-def optimize(rs: ReachabilitySystem, rewrite_axioms: List[Kore.Axiom], treshold=10):
+def optimize(rs: ReachabilitySystem, rewrite_axioms: List[Kore.Axiom], treshold=2) -> List[Kore.Axiom]:
     print(f"Total axioms: {len(rewrite_axioms)} (original was: {len(rs.rewrite_rules)})")
 
     axiom_map = { ax: AxiomInfo(axiom_id=i, is_looping=can_self_loop(rs, ax), is_terminal=False, non_successors=[], is_exploding=False) for i,ax in enumerate(rewrite_axioms)}
@@ -561,7 +561,7 @@ def optimize(rs: ReachabilitySystem, rewrite_axioms: List[Kore.Axiom], treshold=
         some_failed: bool = False
         # For each other axiom2
         for idx,(axiom2,axiom_info2) in enumerate(axiom_map.items()):
-            if (len(newly_combined) >= treshold):
+            if (len(newly_combined) > treshold):
                 break
             if axiom == axiom2:
                 continue
@@ -594,11 +594,11 @@ def optimize(rs: ReachabilitySystem, rewrite_axioms: List[Kore.Axiom], treshold=
             negated_sides = Kore.And(rs.top_sort, negated_sides, Kore.Not(rs.top_sort, side_cond))
             newly_combined.append((combined,axiom_info,axiom_info2,axiom,axiom2))
 
-        if not some_failed:
-            print("A suspicuous rule can be combined with any other one")
-            print(rs.kprint.kore_to_pretty(axiom.pattern))
+        #if not some_failed:
+        #    print("A suspicuous rule can be combined with any other one")
+        #    print(rs.kprint.kore_to_pretty(axiom.pattern))
 
-        if len(newly_combined) >= treshold:
+        if len(newly_combined) > treshold:
             print(f"Too many ({len(newly_combined)}) combinations - marking as exploding")
             axiom_info.is_exploding = True
             axiom_map[axiom] = axiom_info
@@ -639,18 +639,31 @@ def optimize(rs: ReachabilitySystem, rewrite_axioms: List[Kore.Axiom], treshold=
             print(f"Added {new_ne} non-edges")
             non_edges = non_edges.union(new_ne)
 
-    print(f"Resulting axioms: ({compute_stats(axiom_map)})")
-    for ax,ai in axiom_map.items():
-        print(f"ai: {ai}")
-        match ax:
-            case Kore.Axiom(_, rewrite, _):
-                print(rs.kprint.kore_to_pretty(rewrite))
-    return 0
+    return [ax for ax,_ in axiom_map.items()]
+    # print(f"Resulting axioms: ({compute_stats(axiom_map)})")
+    # for ax,ai in axiom_map.items():
+    #     print(f"ai: {ai}")
+    #     match ax:
+    #         case Kore.Axiom(_, rewrite, _):
+    #             print(rs.kprint.kore_to_pretty(rewrite))
+    #return 0
+
+def print_rewrite_axioms(rs: ReachabilitySystem, rewrite_axioms: List[Kore.Axiom]) -> None:
+    for ax in rewrite_axioms:
+        print(rs.kprint.kore_to_pretty(ax.pattern))
 
 def do_optimize(rs: ReachabilitySystem, args) -> int:
     with open(args['analysis_result'], mode="r") as fr:
+        with open(args['output'], mode="w") as fw:
+            axiom_list : List[Kore.Axiom] = json_to_axiom_list(fr.read())
+            new_axiom_list = optimize(rs, axiom_list, treshold=int(args['max_branching']))
+            fw.write(axiom_list_to_json(new_axiom_list))
+    return 0
+
+def do_print(rs: ReachabilitySystem, args) -> int:
+    with open(args['input'], mode="r") as fr:
         axiom_list : List[Kore.Axiom] = json_to_axiom_list(fr.read())
-    optimize(rs, axiom_list)
+        print_rewrite_axioms(rs, axiom_list)
     return 0
 
 def create_argument_parser() -> argparse.ArgumentParser:
@@ -672,6 +685,11 @@ def create_argument_parser() -> argparse.ArgumentParser:
 
     subparser_optimize = subparsers.add_parser('optimize')
     subparser_optimize.add_argument('--analysis-result', required=True)
+    subparser_optimize.add_argument('--max-branching', required=True)
+    subparser_optimize.add_argument('--output', required=True)
+
+    subparser_print = subparsers.add_parser('print')
+    subparser_print.add_argument('--input', required=True)
 
     return argument_parser
 
@@ -698,6 +716,8 @@ def main():
             retval = generate_analyzer(rs, args)
         elif args['command'] == 'optimize':
             retval = do_optimize(rs, args)
+        elif args['command'] == 'print':
+            retval = do_print(rs, args)
         else:
             retval = 1
     
