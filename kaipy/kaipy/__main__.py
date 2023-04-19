@@ -503,46 +503,61 @@ def choose_axiom_with_only_single_successive_axiom(rs: ReachabilitySystem, loopi
             return axiom,the_one,other_axioms
     return None
 
+@dataclass
+class AxiomInfo:
+    is_looping: bool
+    is_terminal: bool
+
+def pick_non_looping_non_terminal_axiom(axioms: Mapping[Kore.Axiom, AxiomInfo]) -> Optional[Tuple[Kore.Axiom, AxiomInfo]]:
+    non_looping = [(ax, ai) for ax,ai in axioms.items() if (not ai.is_looping) and (not ai.is_terminal)]
+    if len(non_looping) >= 1:
+        return non_looping[0]
+    return None
+
+@dataclass
+class AxiomStats:
+    total: int
+    n_looping: int
+    n_terminal: int
+
+def compute_stats(axioms: Mapping[Kore.Axiom, AxiomInfo]) -> AxiomStats:
+    stats = AxiomStats(0,0,0)
+    for _,ai in axioms.items():
+        stats.total = stats.total + 1
+        if ai.is_looping:
+            stats.n_looping = stats.n_looping + 1
+        if ai.is_terminal:
+            stats.n_terminal = stats.n_terminal + 1
+    return stats
+
 def optimize(rs: ReachabilitySystem, rewrite_axioms: List[Kore.Axiom]):
     print(f"Total axioms: {len(rewrite_axioms)} (original was: {len(rs.rewrite_rules)})")
-    looping_axioms: List[Kore.Axiom] = []
-    non_looping_axioms: List[Kore.Axiom] = []
-    for axiom in rewrite_axioms:
-        if can_self_loop(rs, axiom):
-            looping_axioms.append(axiom)
-        else:
-            non_looping_axioms.append(axiom)
 
-    looping_or_final_axioms = looping_axioms
-    while non_looping_axioms != []:
-        print(f"Non looping axioms: {len(non_looping_axioms)}")
-        print(f"Looping or final axioms: {len(looping_or_final_axioms)}")
-
-        axiom = non_looping_axioms[0]
-        non_looping_axioms = non_looping_axioms[1:]
-        all_other_axioms = looping_or_final_axioms + non_looping_axioms
+    axiom_map = { ax: AxiomInfo(is_looping=can_self_loop(rs, ax), is_terminal=False) for ax in rewrite_axioms}
+    while True:
+        print(f"Stats: {compute_stats(axiom_map)}")
+        choice = pick_non_looping_non_terminal_axiom(axiom_map)
+        if choice is None:
+            print("No reasonable candidate; finishing")
+            break
+        axiom,axiom_info = choice
+        axiom_map.pop(axiom)
         newly_combined: List[Kore.Axiom] = []
         negated_sides: Kore.Pattern = Kore.Top(rs.top_sort)
         vars_to_avoid: Set[Kore.EVar] = set()
-        for idx, other_axiom in enumerate(all_other_axioms):
+        # For each other axiom2
+        for idx,(axiom2,axiom_info2) in enumerate(axiom_map.items()):
+            if axiom == axiom2:
+                continue
+            if axiom_info2.is_looping:
+                continue
             print(f"Combining with {idx}-th other")
-            result = combine_rules(rs, axiom, other_axiom, vars_to_avoid=vars_to_avoid)
+            result = combine_rules(rs, axiom, axiom2, vars_to_avoid=vars_to_avoid)
             print(f"succeeded: {result is not None}")
             if result is None:
                 continue
             combined,side_cond = result
             vars_to_avoid = vars_to_avoid.union(free_evars_of_pattern(side_cond))
-            
-            #side_cond_vars = {e.name: e.sort for e in free_evars_of_pattern(side_cond) }
-            #print(f"side cond vars: {side_cond_vars}")
-            #lhs_vars = {e.name: e.sort for e in free_evars_of_pattern(get_lhs(axiom)) }
-            #overlapping = [ var for var,s in lhs_vars.items() if var in side_cond_vars.keys() and side_cond_vars[var] != s ]
-            #print(f"overlapping: {overlapping}")
-            #if len(overlapping) > 0:
-            #    print("Got overlap")
-                #print(f"lhs: {rs.kprint.kore_to_pretty(rewrite)}")
-            #combined_vars = free_evars_of_pattern(combined)
-            
             negated_sides = Kore.And(rs.top_sort, negated_sides, Kore.Not(rs.top_sort, side_cond))
             newly_combined.append(combined)
         
@@ -552,64 +567,18 @@ def optimize(rs: ReachabilitySystem, rewrite_axioms: List[Kore.Axiom]):
         if is_bottom(resulting_lhs):
             print(f"Residual lhs is bottom")
         else:
-            print(f"Residual lhs is not bottom: {rs.kprint.kore_to_pretty(resulting_lhs)}")
-            looping_or_final_axioms.append(Kore.Axiom((), Kore.Rewrites(rs.top_sort, resulting_lhs, get_rhs(axiom)), ()))
+            #print(f"Residual lhs is not bottom: {rs.kprint.kore_to_pretty(resulting_lhs)}")
+            print(f"Residual lhs is not bottom:")
+            axiom_map[Kore.Axiom((), Kore.Rewrites(rs.top_sort, resulting_lhs, get_rhs(axiom)), ())] = AxiomInfo(is_looping=False, is_terminal=True)
 
         for combined in newly_combined:
-            if (can_self_loop(rs, combined)):
-                looping_or_final_axioms.append(combined)
-            else:
-                non_looping_axioms.append(combined)
+            new_ai = AxiomInfo(is_looping=can_self_loop(rs, combined), is_terminal=axiom_info2.is_terminal)
+            axiom_map[combined] = new_ai
 
-
-        # choice = choose_axiom_with_only_single_successive_axiom(rs, looping_or_final_axioms, non_looping_axioms)
-        # if not choice:
-        #     print(f"Cannot choose single axiom, stopping")
-        #     break
-        # axiom, successive, all_other_axioms = choice
-        # non_looping_axioms = all_other_axioms
-
-        # print(f"Chosen 1: {rs.kprint.kore_to_pretty(axiom.pattern)}")
-        # print(f"Chosen 2: {rs.kprint.kore_to_pretty(successive.pattern)}")
-
-        # combined = combine_rules(rs, axiom, successive)
-        # print(f"succeeded: {combined is not None}")
-        # if combined is None:
-        #     continue
-        # if (can_self_loop(rs, combined)):
-        #     print("Combined can self-loop.")
-        #     looping_or_final_axioms.append(combined)
-        # else:
-        #     print("Combined cannot self-loop.")
-        #     non_looping_axioms.append(combined)
-
-        #newly_combined.append(combined)
-        #axiom = non_looping_axioms[0]
-        #non_looping_axioms = non_looping_axioms[1:]
-        #all_other_axioms = looping_or_final_axioms + non_looping_axioms
-        #if not exactly_one_can_consecute(rs, axiom, all_other_axioms):
-        #    print("Too many can consecute. Not merging")
-        #    looping_or_final_axioms.append(axiom)
-        #    continue
-        #print("Exactly one can consecute. Merging.")
-        # newly_combined: List[Kore.Axiom] = []
-        # for idx, other_axiom in enumerate(all_other_axioms):
-        #     print(f"Combining with {idx}-th other")
-        #     combined = combine_rules(rs, axiom, other_axiom)
-        #     print(f"succeeded: {combined is not None}")
-        #     if combined is None:
-        #         continue
-        #     newly_combined.append(combined)
-        
-        # for combined in newly_combined:
-        #     if (can_self_loop(rs, combined)):
-        #         looping_or_final_axioms.append(combined)
-        #     else:
-        #         non_looping_axioms.append(combined)
-    
-    print(f"Looping or final axioms ({len(looping_or_final_axioms)})")
-    for a in looping_or_final_axioms:
-        match a:
+    print(f"Resulting axioms: ({compute_stats(axiom_map)})")
+    for ax,ai in axiom_map.items():
+        print(f"ai: {ai}")
+        match ax:
             case Kore.Axiom(_, rewrite, _):
                 print(rs.kprint.kore_to_pretty(rewrite))
     return 0
