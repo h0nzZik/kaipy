@@ -347,7 +347,8 @@ def to_axiom_list(rs: ReachabilitySystem, scfg: SCFG) -> List[Kore.Axiom]:
                 case Kore.Axiom(vs, Kore.Rewrites(sort, lhs, rhs) as rewrites, _):
                     ri = scfg.node_rule_info[(node, rule_id)]
                     for sub in ri.substitutions:
-                        rewrite_axioms.append(Kore.Axiom(vs, Kore.Rewrites(sort, Kore.And(sort, lhs, subst_to_pattern(rs, sub)), rhs),()))
+                        conjunction = rs.kcs.client.simplify(Kore.And(sort, lhs, subst_to_pattern(rs, sub)))
+                        rewrite_axioms.append(Kore.Axiom(vs, Kore.Rewrites(sort, conjunction, rhs),()))
     return rewrite_axioms
 
 def axiom_list_to_json(rewrite_axioms: List[Kore.Axiom]) -> str:
