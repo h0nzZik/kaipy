@@ -441,7 +441,7 @@ def exactly_one_can_consecute(rs: ReachabilitySystem, axiom: Kore.Axiom, other: 
             the_one = a
     return the_one
 
-def combine_rules(rs: ReachabilitySystem, first_rule: Kore.Axiom, second_rule: Kore.Axiom, vars_to_avoid: Set[Kore.EVar]) -> Optional[Tuple[Kore.Axiom, Kore.Pattern, Set[Kore.EVar]]]:
+def combine_rules(rs: ReachabilitySystem, first_rule: Kore.Axiom, second_rule: Kore.Axiom, vars_to_avoid: Set[Kore.EVar]) -> Optional[Tuple[Kore.Axiom, Kore.Pattern]]:
     curr_lhs = get_lhs(first_rule)
     curr_lhs = rs.kcs.client.simplify(curr_lhs)
     curr_rhs = get_rhs(first_rule)
@@ -492,8 +492,8 @@ def combine_rules(rs: ReachabilitySystem, first_rule: Kore.Axiom, second_rule: K
     #print(f"New lhs clean {rs.kprint.kore_to_pretty(new_lhs_clean)}")
     #print(f"New rhs clean {rs.kprint.kore_to_pretty(new_rhs_clean)}")
     rewrite = Kore.Rewrites(rs.top_sort, new_lhs_clean, new_rhs_clean)
-    print(f"rewrite: {rs.kprint.kore_to_pretty(rewrite)}")
-    return Kore.Axiom((), rewrite, ()),side_cond,vars_to_avoid
+    #print(f"rewrite: {rs.kprint.kore_to_pretty(rewrite)}")
+    return Kore.Axiom((), rewrite, ()),side_cond
 
 def choose_axiom_with_only_single_successive_axiom(rs: ReachabilitySystem, looping_axioms, non_looping_axioms):
     for axiom in non_looping_axioms:
@@ -530,15 +530,24 @@ def optimize(rs: ReachabilitySystem, rewrite_axioms: List[Kore.Axiom]):
             print(f"succeeded: {result is not None}")
             if result is None:
                 continue
-            combined,side_cond,vars_to_avoid_2 = result
-            vars_to_avoid = vars_to_avoid.union(vars_to_avoid_2)
+            combined,side_cond = result
+            vars_to_avoid = vars_to_avoid.union(free_evars_of_pattern(side_cond))
+            
+            #side_cond_vars = {e.name: e.sort for e in free_evars_of_pattern(side_cond) }
+            #print(f"side cond vars: {side_cond_vars}")
+            #lhs_vars = {e.name: e.sort for e in free_evars_of_pattern(get_lhs(axiom)) }
+            #overlapping = [ var for var,s in lhs_vars.items() if var in side_cond_vars.keys() and side_cond_vars[var] != s ]
+            #print(f"overlapping: {overlapping}")
+            #if len(overlapping) > 0:
+            #    print("Got overlap")
+                #print(f"lhs: {rs.kprint.kore_to_pretty(rewrite)}")
             #combined_vars = free_evars_of_pattern(combined)
-            #side_cond_vars = free_evars_of_pattern(side_cond)
+            
             negated_sides = Kore.And(rs.top_sort, negated_sides, Kore.Not(rs.top_sort, side_cond))
             newly_combined.append(combined)
         
         resulting_lhs_before_simplification = Kore.And(rs.top_sort, get_lhs(axiom), negated_sides)
-        print(rs.kprint.kore_to_pretty(resulting_lhs_before_simplification))
+        #print(rs.kprint.kore_to_pretty(resulting_lhs_before_simplification))
         resulting_lhs = rs.kcs.client.simplify(resulting_lhs_before_simplification)
         if is_bottom(resulting_lhs):
             print(f"Residual lhs is bottom")
