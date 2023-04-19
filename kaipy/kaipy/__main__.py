@@ -400,14 +400,18 @@ def get_predicates(phi: Kore.Pattern) -> List[Kore.Pattern]:
     _, preds = filter_out_predicates(phi)
     return preds
 
+def cleanup_eqs(rs: ReachabilitySystem, main_part: Kore.Pattern, eqs: Dict[Kore.EVar, Kore.Pattern]) -> Kore.Pattern:
+    fvs = free_evars_of_pattern(main_part)
+    evs2 = {k:v for k,v in eqs.items() if (k in fvs)}
+    evs2_p = mapping_to_pattern(rs, evs2)
+    return evs2_p
+
 def cleanup_pattern(rs: ReachabilitySystem, phi: Kore.Pattern) -> Kore.Pattern:
     main_part,_ = filter_out_predicates(phi)
     assert(main_part is not None)
     fvphi = free_evars_of_pattern(phi)
     eqs, rest = extract_equalities_and_rest_from_witness({v.name for v in fvphi}, phi)
-    fvs = free_evars_of_pattern(main_part)
-    evs2 = {k:v for k,v in eqs.items() if (k in fvs)}
-    evs2_p = mapping_to_pattern(rs, evs2)
+    evs2_p = cleanup_eqs(rs, main_part, eqs)
     if rest is None:
         return evs2_p
     return Kore.And(rs.top_sort, rest, evs2_p)
@@ -437,13 +441,14 @@ def exactly_one_can_consecute(rs: ReachabilitySystem, axiom: Kore.Axiom, other: 
             the_one = a
     return the_one
 
-def combine_rules(rs: ReachabilitySystem, first_rule: Kore.Axiom, second_rule: Kore.Axiom) -> Optional[Kore.Axiom]:
+def combine_rules(rs: ReachabilitySystem, first_rule: Kore.Axiom, second_rule: Kore.Axiom, vars_to_avoid: Set[Kore.EVar]) -> Optional[Tuple[Kore.Axiom, Kore.Pattern, Set[Kore.EVar]]]:
     curr_lhs = get_lhs(first_rule)
     curr_lhs = rs.kcs.client.simplify(curr_lhs)
     curr_rhs = get_rhs(first_rule)
     other_lhs = get_lhs(second_rule)
     other_rhs = get_rhs(second_rule)
-    other_renaming = compute_renaming(other_lhs, list(free_evars_of_pattern(curr_rhs)))
+    vars_to_avoid = vars_to_avoid.union(free_evars_of_pattern(curr_rhs)).union(free_evars_of_pattern(curr_lhs))
+    other_renaming = compute_renaming(other_lhs, list(vars_to_avoid))
     other_lhs_renamed: Kore.Pattern = rename_vars(other_renaming, other_lhs)
     other_rhs_renamed: Kore.Pattern = rename_vars(other_renaming, other_rhs)
     #simplified_conj = rs.kcs.client.simplify(Kore.And(rs.top_sort, curr_rhs, other_lhs_renamed))
@@ -465,8 +470,10 @@ def combine_rules(rs: ReachabilitySystem, first_rule: Kore.Axiom, second_rule: K
     #      maybe target only the reachable nodes from the initial ones...
 
     preds1_conj = make_conjunction(rs, preds1)
+    eqs1_p = mapping_to_pattern(rs, eqs1)
+    side_cond: Kore.Pattern = Kore.And(rs.top_sort, eqs1_p, preds1_conj)
     #print(f"preds1_conj: {rs.kprint.kore_to_pretty(preds1_conj)}")
-    new_lhs = rs.kcs.client.simplify(Kore.And(rs.top_sort, curr_lhs, Kore.And(rs.top_sort, mapping_to_pattern(rs, eqs1), preds1_conj)))
+    new_lhs = rs.kcs.client.simplify(Kore.And(rs.top_sort, curr_lhs, side_cond))
     if is_bottom(new_lhs):
         print(f"not bottom: {rs.kprint.kore_to_pretty(simplified_conj)}")
         print(f"Axiom1 lhs: {rs.kprint.kore_to_pretty(curr_lhs)}")
@@ -486,7 +493,7 @@ def combine_rules(rs: ReachabilitySystem, first_rule: Kore.Axiom, second_rule: K
     #print(f"New rhs clean {rs.kprint.kore_to_pretty(new_rhs_clean)}")
     rewrite = Kore.Rewrites(rs.top_sort, new_lhs_clean, new_rhs_clean)
     print(f"rewrite: {rs.kprint.kore_to_pretty(rewrite)}")
-    return Kore.Axiom((), rewrite, ())
+    return Kore.Axiom((), rewrite, ()),side_cond,vars_to_avoid
 
 def choose_axiom_with_only_single_successive_axiom(rs: ReachabilitySystem, looping_axioms, non_looping_axioms):
     for axiom in non_looping_axioms:
@@ -510,26 +517,62 @@ def optimize(rs: ReachabilitySystem, rewrite_axioms: List[Kore.Axiom]):
     while non_looping_axioms != []:
         print(f"Non looping axioms: {len(non_looping_axioms)}")
         print(f"Looping or final axioms: {len(looping_or_final_axioms)}")
-        choice = choose_axiom_with_only_single_successive_axiom(rs, looping_or_final_axioms, non_looping_axioms)
-        if not choice:
-            print(f"Cannot choose single axiom, stopping")
-            break
-        axiom, successive, all_other_axioms = choice
-        non_looping_axioms = all_other_axioms
 
-        print(f"Chosen 1: {rs.kprint.kore_to_pretty(axiom.pattern)}")
-        print(f"Chosen 2: {rs.kprint.kore_to_pretty(successive.pattern)}")
-
-        combined = combine_rules(rs, axiom, successive)
-        print(f"succeeded: {combined is not None}")
-        if combined is None:
-            continue
-        if (can_self_loop(rs, combined)):
-            print("Combined can self-loop.")
-            looping_or_final_axioms.append(combined)
+        axiom = non_looping_axioms[0]
+        non_looping_axioms = non_looping_axioms[1:]
+        all_other_axioms = looping_or_final_axioms + non_looping_axioms
+        newly_combined: List[Kore.Axiom] = []
+        negated_sides: Kore.Pattern = Kore.Top(rs.top_sort)
+        vars_to_avoid: Set[Kore.EVar] = set()
+        for idx, other_axiom in enumerate(all_other_axioms):
+            print(f"Combining with {idx}-th other")
+            result = combine_rules(rs, axiom, other_axiom, vars_to_avoid=vars_to_avoid)
+            print(f"succeeded: {result is not None}")
+            if result is None:
+                continue
+            combined,side_cond,vars_to_avoid_2 = result
+            vars_to_avoid = vars_to_avoid.union(vars_to_avoid_2)
+            #combined_vars = free_evars_of_pattern(combined)
+            #side_cond_vars = free_evars_of_pattern(side_cond)
+            negated_sides = Kore.And(rs.top_sort, negated_sides, Kore.Not(rs.top_sort, side_cond))
+            newly_combined.append(combined)
+        
+        resulting_lhs_before_simplification = Kore.And(rs.top_sort, get_lhs(axiom), negated_sides)
+        print(rs.kprint.kore_to_pretty(resulting_lhs_before_simplification))
+        resulting_lhs = rs.kcs.client.simplify(resulting_lhs_before_simplification)
+        if is_bottom(resulting_lhs):
+            print(f"Residual lhs is bottom")
         else:
-            print("Combined cannot self-loop.")
-            non_looping_axioms.append(combined)
+            print(f"Residual lhs is not bottom: {rs.kprint.kore_to_pretty(resulting_lhs)}")
+            looping_or_final_axioms.append(Kore.Axiom((), Kore.Rewrites(rs.top_sort, resulting_lhs, get_rhs(axiom)), ()))
+
+        for combined in newly_combined:
+            if (can_self_loop(rs, combined)):
+                looping_or_final_axioms.append(combined)
+            else:
+                non_looping_axioms.append(combined)
+
+
+        # choice = choose_axiom_with_only_single_successive_axiom(rs, looping_or_final_axioms, non_looping_axioms)
+        # if not choice:
+        #     print(f"Cannot choose single axiom, stopping")
+        #     break
+        # axiom, successive, all_other_axioms = choice
+        # non_looping_axioms = all_other_axioms
+
+        # print(f"Chosen 1: {rs.kprint.kore_to_pretty(axiom.pattern)}")
+        # print(f"Chosen 2: {rs.kprint.kore_to_pretty(successive.pattern)}")
+
+        # combined = combine_rules(rs, axiom, successive)
+        # print(f"succeeded: {combined is not None}")
+        # if combined is None:
+        #     continue
+        # if (can_self_loop(rs, combined)):
+        #     print("Combined can self-loop.")
+        #     looping_or_final_axioms.append(combined)
+        # else:
+        #     print("Combined cannot self-loop.")
+        #     non_looping_axioms.append(combined)
 
         #newly_combined.append(combined)
         #axiom = non_looping_axioms[0]
