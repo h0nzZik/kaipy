@@ -417,31 +417,6 @@ def cleanup_pattern(rs: ReachabilitySystem, phi: Kore.Pattern) -> Kore.Pattern:
         return evs2_p
     return Kore.And(rs.top_sort, rest, evs2_p)
 
-# TODO duplication with combine_rules
-def rules_can_consecute(rs: ReachabilitySystem, first_rule: Kore.Axiom, second_rule: Kore.Axiom) -> bool:
-    curr_lhs = get_lhs(first_rule)
-    # For some reason, we can se a non-normalized curr_lhs here.
-    # Maybe we are doing something wrong in the analysis phase?
-    curr_lhs = rs.kcs.client.simplify(curr_lhs)
-    curr_rhs = get_rhs(first_rule)
-    other_lhs = get_lhs(second_rule)
-    other_renaming = compute_renaming(other_lhs, list(free_evars_of_pattern(curr_rhs)))
-    other_lhs_renamed: Kore.Pattern = rename_vars(other_renaming, other_lhs)
-    #simplified_conj = rs.kcs.client.simplify(Kore.And(rs.top_sort, curr_rhs, other_lhs_renamed))
-    simplified_conj = rs.kcs.client.simplify(Kore.And(rs.top_sort, Kore.And(rs.top_sort, curr_rhs, make_conjunction(rs, get_predicates(curr_lhs))), other_lhs_renamed))
-    return not is_bottom(simplified_conj)
-
-def exactly_one_can_consecute(rs: ReachabilitySystem, axiom: Kore.Axiom, other: List[Kore.Axiom]) -> Optional[Kore.Axiom]:
-    cnt = 0
-    the_one: Optional[Kore.Axiom] = None
-    for a in other:
-        if rules_can_consecute(rs, axiom, a):
-            cnt = cnt + 1
-            if cnt >= 2:
-                return None
-            the_one = a
-    return the_one
-
 def combine_rules(rs: ReachabilitySystem, first_rule: Kore.Axiom, second_rule: Kore.Axiom, vars_to_avoid: Set[Kore.EVar]) -> Optional[Tuple[Kore.Axiom, Kore.Pattern]]:
     curr_lhs = get_lhs(first_rule)
     curr_lhs = rs.kcs.client.simplify(curr_lhs)
@@ -495,14 +470,6 @@ def combine_rules(rs: ReachabilitySystem, first_rule: Kore.Axiom, second_rule: K
     rewrite = Kore.Rewrites(rs.top_sort, new_lhs_clean, new_rhs_clean)
     #print(f"rewrite: {rs.kprint.kore_to_pretty(rewrite)}")
     return Kore.Axiom((), rewrite, ()),side_cond
-
-def choose_axiom_with_only_single_successive_axiom(rs: ReachabilitySystem, looping_axioms, non_looping_axioms):
-    for axiom in non_looping_axioms:
-        other_axioms = looping_axioms = [a for a in non_looping_axioms if a != axiom]
-        the_one = exactly_one_can_consecute(rs, axiom, other_axioms)
-        if the_one is not None:
-            return axiom,the_one,other_axioms
-    return None
 
 @dataclass
 class AxiomInfo:
@@ -570,9 +537,9 @@ def optimize(rs: ReachabilitySystem, rewrite_axioms: List[Kore.Axiom], treshold=
             print(f"Trying edge {(axiom_info.axiom_id,axiom_info2.axiom_id)}")
             if (axiom_info.axiom_id,axiom_info2.axiom_id) in non_edges:
                 print("Skipping a non-edge")
-            if axiom2 in axiom_info.non_successors:
-                print("Filtering out an impossiblec combination")
-                continue
+            #if axiom2 in axiom_info.non_successors:
+            #    print("Filtering out an impossiblec combination")
+            #    continue
             print(f"Combining with {idx}-th other")
             try:
                 result = combine_rules(rs, axiom, axiom2, vars_to_avoid=vars_to_avoid)
