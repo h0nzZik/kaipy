@@ -8,7 +8,7 @@ import frozendict
 
 from pathlib import Path
 import networkx as nx # type: ignore
-
+import matplotlib.pyplot as plt # type: ignore
 
 from typing import (
     Any,
@@ -329,11 +329,12 @@ def get_rhs(rule: Kore.Axiom) -> Kore.Pattern:
             return rhs
     raise RuntimeError("Not a rewrite rule")
 
+
 def can_self_loop(rs: ReachabilitySystem, rule: Kore.Axiom):
     match rule:
         case Kore.Axiom(vs, Kore.Rewrites(sort, lhs, rhs) as rewrites, _):
             lhs_renamed: Kore.Pattern = rename_vars(compute_renaming(lhs, list(free_evars_of_pattern(lhs))), lhs)
-            if not is_bottom(rs.kcs.client.simplify(Kore.And(rs.top_sort, rhs, lhs))):
+            if not is_bottom(rs.kcs.client.simplify(Kore.And(rs.top_sort, rhs, lhs_renamed))):
                 return True
             return False
 
@@ -512,8 +513,60 @@ def compute_stats(axioms: Mapping[Kore.Axiom, AxiomInfo]) -> AxiomStats:
             stats.n_exploding = stats.n_exploding + 1
     return stats
 
+def choose_node(g: nx.DiGraph):
+    for n in g.nodes:
+        if len(g.successors(n)) != 1:
+            continue
+        n2 = g.successors(n)[0]
+        if len(g.predecessors(n2)) != 1:
+            continue
+        return n,n2
+    return None
+
 def optimize(rs: ReachabilitySystem, rewrite_axioms: List[Tuple[Kore.Axiom, bool]], treshold=2) -> List[Tuple[Kore.Axiom, bool]]:
     print(f"Total axioms: {len(rewrite_axioms)} (original was: {len(rs.rewrite_rules)})")
+
+    plt.ion()
+    g: nx.DiGraph = nx.DiGraph()
+    for (ax,_) in rewrite_axioms:
+        g.add_node(ax)
+    
+    print("Building the graph")
+    for i,ax1 in enumerate(g.nodes):
+        nx.draw(g, with_labels=False, font_weight='bold')
+        plt.show()
+        plt.pause(1)
+        for j,ax2 in enumerate(g.nodes):
+            #plt.show(block=False)
+            result = combine_rules(rs, ax1, ax2, vars_to_avoid=set())
+            print(f"{i},{j} = {result is not None}")
+            if result is None:
+                continue
+            combined,side_cond = result
+            g.add_edge(ax1, ax2, composition=combined)
+
+    while(True):
+        nx.draw(g, with_labels=False, font_weight='bold')
+        plt.show()
+        plt.pause(1)
+        #plt.show(block=False)
+        choice = choose_node(g)
+        if choice is None:
+            break
+        ax1,ax2 = choice
+        composition = g.edges(ax1,ax2)['composition']
+        g.remove_edge(ax1,ax2)
+        for ax3 in g.successors(ax2):
+            composition2 = g.edges(ax2,ax3)['composition']
+            g.remove_edge(ax2, ax3)
+            new_composition = combine_rules(rs, composition, composition2, vars_to_avoid=set())
+            g.add_edge(ax1, ax3, composition=new_composition)
+        g.remove_node(ax2)
+    
+    print("finished")
+    return [(ax, False) for ax in g.nodes()]
+
+
 
     axiom_map = { ax: AxiomInfo(axiom_id=i, is_looping=can_self_loop(rs, ax), is_initial=b, is_terminal=False, non_successors=[], is_exploding=False) for i,(ax,b) in enumerate(rewrite_axioms)}
     next_id = 1 + len(rewrite_axioms)

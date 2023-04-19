@@ -38,6 +38,9 @@
               python.pkgs.setuptools
               python.pkgs.networkx
               python.pkgs.frozendict
+              python.pkgs.matplotlib
+              #python.pkgs.pyqt5
+              python.pkgs.tkinter
             ];
             postInstall = ''
               substituteInPlace $out/lib/*/site-packages/kaipy/kcommands.py \
