@@ -60,14 +60,16 @@ def get_input_kore(definition_dir: Path, program: Path) -> Kore.Pattern:
     assert parser.eof
     return res
 
-def compute_renaming(patt: Kore.Pattern, vars_to_avoid: List[Kore.EVar]) -> Dict[str, str]:
-    vars_to_rename = list(free_evars_of_pattern(patt))
+def compute_renaming0(patt: Kore.Pattern, vars_to_avoid: List[Kore.EVar], vars_to_rename: List[Kore.EVar]) -> Dict[str, str]:
     vars_to_avoid = vars_to_rename + vars_to_avoid
     new_vars = get_fresh_evars_with_sorts(avoid=list(vars_to_avoid), sorts=list(map(lambda ev: ev.sort, vars_to_rename)))
     vars_fr : List[str] = list(map(lambda e: e.name, vars_to_rename))
     vars_to : List[str] = list(map(lambda e: e.name, new_vars))
     renaming = dict(zip(vars_fr, vars_to))
     return renaming
+
+def compute_renaming(patt: Kore.Pattern, vars_to_avoid: List[Kore.EVar]) -> Dict[str, str]:
+    return compute_renaming0(patt=patt, vars_to_avoid=vars_to_avoid, vars_to_rename=list(free_evars_of_pattern(patt)))
 
 def compute_conjunction(rs: ReachabilitySystem, a: Kore.Pattern, b: Kore.Pattern) -> Kore.Pattern:
     return rs.kcs.client.simplify(Kore.And(rs.top_sort, a, b))
@@ -195,7 +197,12 @@ class SCFG:
                 self.node_rule_info[(n,rl)] = SCFG.NodeRuleInfo(initial=False, substitutions=set(), new_substitutions=set())
     
     def break_pattern(self, pattern: Kore.Pattern, normalize: Callable[[Substitution],Substitution], mark_initial: bool):
-        input_kore_renamed: Kore.Pattern = rename_vars(compute_renaming(pattern, list(self.rs.rules_variables)), pattern)
+        #VarARGS:SortList{}
+        print(f"Original {self.rs.kprint.kore_to_pretty(pattern)}")
+        vars_to_rename = [v for v in self.rs.rules_variables if v.name != 'VarARGS']
+        renaming = compute_renaming0(pattern, list(free_evars_of_pattern(pattern)), vars_to_rename)
+        print(f"Renaming: {renaming}")
+        input_kore_renamed: Kore.Pattern = rename_vars(renaming, pattern)
         print(f"Breaking {self.rs.kprint.kore_to_pretty(input_kore_renamed)}")
         #print(f"Breaking: {input_kore_renamed.text}")
         for node in self.nodes:
@@ -214,6 +221,7 @@ class SCFG:
                         #print(self.rs.kprint.kore_to_pretty(m))
                         
                         substitution = Substitution(frozendict.frozendict(eqs))
+                        #print(f"substitution: {self.rs.kprint.kore_to_pretty(subst_to_pattern(self.rs, substitution))}")
                         normalized_substitution = normalize(substitution)
                         if normalized_substitution not in self.node_rule_info[(node, ruleid)].substitutions:
                             #normalized_substitution_pretty = dict((k,self.rs.kprint.kore_to_pretty(v)) for k,v in normalized_substitution.mapping.items())

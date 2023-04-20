@@ -48,7 +48,7 @@ module IMP
   rule [getArg]:
     <k> getArg(N:Int) => ARGS[N] ...</k>
     <args> ARGS:List </args>
-    requires N >=Int 0 andBool size(ARGS) >Int N
+    requires N >=Int 0 andBool size(ARGS) >Int N andBool isInt(ARGS[N])
 
   rule [id-lookup]:
     <k> X:Id => STATE[X] ... </k> <state> STATE </state> requires X in_keys(STATE)
