@@ -44,14 +44,23 @@ from .kore_utils import (
     some_subpatterns_of,
 )
 
-def get_input_kore(definition_dir: Path, program: Path) -> Kore.Pattern:
+def get_input_kore(rs: ReachabilitySystem, definition_dir: Path, program: Path) -> Kore.Pattern:
+    # we have to invent a name which does not occur among variables of the semantic rules
+    n: int = 0
+    names = [v.name for v in rs.rules_variables]
+    while ('VarARGS' + str(n)) in names:
+        n = n + 1
+    
+    args_name='VarARGS' + str(n)
+    print(f"args_name: {args_name}")
+
     result = krun._krun(
         command=(KRUN_COMMAND),
         input_file=Path(program),
         definition_dir=definition_dir,
         output=krun.KRunOutput.KORE,
         depth=0,
-        cmap={'ARGS': r'VarARGS:SortList{}'},
+        cmap={'ARGS': (args_name + r':SortList{}')},
         pmap={'ARGS': 'cat'}
     )
     krun.KRun._check_return_code(result.returncode,0)
@@ -199,9 +208,10 @@ class SCFG:
     def break_pattern(self, pattern: Kore.Pattern, normalize: Callable[[Substitution],Substitution], mark_initial: bool):
         #VarARGS:SortList{}
         print(f"Original {self.rs.kprint.kore_to_pretty(pattern)}")
-        vars_to_rename = [v for v in self.rs.rules_variables if v.name != 'VarARGS']
+        #vars_to_rename = [v for v in self.rs.rules_variables if v.name != 'VarARGS']
+        vars_to_rename = [v for v in self.rs.rules_variables]
         renaming = compute_renaming0(pattern, list(free_evars_of_pattern(pattern)), vars_to_rename)
-        print(f"Renaming: {renaming}")
+        #print(f"Renaming: {renaming}")
         input_kore_renamed: Kore.Pattern = rename_vars(renaming, pattern)
         print(f"Breaking {self.rs.kprint.kore_to_pretty(input_kore_renamed)}")
         #print(f"Breaking: {input_kore_renamed.text}")
@@ -417,7 +427,7 @@ def analyze(rs: ReachabilitySystem, args) -> int:
     with open(args['analyzer'], mode='r') as fr:
         jsa = json.load(fr)
     spg: SemanticsPreGraph = SemanticsPreGraph.from_dict(jsa)
-    input_kore: Kore.Pattern = get_input_kore(Path(args['definition']), Path(args['input']))
+    input_kore: Kore.Pattern = get_input_kore(rs, Path(args['definition']), Path(args['input']))
 
     input_kore_simplified = rs.kcs.client.simplify(input_kore)
     normalize = make_normalizer(rs, input_kore_simplified)
