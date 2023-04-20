@@ -51,7 +51,7 @@ def get_input_kore(definition_dir: Path, program: Path) -> Kore.Pattern:
         definition_dir=definition_dir,
         output=krun.KRunOutput.KORE,
         depth=0,
-        cmap={'ARGS': r'ARGS:SortList{}'},
+        cmap={'ARGS': r'VarARGS:SortList{}'},
         pmap={'ARGS': 'cat'}
     )
     krun.KRun._check_return_code(result.returncode,0)
@@ -196,7 +196,7 @@ class SCFG:
     
     def break_pattern(self, pattern: Kore.Pattern, normalize: Callable[[Substitution],Substitution], mark_initial: bool):
         input_kore_renamed: Kore.Pattern = rename_vars(compute_renaming(pattern, list(self.rs.rules_variables)), pattern)
-        #print(f"Breaking {self.rs.kprint.kore_to_pretty(input_kore_renamed)}")
+        print(f"Breaking {self.rs.kprint.kore_to_pretty(input_kore_renamed)}")
         #print(f"Breaking: {input_kore_renamed.text}")
         for node in self.nodes:
             for ruleid in node.applicable_rules:
@@ -235,6 +235,12 @@ class SCFG:
                 return (node, ruleid, substitution)
         return None
 
+def app_size(p: Kore.Pattern) -> int:
+    match p:
+        case Kore.App(_, _, args):
+            return (1 + sum([app_size(a) for a in args]))
+    return 1
+
 # TODO maybe we could allow constants of sort Bool, since there are only two of them
 def is_linear_kseq_combination_of(subpatterns: List[Kore.Pattern], candidate: Kore.Pattern) -> Tuple[bool, List[Kore.Pattern]]:
     if candidate in subpatterns:
@@ -255,15 +261,47 @@ def is_linear_kseq_combination_of(subpatterns: List[Kore.Pattern], candidate: Ko
             return (True, (u1+u2))
     return False,[]
 
-def make_normalizer(pattern: Kore.Pattern) -> Callable[[Substitution],Substitution]:
-    subpatterns = [s for s in some_subpatterns_of(pattern) if type(s) is not Kore.EVar]
-    #print(subpatterns)
+def is_app_combination(subpatterns: List[Kore.Pattern], candidate: Kore.Pattern, trace=False) -> bool:
+    if trace:
+        print(f"app combination? {candidate}")
+    if candidate in subpatterns:
+        if trace:
+            print("in subpatterns")
+        return True
+    if trace:
+        print("not in subpatterns")
+    match candidate:
+        case Kore.App(_, _, args):
+            return all([is_app_combination(subpatterns, a, trace=trace) for a in args])
+        case Kore.DV(Kore.SortApp('SortBool', ()), _):
+            return True
+    if trace:
+        print("owise case")
+    return False
+
+def make_normalizer(rs, pattern: Kore.Pattern) -> Callable[[Substitution],Substitution]:
+    print(f"Make normalizer from {rs.kprint.kore_to_pretty(pattern)}")
+    #subpatterns = [s for s in some_subpatterns_of(pattern) if type(s) is not Kore.EVar]
+    subpatterns = [s for s in some_subpatterns_of(pattern)]
+    pattern_size = app_size(pattern)
+    print(f"size: {pattern_size}")
+    #print(f"vars in subpatterns: {[v for v in subpatterns if type(v) is Kore.EVar]}")
 
     def is_there(candidate: Kore.Pattern) -> bool:
-        b,u = is_linear_kseq_combination_of(subpatterns, candidate)
+        #b,u = is_linear_kseq_combination_of(subpatterns, candidate)
+        if app_size(candidate) > pattern_size:
+            print(f"Filtering out (too big) {rs.kprint.kore_to_pretty(candidate)}")    
+
+        b = is_app_combination(subpatterns, candidate)
         if b:
             return True
-        print(f"Filtering out {candidate}")
+        if type(candidate) is Kore.EVar:
+            #print(f"Filtering out a variable {candidate}") # Do not spend time pretty printing
+            return False
+        #print(f"***Filtering out {rs.kprint.kore_to_pretty(candidate)}")
+        print(f"***Filtering out {candidate.text}")
+        #print("tracing")
+        #is_app_combination(subpatterns, candidate, trace=True)
         return False
 
     def f(s: Substitution):
@@ -282,8 +320,10 @@ def perform_analysis(rs: ReachabilitySystem, spg, normalize, input_kore):
         print(f"Choosing node {node.original_rule_label}")
         sp = subst_to_pattern(rs, substitution)
         patt: Kore.Pattern = Kore.And(rs.top_sort, node.pattern, sp)
-        #print(f"pattern: {patt.text}")
-        exec_result = rs.kcs.client.execute(pattern=patt, max_depth=1)
+        simplified_patt = cleanup_pattern(rs, rs.kcs.client.simplify(patt))
+        print(f"Executing pattern: {rs.kprint.kore_to_pretty(simplified_patt)}")
+        #exec_result = rs.kcs.client.execute(pattern=patt, max_depth=1)
+        exec_result = rs.kcs.client.execute(pattern=simplified_patt, max_depth=1)
         
         next_patterns: List[Kore.Pattern] = [exec_result.state.kore] if exec_result.next_states is None else [s.kore for s in exec_result.next_states]
         print(f"Has {len(next_patterns)} successors")
@@ -292,14 +332,14 @@ def perform_analysis(rs: ReachabilitySystem, spg, normalize, input_kore):
             scfg.break_pattern(new_pattern, normalize=normalize, mark_initial=False)
     return scfg
 
-def print_analyze_results(scfg: SCFG):
+def print_analyze_results(rs, scfg: SCFG):
     print("****** ANALYSIS RESULTS *********")
     for node in scfg.nodes:
         for ruleid in node.applicable_rules:
             ri = scfg.node_rule_info[(node, ruleid)]
             print(f"{node.original_rule_label}/{ruleid}")
             for sub in ri.substitutions:
-                print(f"  {sub}")
+                print(f"  {rs.kprint.kore_to_pretty(subst_to_pattern(rs, sub))}")
     
     print("States/rules without empty substitution")
     for node in scfg.nodes:
@@ -372,9 +412,9 @@ def analyze(rs: ReachabilitySystem, args) -> int:
     input_kore: Kore.Pattern = get_input_kore(Path(args['definition']), Path(args['input']))
 
     input_kore_simplified = rs.kcs.client.simplify(input_kore)
-    normalize = make_normalizer(input_kore_simplified)
+    normalize = make_normalizer(rs, input_kore_simplified)
     scfg = perform_analysis(rs, spg, normalize, input_kore_simplified)
-    print_analyze_results(scfg)
+    print_analyze_results(rs, scfg)
     axiom_list: List[Tuple[Kore.Axiom,bool]] = to_axiom_list(rs, scfg)
     with open(args['output'], mode='w') as fw:
         fw.write(axiom_list_to_json(axiom_list))

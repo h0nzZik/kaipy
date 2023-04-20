@@ -11,7 +11,8 @@ module IMP-SYNTAX
                  | "-" Int                    [seqstrict(1)]
                  | AExp "/" AExp              [left, seqstrict]
                  | "(" AExp ")"               [bracket]
-                 | "getArg" "(" AExp ")"      [seqstrict(1)]
+                 //| "getArg" "(" AExp ")"      [seqstrict(1)]
+                 | "getArg" "(" Int ")"      [seqstrict(1)]
                  > AExp "+" AExp              [left, seqstrict]
   syntax BExp  ::= Bool
                  | AExp "<=" AExp             [seqstrict, latex({#1}\leq{#2})]
