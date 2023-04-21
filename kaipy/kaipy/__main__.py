@@ -290,61 +290,80 @@ def is_linear_combination_of(
     subpatterns: Dict[Kore.Pattern, int],
     allowed_outliers : int,
     allowed_outlier_size: int,
-    candidate: Kore.Pattern
-) -> Tuple[bool, Dict[Kore.Pattern, int], int]:
+    remaining_unary_size: int,
+    candidate: Kore.Pattern,
+) -> Tuple[bool, Dict[Kore.Pattern, int], int,int]:
     if subpatterns.get(candidate, 0) >= 1:
         subpatterns2 = subpatterns.copy()
         subpatterns2[candidate] = subpatterns2[candidate] - 1
-        return True, subpatterns2, allowed_outliers
+        return True, subpatterns2, allowed_outliers, remaining_unary_size
     
     
     match candidate:
         # There is only finitely many nullary constructors, so we allow these
         case Kore.App(_, _, ()):
-            return True,subpatterns,allowed_outliers
+            return True,subpatterns,allowed_outliers, remaining_unary_size
         # There are subsort hierarchies of finite height only.
         # We assume that `inj` is used for upcasting only.
         case Kore.App('inj', _, (arg,)):
-            return is_linear_combination_of(subpatterns, allowed_outliers=allowed_outliers, allowed_outlier_size=allowed_outlier_size, candidate=arg)
+            return is_linear_combination_of(subpatterns, allowed_outliers=allowed_outliers, allowed_outlier_size=allowed_outlier_size, candidate=arg, remaining_unary_size=remaining_unary_size)
         # We prohibit other constructors of arity 1, since they might be chained indefinitely.
         # TODO: we may want to relax it to allow chains of length at most `k` for some fixed `k`
         # The problem is that we often get chains of freezers of length that is linear to the size of the input program.
         # like, the expression `(x+y)+z` will lead to a chain similar to `x ~> #freezer+R(y) ~> #freezer+R(z)`
         # But another problem is what happens after such sequence gets evaluated, which is what worries me now.
         case Kore.App(_, _, (arg,)):
-            return True,subpatterns,allowed_outliers # FIXME this is just a temporary thing to try out what happens
-            pass
+            if remaining_unary_size <= 0:
+                pass
+            return is_linear_combination_of(subpatterns, allowed_outliers=allowed_outliers, allowed_outlier_size=allowed_outlier_size, remaining_unary_size=(remaining_unary_size-1), candidate=arg)
             #return False,[],0
             # no fall-through, break
         # Constructors of arity 2 or more
         case Kore.App(_, _, args):
             assert len(args) >= 2
-            b,u,a = True, subpatterns, allowed_outliers
+            b,u,a,r = True, subpatterns, allowed_outliers, remaining_unary_size
             for arg in args:
-                b,u,a = is_linear_combination_of(subpatterns=u, allowed_outliers=a, allowed_outlier_size=allowed_outlier_size, candidate=arg)
+                b,u,a,r = is_linear_combination_of(subpatterns=u, allowed_outliers=a, allowed_outlier_size=allowed_outlier_size, remaining_unary_size=r, candidate=arg)
                 if not b:
                     break
             if b:
-                return True,u,a
+                return True,u,a,r
     
     # Outliers allowed?
     if allowed_outliers >= 1 and app_size(candidate) <= allowed_outlier_size:
-        return True,subpatterns,(allowed_outliers - 1)
+        return True,subpatterns,(allowed_outliers - 1),remaining_unary_size
 
-    return False,{},0
+    return False,{},0,0
 
 
 def make_normalizer(rs, pattern: Kore.Pattern) -> Callable[[Substitution],Substitution]:
     print(f"Make normalizer from {rs.kprint.kore_to_pretty(pattern)}")
     #subpatterns = [s for s in some_subpatterns_of(pattern) if type(s) is not Kore.EVar]
     subpatterns = some_subpatterns_of(pattern)
-    allowed_outliers = 1
+    allowed_outliers = 0 # 1.
     allowed_outlier_size = 3
+    max_unary_size = int(app_size(pattern))
+    print(f"max unary size: {max_unary_size}")
     # app_size
     #print(f"vars in subpatterns: {[v for v in subpatterns if type(v) is Kore.EVar]}")
 
-    def is_there(candidate: Kore.Pattern) -> bool:
-        b,_,_ = is_linear_combination_of(subpatterns=subpatterns.copy(), allowed_outliers=allowed_outliers, allowed_outlier_size=allowed_outlier_size, candidate=candidate)
+    def is_there(s: Kore.Sort, candidate: Kore.Pattern) -> bool:
+        match s:
+            case Kore.SortApp('SortMap', _):
+                return False
+            case Kore.SortApp('SortList', _):
+                return False
+            case Kore.SortApp('SortInt', _):
+                return False
+            case Kore.SortApp('SortSet', _):
+                return False
+        b,_,_,_ = is_linear_combination_of(
+            subpatterns=subpatterns.copy(),
+            allowed_outliers=allowed_outliers,
+            allowed_outlier_size=allowed_outlier_size,
+            remaining_unary_size=max_unary_size,
+            candidate=candidate
+        )
         if b:
             return True
         if type(candidate) is Kore.EVar:
@@ -357,7 +376,7 @@ def make_normalizer(rs, pattern: Kore.Pattern) -> Callable[[Substitution],Substi
         return False
 
     def f(s: Substitution):
-        return Substitution(frozendict.frozendict({k : v for k,v in s.mapping.items() if is_there(v)}))
+        return Substitution(frozendict.frozendict({k : v for k,v in s.mapping.items() if is_there(k.sort, v)}))
 
     return f
 

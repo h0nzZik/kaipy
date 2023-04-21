@@ -50,8 +50,11 @@ module IMP
     <args> ARGS:List </args>
     requires N >=Int 0 andBool size(ARGS) >Int N
 
+  // TODO we should be able to write some sorts analysis which would infer that State[X] is always of sort Int
+  // and transformed the rhs to say {STATE[X]}:>Int instead. That should be a semantics-level analysis/transformation.
+  // <k> X:Id => STATE[X] ... </k> <state> STATE </state> requires X in_keys(STATE)
   rule [id-lookup]:
-    <k> X:Id => STATE[X] ... </k> <state> STATE </state> requires X in_keys(STATE)
+    <k> X:Id => {STATE[X]}:>Int ... </k> <state> STATE </state> requires X in_keys(STATE)
 
   rule [div-nonzero]:
     <k> I1 / I2 => I1 /Int I2 ... </k>  requires I2 =/=Int 0
