@@ -207,7 +207,7 @@ class SCFG:
     
     def break_pattern(self, pattern: Kore.Pattern, normalize: Callable[[Substitution],Substitution], mark_initial: bool):
         #VarARGS:SortList{}
-        print(f"Original {self.rs.kprint.kore_to_pretty(pattern)}")
+        #print(f"Original {self.rs.kprint.kore_to_pretty(pattern)}")
         #vars_to_rename = [v for v in self.rs.rules_variables if v.name != 'VarARGS']
         vars_to_rename = [v for v in self.rs.rules_variables]
         renaming = compute_renaming0(pattern, list(free_evars_of_pattern(pattern)), vars_to_rename)
@@ -231,8 +231,10 @@ class SCFG:
                         #print(self.rs.kprint.kore_to_pretty(m))
                         
                         substitution = Substitution(frozendict.frozendict(eqs))
+                        #print(f"conjunction: {self.rs.kprint.kore_to_pretty(m)}")
                         #print(f"substitution: {self.rs.kprint.kore_to_pretty(subst_to_pattern(self.rs, substitution))}")
                         normalized_substitution = normalize(substitution)
+                        # TODO maybe check if it is also not subsumed by other substitution?
                         if normalized_substitution not in self.node_rule_info[(node, ruleid)].substitutions:
                             #normalized_substitution_pretty = dict((k,self.rs.kprint.kore_to_pretty(v)) for k,v in normalized_substitution.mapping.items())
                             #print(f"New substitution: {normalized_substitution_pretty}")
@@ -259,58 +261,81 @@ def app_size(p: Kore.Pattern) -> int:
             return (1 + sum([app_size(a) for a in args]))
     return 1
 
-# TODO maybe we could allow constants of sort Bool, since there are only two of them
-def is_linear_kseq_combination_of(subpatterns: List[Kore.Pattern], candidate: Kore.Pattern) -> Tuple[bool, List[Kore.Pattern]]:
-    if candidate in subpatterns:
-        return True,[candidate]
+# def is_app_combination(subpatterns: List[Kore.Pattern], candidate: Kore.Pattern, trace=False) -> bool:
+#     if trace:
+#         print(f"app combination? {candidate}")
+#     if candidate in subpatterns:
+#         if trace:
+#             print("in subpatterns")
+#         return True
+#     if trace:
+#         print("not in subpatterns")
+#     match candidate:
+#         case Kore.App(_, _, args):
+#             return all([is_app_combination(subpatterns, a, trace=trace) for a in args])
+#         case Kore.DV(Kore.SortApp('SortBool', ()), _):
+#             return True
+#     if trace:
+#         print("owise case")
+    return False
+
+# TODO maybe we could allow constants of sort Bool, since there are only two of them.
+# Or finite / non-recursive sorts.
+def is_linear_combination_of(
+    subpatterns: Dict[Kore.Pattern, int],
+    allowed_outliers : int,
+    allowed_outlier_size: int,
+    candidate: Kore.Pattern
+) -> Tuple[bool, Dict[Kore.Pattern, int], int]:
+    if subpatterns.get(candidate, 0) >= 1:
+        subpatterns2 = subpatterns.copy()
+        subpatterns2[candidate] = subpatterns2[candidate] - 1
+        return True, subpatterns2, allowed_outliers
+    
     
     match candidate:
-        case Kore.App('dotk', _, _):
-            return (True,[])
+        # There is only finitely many nullary constructors, so we allow these
+        case Kore.App(_, _, ()):
+            return True,subpatterns,allowed_outliers
+        # There are subsort hierarchies of finite height only.
+        # We assume that `inj` is used for upcasting only.
         case Kore.App('inj', _, (arg,)):
-            return is_linear_kseq_combination_of(subpatterns, arg)
-        case Kore.App('kseq', _, (arg1, arg2)):
-            b1,u1 = is_linear_kseq_combination_of(subpatterns, arg1)
-            if not b1:
-                return (False,[])
-            b2,u2 = is_linear_kseq_combination_of([s for s in subpatterns if s not in u1], arg2)
-            if not b2:
-                return (False,[])
-            return (True, (u1+u2))
-    return False,[]
-
-def is_app_combination(subpatterns: List[Kore.Pattern], candidate: Kore.Pattern, trace=False) -> bool:
-    if trace:
-        print(f"app combination? {candidate}")
-    if candidate in subpatterns:
-        if trace:
-            print("in subpatterns")
-        return True
-    if trace:
-        print("not in subpatterns")
-    match candidate:
+            return is_linear_combination_of(subpatterns, allowed_outliers=allowed_outliers, allowed_outlier_size=allowed_outlier_size, candidate=arg)
+        # We prohibit other constructors of arity 1, since they might be chained indefinitely.
+        # TODO: we may want to relax it to allow chains of length at most `k` for some fixed `k`
+        case Kore.App(_, _, (arg,)):
+            pass
+            #return False,[],0
+            # no fall-through, break
+        # Constructors of arity 2 or more
         case Kore.App(_, _, args):
-            return all([is_app_combination(subpatterns, a, trace=trace) for a in args])
-        case Kore.DV(Kore.SortApp('SortBool', ()), _):
-            return True
-    if trace:
-        print("owise case")
-    return False
+            assert len(args) >= 2
+            b,u,a = True, subpatterns, allowed_outliers
+            for arg in args:
+                b,u,a = is_linear_combination_of(subpatterns=u, allowed_outliers=a, allowed_outlier_size=allowed_outlier_size, candidate=arg)
+                if not b:
+                    break
+            if b:
+                return True,u,a
+    
+    # Outliers allowed?
+    if allowed_outliers >= 1 and app_size(candidate) <= allowed_outlier_size:
+        return True,subpatterns,(allowed_outliers - 1)
+
+    return False,{},0
+
 
 def make_normalizer(rs, pattern: Kore.Pattern) -> Callable[[Substitution],Substitution]:
     print(f"Make normalizer from {rs.kprint.kore_to_pretty(pattern)}")
     #subpatterns = [s for s in some_subpatterns_of(pattern) if type(s) is not Kore.EVar]
-    subpatterns = [s for s in some_subpatterns_of(pattern)]
-    pattern_size = app_size(pattern)
-    print(f"size: {pattern_size}")
+    subpatterns = some_subpatterns_of(pattern)
+    allowed_outliers = 1
+    allowed_outlier_size = 3
+    # app_size
     #print(f"vars in subpatterns: {[v for v in subpatterns if type(v) is Kore.EVar]}")
 
     def is_there(candidate: Kore.Pattern) -> bool:
-        #b,u = is_linear_kseq_combination_of(subpatterns, candidate)
-        if app_size(candidate) > pattern_size:
-            print(f"Filtering out (too big) {rs.kprint.kore_to_pretty(candidate)}")    
-
-        b = is_app_combination(subpatterns, candidate)
+        b = is_linear_combination_of(subpatterns=subpatterns.copy(), allowed_outliers=allowed_outliers, allowed_outlier_size=allowed_outlier_size, candidate=candidate)
         if b:
             return True
         if type(candidate) is Kore.EVar:

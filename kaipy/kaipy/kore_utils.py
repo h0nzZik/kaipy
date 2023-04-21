@@ -226,10 +226,14 @@ def extract_equalities_from_witness(expected_vars : Set[str], witness : Kore.Pat
 
 
 
-def some_subpatterns_of(phi: Kore.Pattern) -> Set[Kore.Pattern]:
-    subs: Set[Kore.Pattern] = set()
-    match phi:
-        # The recursive cases    
-        case Kore.App(symbol_name, sorts, args):
-            subs = set().union(*[some_subpatterns_of(a) for a in args])
-    return {phi}.union(subs)
+def some_subpatterns_of(phi: Kore.Pattern) -> Dict[Kore.Pattern, int]:
+    subs: Dict[Kore.Pattern, int] = dict()
+    def go(phi):
+        subs[phi] = subs.get(phi, 0) + 1
+        match phi:
+            # The recursive cases    
+            case Kore.App(symbol_name, sorts, args):
+                for a in args:
+                    go(a)
+    go(phi)
+    return subs
