@@ -209,10 +209,13 @@ class SCFG:
         #VarARGS:SortList{}
         #print(f"Original {self.rs.kprint.kore_to_pretty(pattern)}")
         #vars_to_rename = [v for v in self.rs.rules_variables if v.name != 'VarARGS']
+        
         vars_to_rename = [v for v in self.rs.rules_variables]
         renaming = compute_renaming0(pattern, list(free_evars_of_pattern(pattern)), vars_to_rename)
-        #print(f"Renaming: {renaming}")
+        ##print(f"Renaming: {renaming}")
         input_kore_renamed: Kore.Pattern = rename_vars(renaming, pattern)
+        
+        #input_kore_renamed = pattern
         print(f"Breaking {self.rs.kprint.kore_to_pretty(input_kore_renamed)}")
         #print(f"Breaking: {input_kore_renamed.text}")
         for node in self.nodes:
@@ -228,11 +231,13 @@ class SCFG:
                             self.node_rule_info[(node, ruleid)].initial = True
                         #print(f"Matched rule's lhs: {self.rs.kprint.kore_to_pretty(lhs)}")
                         eqs = extract_equalities_from_witness({ v.name for v in free_evars_of_pattern(rewrites)}, m)
-                        #print(self.rs.kprint.kore_to_pretty(m))
+                        #if ruleid == 'IMP.getArg':
+                        #    print(self.rs.kprint.kore_to_pretty(m))
                         
                         substitution = Substitution(frozendict.frozendict(eqs))
-                        #print(f"conjunction: {self.rs.kprint.kore_to_pretty(m)}")
-                        #print(f"substitution: {self.rs.kprint.kore_to_pretty(subst_to_pattern(self.rs, substitution))}")
+                        #if ruleid == 'IMP.var-decl':
+                        #    print(f"conjunction: {self.rs.kprint.kore_to_pretty(m)}")
+                        #    print(f"substitution: {self.rs.kprint.kore_to_pretty(subst_to_pattern(self.rs, substitution))}")
                         normalized_substitution = normalize(substitution)
                         # TODO maybe check if it is also not subsumed by other substitution?
                         if normalized_substitution not in self.node_rule_info[(node, ruleid)].substitutions:
@@ -303,7 +308,11 @@ def is_linear_combination_of(
             return is_linear_combination_of(subpatterns, allowed_outliers=allowed_outliers, allowed_outlier_size=allowed_outlier_size, candidate=arg)
         # We prohibit other constructors of arity 1, since they might be chained indefinitely.
         # TODO: we may want to relax it to allow chains of length at most `k` for some fixed `k`
+        # The problem is that we often get chains of freezers of length that is linear to the size of the input program.
+        # like, the expression `(x+y)+z` will lead to a chain similar to `x ~> #freezer+R(y) ~> #freezer+R(z)`
+        # But another problem is what happens after such sequence gets evaluated, which is what worries me now.
         case Kore.App(_, _, (arg,)):
+            return True,subpatterns,allowed_outliers # FIXME this is just a temporary thing to try out what happens
             pass
             #return False,[],0
             # no fall-through, break
@@ -335,14 +344,14 @@ def make_normalizer(rs, pattern: Kore.Pattern) -> Callable[[Substitution],Substi
     #print(f"vars in subpatterns: {[v for v in subpatterns if type(v) is Kore.EVar]}")
 
     def is_there(candidate: Kore.Pattern) -> bool:
-        b = is_linear_combination_of(subpatterns=subpatterns.copy(), allowed_outliers=allowed_outliers, allowed_outlier_size=allowed_outlier_size, candidate=candidate)
+        b,_,_ = is_linear_combination_of(subpatterns=subpatterns.copy(), allowed_outliers=allowed_outliers, allowed_outlier_size=allowed_outlier_size, candidate=candidate)
         if b:
             return True
         if type(candidate) is Kore.EVar:
             #print(f"Filtering out a variable {candidate}") # Do not spend time pretty printing
             return False
-        #print(f"***Filtering out {rs.kprint.kore_to_pretty(candidate)}")
-        print(f"***Filtering out {candidate.text}")
+        print(f"***Filtering out {rs.kprint.kore_to_pretty(candidate)}")
+        #print(f"***Filtering out {candidate.text}")
         #print("tracing")
         #is_app_combination(subpatterns, candidate, trace=True)
         return False

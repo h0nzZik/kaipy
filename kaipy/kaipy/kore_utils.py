@@ -136,7 +136,12 @@ def rename_vars(renaming: Dict[str, str], phi: Kore.Pattern) -> Kore.Pattern:
             return phi
         case Kore.Bottom(_):
             return phi
+        case Kore.Ceil(op_sort, sort, pattern):
+            return Kore.Ceil(op_sort, sort, rename_vars(renaming, pattern))
+        case Kore.Floor(op_sort, sort, pattern):
+            return Kore.Floor(op_sort, sort, rename_vars(renaming, pattern))
         case _:
+            print(f"renaming not implemented for {phi}")
             raise NotImplementedError()
     raise NotImplementedError()
 
