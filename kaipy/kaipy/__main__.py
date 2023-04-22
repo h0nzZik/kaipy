@@ -379,12 +379,14 @@ def make_constructor_pattern(rs: ReachabilitySystem, pattern: Kore.Pattern, avoi
             case Kore.App('inj', sorts, (arg,)):
                 r, a = go(arg, avoid)
                 return Kore.App('inj', sorts, (r,)),a
-            case Kore.App(symbol, (), args):
+            case Kore.App(symbol, sorts, args):
+                if len(sorts) != 0:
+                    raise RuntimeError(f"Weird pattern {p}")
                 if not rs.is_nonhooked_constructor(symbol):
                     nonlocal modified
                     modified = True
                     x = get_fresh_evar(list(avoid), rs.get_symbol_sort(symbol))
-                    print(f"fresh evar: {x}")
+                    #print(f"fresh evar: {x}")
                     return x, avoid.union({x})
 
                 new_args: List[Kore.Pattern] = []
@@ -392,7 +394,7 @@ def make_constructor_pattern(rs: ReachabilitySystem, pattern: Kore.Pattern, avoi
                 for arg in args:
                     r, a = go(arg, a)
                     new_args.append(r)
-                return Kore.App(symbol, (), tuple(new_args)), a
+                return Kore.App(symbol, sorts, tuple(new_args)), a
             case Kore.EVar(_, _):
                 return p, avoid
             case Kore.DV(_, _):
@@ -402,10 +404,11 @@ def make_constructor_pattern(rs: ReachabilitySystem, pattern: Kore.Pattern, avoi
 
     fvs = free_evars_of_pattern(pattern)
     new_pattern, _ = go(pattern, fvs.union(avoid))
+
     if modified:
         pass
-        #print(f"old: {pattern.text}")
-        #print(f"new: {new_pattern.text}")
+        print(f"old: {pattern.text}")
+        print(f"new: {new_pattern.text}")
         #print(f"old: {rs.kprint.kore_to_pretty(pattern)}")
         #print(f"new: {rs.kprint.kore_to_pretty(new_pattern)}")
     return new_pattern
@@ -459,7 +462,7 @@ def make_normalizer(rs: ReachabilitySystem, pattern: Kore.Pattern, avoid: Set[Ko
         new_subst = Substitution(frozendict.frozendict({k : v for k,v in s2.items() if is_there(k.sort, v)}))
         # Try validatiny
         #print(f"new subst: {subst_to_pattern(rs.top_sort, new_subst).text}")
-        print(f"new subst simplified: {rs.simplify(subst_to_pattern(rs.top_sort, new_subst)).text}")
+        #print(f"new subst simplified: {rs.simplify(subst_to_pattern(rs.top_sort, new_subst)).text}")
         return new_subst
 
     return f

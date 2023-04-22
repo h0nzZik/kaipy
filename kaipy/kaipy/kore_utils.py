@@ -97,8 +97,15 @@ def get_symbol_sort(definition: Kore.Definition, main_module_name: str, symbol_n
 def is_nonhooked_constructor_symbol(definition: Kore.Definition, main_module_name: str, symbol_name: str) -> bool:
     decl = get_symbol_decl_from_definition(definition, main_module_name, symbol_name)
     if decl.hooked:
+        print(f'symbol {symbol_name} is hooked')
         return False
-    return ('constructor' in decl.attrs)
+    for attr in decl.attrs:
+        match attr:
+            case Kore.App('constructor', _, _):
+                #print(f"symbol {symbol_name} is a constructor")
+                return True
+    #print(f"symbol {symbol_name} is NOT a constructor")
+    return False
 
 def get_top_cell_initializer(definition: Kore.Definition) -> str:
     for a in definition.attrs:
