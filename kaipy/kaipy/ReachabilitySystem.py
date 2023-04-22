@@ -33,6 +33,7 @@ from pyk.kore.syntax import (
     Definition,
     Sort,
     EVar,
+    Pattern,
 )
 
 from .kcommands import KORE_RPC_COMMAND
@@ -138,3 +139,11 @@ class ReachabilitySystem:
 
     def is_nonhooked_constructor(self, name: str) -> bool:
         return is_nonhooked_constructor_symbol(self.definition, self.main_module_name, name)
+    
+    def simplify(self, pattern: Pattern) -> Pattern:
+        try:
+            return self.kcs.client.simplify(pattern)
+        except:
+            print(f"Error when simplifying: {self.kprint.kore_to_pretty(pattern)}")
+            raise
+        

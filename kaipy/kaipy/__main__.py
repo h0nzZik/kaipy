@@ -84,7 +84,7 @@ def compute_renaming(patt: Kore.Pattern, vars_to_avoid: List[Kore.EVar]) -> Dict
     return compute_renaming0(vars_to_avoid=vars_to_avoid, vars_to_rename=list(free_evars_of_pattern(patt)))
 
 def compute_conjunction(rs: ReachabilitySystem, a: Kore.Pattern, b: Kore.Pattern) -> Kore.Pattern:
-    return rs.kcs.client.simplify(Kore.And(rs.top_sort, a, b))
+    return rs.simplify(Kore.And(rs.top_sort, a, b))
 
 def compute_match(rs: ReachabilitySystem, patt_from: Kore.Pattern, axiom: Kore.Rewrites) -> Tuple[Kore.Pattern,Dict[str,str]]:
     vars_to_rename = list(free_evars_of_pattern(axiom.left))
@@ -213,7 +213,17 @@ def substitution_subsumed_by(rs: ReachabilitySystem, subst1: Substitution, subst
         print("Subsumption?")
         print(f"lhs = {rs.kprint.kore_to_pretty(lhs)}")
         print(f"rhs = {rs.kprint.kore_to_pretty(rhs_renamed_quantified)}")
-    impl_result = rs.kcs.client.implies(lhs, rhs_renamed_quantified)
+    try:
+        impl_result = rs.kcs.client.implies(lhs, rhs_renamed_quantified)
+    except:
+        print("An exception occurred.")
+        #print(f"lhs = {rs.kprint.kore_to_pretty(lhs)}")
+        #print(f"rhs = {rs.kprint.kore_to_pretty(rhs_renamed_quantified)}")
+        print(f"lhs = {lhs.text}")
+        print(f"rhs = {rhs_renamed_quantified.text}")
+        print(f"pattern1 = {pattern1.text}")
+        print(f"pattern2 = {pattern2.text}")
+        raise
     if verbose:
         print(f"sat? {impl_result.satisfiable}")
     return impl_result.satisfiable
@@ -247,7 +257,12 @@ class SCFG:
             for rl in n.applicable_rules:
                 self.node_rule_info[(n,rl)] = SCFG.NodeRuleInfo(initial=False, substitutions=set(), new_substitutions=set())
     
-    def break_pattern(self, pattern: Kore.Pattern, normalize: Callable[[Substitution],Substitution], mark_initial: bool):
+    def break_pattern(
+        self,
+        pattern: Kore.Pattern,
+        normalize: Callable[[Set[Kore.EVar], Substitution],Substitution],
+        mark_initial: bool
+    ):
         #VarARGS:SortList{}
         #print(f"Original {self.rs.kprint.kore_to_pretty(pattern)}")
         #vars_to_rename = [v for v in self.rs.rules_variables if v.name != 'VarARGS']
@@ -278,7 +293,7 @@ class SCFG:
                         #    print(self.rs.kprint.kore_to_pretty(m))
                         
                         substitution = Substitution(frozendict.frozendict(eqs))
-                        normalized_substitution = normalize(substitution)
+                        normalized_substitution = normalize(free_evars_of_pattern(lhs).union(free_evars_of_pattern(node.pattern)), substitution)
 
                         verbose = ruleid == 'IMP.while-unroll'
                         if any([substitution_subsumed_by(self.rs, normalized_substitution, subst, verbose=verbose) for subst in nri.substitutions]):
@@ -303,24 +318,6 @@ def app_size(p: Kore.Pattern) -> int:
         case Kore.App(_, _, args):
             return (1 + sum([app_size(a) for a in args]))
     return 1
-
-# def is_app_combination(subpatterns: List[Kore.Pattern], candidate: Kore.Pattern, trace=False) -> bool:
-#     if trace:
-#         print(f"app combination? {candidate}")
-#     if candidate in subpatterns:
-#         if trace:
-#             print("in subpatterns")
-#         return True
-#     if trace:
-#         print("not in subpatterns")
-#     match candidate:
-#         case Kore.App(_, _, args):
-#             return all([is_app_combination(subpatterns, a, trace=trace) for a in args])
-#         case Kore.DV(Kore.SortApp('SortBool', ()), _):
-#             return True
-#     if trace:
-#         print("owise case")
-    return False
 
 # TODO maybe we could allow constants of sort Bool, since there are only two of them.
 # Or finite / non-recursive sorts.
@@ -372,13 +369,22 @@ def is_linear_combination_of(
 
     return False,{},0,0
 
-def make_constructor_pattern(rs: ReachabilitySystem, pattern: Kore.Pattern) -> Kore.Pattern:
-    
+def make_constructor_pattern(rs: ReachabilitySystem, pattern: Kore.Pattern, avoid: Set[Kore.EVar]) -> Kore.Pattern:
+    modified: bool = False
     def go(p: Kore.Pattern, avoid: Set[Kore.EVar]) -> Tuple[Kore.Pattern, Set[Kore.EVar]]:
+        #print(f"go {p.text}")
         match p:
-            case Kore.App(symbol, sorts, args):
+            # We cannot use the generic Kore.App case for injections
+            # because the return sort of 'inj' is 'To' - that is, the second sort parameter.
+            case Kore.App('inj', sorts, (arg,)):
+                r, a = go(arg, avoid)
+                return Kore.App('inj', sorts, (r,)),a
+            case Kore.App(symbol, (), args):
                 if not rs.is_nonhooked_constructor(symbol):
+                    nonlocal modified
+                    modified = True
                     x = get_fresh_evar(list(avoid), rs.get_symbol_sort(symbol))
+                    print(f"fresh evar: {x}")
                     return x, avoid.union({x})
 
                 new_args: List[Kore.Pattern] = []
@@ -386,24 +392,32 @@ def make_constructor_pattern(rs: ReachabilitySystem, pattern: Kore.Pattern) -> K
                 for arg in args:
                     r, a = go(arg, a)
                     new_args.append(r)
-                return Kore.App(symbol, sorts, new_args), a
+                return Kore.App(symbol, (), tuple(new_args)), a
             case Kore.EVar(_, _):
                 return p, avoid
+            case Kore.DV(_, _):
+                return p, avoid
             case _:
-                raise NotImplementedError()
+                raise NotImplementedError(f"Not implemented: {p.text}")
 
     fvs = free_evars_of_pattern(pattern)
-    new_pattern, _ = go(pattern, fvs)
+    new_pattern, _ = go(pattern, fvs.union(avoid))
+    if modified:
+        pass
+        #print(f"old: {pattern.text}")
+        #print(f"new: {new_pattern.text}")
+        #print(f"old: {rs.kprint.kore_to_pretty(pattern)}")
+        #print(f"new: {rs.kprint.kore_to_pretty(new_pattern)}")
     return new_pattern
 
-def make_normalizer(rs: ReachabilitySystem, pattern: Kore.Pattern) -> Callable[[Substitution],Substitution]:
-    print(f"Make normalizer from {rs.kprint.kore_to_pretty(pattern)}")
+def make_normalizer(rs: ReachabilitySystem, pattern: Kore.Pattern, avoid: Set[Kore.EVar]) -> Callable[[Set[Kore.EVar],Substitution],Substitution]:
+    #print(f"Make normalizer from {rs.kprint.kore_to_pretty(pattern)}")
     #subpatterns = [s for s in some_subpatterns_of(pattern) if type(s) is not Kore.EVar]
     subpatterns = some_subpatterns_of(pattern)
     allowed_outliers = 0 # 1.
     allowed_outlier_size = 3
     max_unary_size = int(app_size(pattern))
-    print(f"max unary size: {max_unary_size}")
+    #print(f"max unary size: {max_unary_size}")
     # app_size
     #print(f"vars in subpatterns: {[v for v in subpatterns if type(v) is Kore.EVar]}")
 
@@ -435,9 +449,18 @@ def make_normalizer(rs: ReachabilitySystem, pattern: Kore.Pattern) -> Callable[[
         #is_app_combination(subpatterns, candidate, trace=True)
         return False
 
-    def f(s: Substitution):
-        s2 = {k : make_constructor_pattern(rs, v) for k,v in s.mapping.items()}
-        return Substitution(frozendict.frozendict({k : v for k,v in s2.items() if is_there(k.sort, v)}))
+    def f(avoid2: Set[Kore.EVar], s: Substitution) -> Substitution:
+        s2: Dict[Kore.EVar, Kore.Pattern] = dict()
+        for k,v in s.mapping.items():
+            constr = make_constructor_pattern(rs, v, avoid=avoid2.union(avoid))
+            avoid2 = avoid2.union(free_evars_of_pattern(constr))
+            s2[k] = constr
+        #s2 = {k : make_constructor_pattern(rs, v, avoid=avoid2.union(avoid)) for k,v in s.mapping.items()}
+        new_subst = Substitution(frozendict.frozendict({k : v for k,v in s2.items() if is_there(k.sort, v)}))
+        # Try validatiny
+        #print(f"new subst: {subst_to_pattern(rs.top_sort, new_subst).text}")
+        print(f"new subst simplified: {rs.simplify(subst_to_pattern(rs.top_sort, new_subst)).text}")
+        return new_subst
 
     return f
 
@@ -451,8 +474,10 @@ def perform_analysis(rs: ReachabilitySystem, spg, normalize, input_kore):
         (node,ruleid,substitution) = x
         print(f"Choosing node {node.original_rule_label}")
         sp = subst_to_pattern(rs.top_sort, substitution)
+        #print(f"Node: {rs.kprint.kore_to_pretty(node.pattern)}")
+        #print(f"Substitution: {rs.kprint.kore_to_pretty(sp)}")
         patt: Kore.Pattern = Kore.And(rs.top_sort, node.pattern, sp)
-        simplified_patt = cleanup_pattern(rs, rs.kcs.client.simplify(patt))
+        simplified_patt = cleanup_pattern(rs, rs.simplify(patt))
         #print(f"Executing pattern: {rs.kprint.kore_to_pretty(simplified_patt)}")
         #exec_result = rs.kcs.client.execute(pattern=patt, max_depth=1)
         exec_result = rs.kcs.client.execute(pattern=simplified_patt, max_depth=1)
@@ -506,7 +531,7 @@ def can_self_loop(rs: ReachabilitySystem, rule: Kore.Axiom):
     match rule:
         case Kore.Axiom(vs, Kore.Rewrites(sort, lhs, rhs) as rewrites, _):
             lhs_renamed: Kore.Pattern = rename_vars(compute_renaming(lhs, list(free_evars_of_pattern(lhs))), lhs)
-            if not is_bottom(rs.kcs.client.simplify(Kore.And(rs.top_sort, rhs, lhs_renamed))):
+            if not is_bottom(rs.simplify(Kore.And(rs.top_sort, rhs, lhs_renamed))):
                 return True
             return False
 
@@ -523,7 +548,7 @@ def to_axiom_list(rs: ReachabilitySystem, scfg: SCFG) -> List[Tuple[Kore.Axiom, 
                 case Kore.Axiom(vs, Kore.Rewrites(sort, lhs, rhs) as rewrites, _):
                     ri = scfg.node_rule_info[(node, rule_id)]
                     for sub in ri.substitutions:
-                        conjunction = rs.kcs.client.simplify(Kore.And(sort, lhs, subst_to_pattern(rs.top_sort, sub)))
+                        conjunction = rs.simplify(Kore.And(sort, lhs, subst_to_pattern(rs.top_sort, sub)))
                         rewrite_axioms.append((Kore.Axiom(vs, Kore.Rewrites(sort, conjunction, rhs),()), ri.initial))
     return rewrite_axioms
 
@@ -543,8 +568,8 @@ def analyze(rs: ReachabilitySystem, args) -> int:
     spg: SemanticsPreGraph = SemanticsPreGraph.from_dict(jsa)
     input_kore: Kore.Pattern = get_input_kore(rs, Path(args['definition']), Path(args['input']))
 
-    input_kore_simplified = rs.kcs.client.simplify(input_kore)
-    normalize = make_normalizer(rs, input_kore_simplified)
+    input_kore_simplified = rs.simplify(input_kore)
+    normalize = make_normalizer(rs, input_kore_simplified, avoid=rs.rules_variables)
     scfg = perform_analysis(rs, spg, normalize, input_kore_simplified)
     print_analyze_results(rs, scfg)
     axiom_list: List[Tuple[Kore.Axiom,bool]] = to_axiom_list(rs, scfg)
@@ -596,7 +621,7 @@ def cleanup_pattern(rs: ReachabilitySystem, phi: Kore.Pattern) -> Kore.Pattern:
 
 def combine_rules(rs: ReachabilitySystem, first_rule: Kore.Axiom, second_rule: Kore.Axiom, vars_to_avoid: Set[Kore.EVar]) -> Optional[Tuple[Kore.Axiom, Kore.Pattern]]:
     curr_lhs = get_lhs(first_rule)
-    curr_lhs = rs.kcs.client.simplify(curr_lhs)
+    curr_lhs = rs.simplify(curr_lhs)
     curr_rhs = get_rhs(first_rule)
     other_lhs = get_lhs(second_rule)
     other_rhs = get_rhs(second_rule)
@@ -605,7 +630,7 @@ def combine_rules(rs: ReachabilitySystem, first_rule: Kore.Axiom, second_rule: K
     other_lhs_renamed: Kore.Pattern = rename_vars(other_renaming, other_lhs)
     other_rhs_renamed: Kore.Pattern = rename_vars(other_renaming, other_rhs)
     #simplified_conj = rs.kcs.client.simplify(Kore.And(rs.top_sort, curr_rhs, other_lhs_renamed))
-    simplified_conj = rs.kcs.client.simplify(Kore.And(rs.top_sort, Kore.And(rs.top_sort, curr_rhs, make_conjunction(rs, get_predicates(curr_lhs))), other_lhs_renamed))
+    simplified_conj = rs.simplify(Kore.And(rs.top_sort, Kore.And(rs.top_sort, curr_rhs, make_conjunction(rs, get_predicates(curr_lhs))), other_lhs_renamed))
     if is_bottom(simplified_conj):
         return None
     #print(f"not bottom: {rs.kprint.kore_to_pretty(simplified_conj)}")
@@ -626,7 +651,7 @@ def combine_rules(rs: ReachabilitySystem, first_rule: Kore.Axiom, second_rule: K
     eqs1_p = mapping_to_pattern(rs.top_sort, eqs1)
     side_cond: Kore.Pattern = Kore.And(rs.top_sort, eqs1_p, preds1_conj)
     #print(f"preds1_conj: {rs.kprint.kore_to_pretty(preds1_conj)}")
-    new_lhs = rs.kcs.client.simplify(Kore.And(rs.top_sort, curr_lhs, side_cond))
+    new_lhs = rs.simplify(Kore.And(rs.top_sort, curr_lhs, side_cond))
     if is_bottom(new_lhs):
         print(f"not bottom: {rs.kprint.kore_to_pretty(simplified_conj)}")
         print(f"Axiom1 lhs: {rs.kprint.kore_to_pretty(curr_lhs)}")
@@ -635,7 +660,7 @@ def combine_rules(rs: ReachabilitySystem, first_rule: Kore.Axiom, second_rule: K
         print(f"Axiom2 rhs {rs.kprint.kore_to_pretty(other_rhs_renamed)}")
         raise RuntimeError("new_lhs is unexpectedly bottom.")
     #new_lhs = rs.kcs.client.simplify(Kore.And(rs.top_sort, curr_lhs, mapping_to_pattern(rs, eqs1))) # FIXME I know this is not enough
-    new_rhs = rs.kcs.client.simplify(Kore.And(rs.top_sort, other_rhs_renamed, mapping_to_pattern(rs.top_sort, eqs2)))
+    new_rhs = rs.simplify(Kore.And(rs.top_sort, other_rhs_renamed, mapping_to_pattern(rs.top_sort, eqs2)))
     # After the simplification, the intermediate variables (from 'other_renaming') should disappear
     #print(f"New lhs {rs.kprint.kore_to_pretty(new_lhs)}")
     #print(f"New rhs {rs.kprint.kore_to_pretty(new_rhs)}")
@@ -806,7 +831,7 @@ def optimize(rs: ReachabilitySystem, rewrite_axioms: List[Tuple[Kore.Axiom, bool
 
         resulting_lhs_before_simplification = Kore.And(rs.top_sort, get_lhs(axiom), negated_sides)
         #print(rs.kprint.kore_to_pretty(resulting_lhs_before_simplification))
-        resulting_lhs = rs.kcs.client.simplify(resulting_lhs_before_simplification)
+        resulting_lhs = rs.simplify(resulting_lhs_before_simplification)
         if is_bottom(resulting_lhs):
             print(f"Residual lhs is bottom")
         else:
@@ -875,6 +900,7 @@ def create_argument_parser() -> argparse.ArgumentParser:
         description="A K abstract interpreter"
     )
     argument_parser.add_argument('-d', '--definition', required=True)
+    argument_parser.add_argument('--print-rpc-logs', action='store_true')
 
     subparsers = argument_parser.add_subparsers(dest='command')
     
@@ -902,7 +928,8 @@ def main():
     args = vars(argument_parser.parse_args())
     #print(f"args: {args}")
     logging.basicConfig(encoding='utf-8', level=logging.DEBUG)
-    logging.getLogger('pyk.kore.rpc').disabled = True
+    if not args['print_rpc_logs']:
+        logging.getLogger('pyk.kore.rpc').disabled = True
     logging.getLogger('pyk.ktool.kprint').disabled = True
     logging.getLogger('pyk.kast.inner').disabled = True 
     
