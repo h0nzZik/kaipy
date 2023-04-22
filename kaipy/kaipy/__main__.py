@@ -5,6 +5,8 @@ import json
 import argparse
 from dataclasses import dataclass
 import frozendict
+import functools
+
 
 from pathlib import Path
 import networkx as nx # type: ignore
@@ -69,7 +71,7 @@ def get_input_kore(rs: ReachabilitySystem, definition_dir: Path, program: Path) 
     assert parser.eof
     return res
 
-def compute_renaming0(patt: Kore.Pattern, vars_to_avoid: List[Kore.EVar], vars_to_rename: List[Kore.EVar]) -> Dict[str, str]:
+def compute_renaming0(vars_to_avoid: List[Kore.EVar], vars_to_rename: List[Kore.EVar]) -> Dict[str, str]:
     vars_to_avoid = vars_to_rename + vars_to_avoid
     new_vars = get_fresh_evars_with_sorts(avoid=list(vars_to_avoid), sorts=list(map(lambda ev: ev.sort, vars_to_rename)))
     vars_fr : List[str] = list(map(lambda e: e.name, vars_to_rename))
@@ -78,7 +80,7 @@ def compute_renaming0(patt: Kore.Pattern, vars_to_avoid: List[Kore.EVar], vars_t
     return renaming
 
 def compute_renaming(patt: Kore.Pattern, vars_to_avoid: List[Kore.EVar]) -> Dict[str, str]:
-    return compute_renaming0(patt=patt, vars_to_avoid=vars_to_avoid, vars_to_rename=list(free_evars_of_pattern(patt)))
+    return compute_renaming0(vars_to_avoid=vars_to_avoid, vars_to_rename=list(free_evars_of_pattern(patt)))
 
 def compute_conjunction(rs: ReachabilitySystem, a: Kore.Pattern, b: Kore.Pattern) -> Kore.Pattern:
     return rs.kcs.client.simplify(Kore.And(rs.top_sort, a, b))
@@ -159,6 +161,12 @@ def compute_semantics_pregraph(rs: ReachabilitySystem) -> SemanticsPreGraph:
 class Substitution:
     mapping: Mapping[Kore.EVar, Kore.Pattern]
 
+    def free_evars(self) -> Set[Kore.EVar]:
+        fe: Set[Kore.EVar] = set()
+        for _,p in self.mapping.items():
+            fe = fe.union(free_evars_of_pattern(p))
+        return fe
+
 def make_conjunction(rs: ReachabilitySystem, l: List[Kore.Pattern]) -> Kore.Pattern:
     result: Kore.Pattern = Kore.Top(rs.top_sort)
     for x in l:
@@ -175,6 +183,33 @@ def mapping_to_pattern(rs: ReachabilitySystem, m: Mapping[Kore.EVar, Kore.Patter
 
 def subst_to_pattern(rs: ReachabilitySystem, subst: Substitution) -> Kore.Pattern:
     return mapping_to_pattern(rs, subst.mapping)
+
+def existentially_quantify_variables(rs: ReachabilitySystem, pattern: Kore.Pattern, vars: List[Kore.EVar]) -> Kore.Pattern:
+    return functools.reduce(lambda p, var: Kore.Exists(rs.top_sort, var, p), vars, pattern)
+
+def existentially_quantify_free_variables(rs: ReachabilitySystem, pattern: Kore.Pattern) -> Kore.Pattern:
+    return existentially_quantify_variables(rs, pattern, list(free_evars_of_pattern(pattern)))
+
+def substitution_subsumed_by(rs: ReachabilitySystem, subst1: Substitution, subst2: Substitution) -> bool:
+    pattern1 = subst_to_pattern(rs, subst1)
+    pattern2 = subst_to_pattern(rs, subst2)
+    fes = subst1.free_evars().union(subst2.free_evars())
+    keys = set(subst1.mapping.keys()).union(subst2.mapping.keys())
+    list_pattern = Kore.App("Lbl'Stop'List", (), ())
+    for k in keys:
+        list_pattern = Kore.App("Lbl'Unds'List'Unds'", (), (list_pattern, Kore.App("LblListItem", (), (k,))))
+    
+    lhs = Kore.And(Kore.SortApp('SortList', ()), list_pattern, pattern1)
+    rhs = Kore.And(Kore.SortApp('SortList', ()), list_pattern, pattern2)
+    renaming = compute_renaming0(vars_to_avoid=list(keys.union(fes)), vars_to_rename=list(subst2.free_evars()))
+    rhs_renamed = rename_vars(renaming, rhs)
+    rhs_renamed_quantified = existentially_quantify_variables(rs, rhs_renamed, list(subst2.free_evars()))
+    print("Subsumption?")
+    print(f"lhs = {rs.kprint.kore_to_pretty(lhs)}")
+    print(f"rhs = {rs.kprint.kore_to_pretty(rhs_renamed_quantified)}")
+    impl_result = rs.kcs.client.implies(lhs, rhs_renamed_quantified)
+    print(f"sat? {impl_result.satisfiable}")
+    return impl_result.satisfiable
 
 # The graph on which we do the analysis
 class SCFG:
@@ -211,7 +246,7 @@ class SCFG:
         #vars_to_rename = [v for v in self.rs.rules_variables if v.name != 'VarARGS']
         
         vars_to_rename = [v for v in self.rs.rules_variables]
-        renaming = compute_renaming0(pattern, list(free_evars_of_pattern(pattern)), vars_to_rename)
+        renaming = compute_renaming0(list(free_evars_of_pattern(pattern)), vars_to_rename)
         ##print(f"Renaming: {renaming}")
         input_kore_renamed: Kore.Pattern = rename_vars(renaming, pattern)
         
@@ -227,30 +262,25 @@ class SCFG:
                         if is_bottom(m):
                             continue
                         print(f"{node.original_rule_label}.{ruleid}:")
+                        nri = self.node_rule_info[(node, ruleid)]
                         if mark_initial:
-                            self.node_rule_info[(node, ruleid)].initial = True
+                            nri.initial = True
                         #print(f"Matched rule's lhs: {self.rs.kprint.kore_to_pretty(lhs)}")
                         eqs = extract_equalities_from_witness({ v.name for v in free_evars_of_pattern(rewrites)}, m)
                         #if ruleid == 'IMP.getArg':
                         #    print(self.rs.kprint.kore_to_pretty(m))
                         
                         substitution = Substitution(frozendict.frozendict(eqs))
-                        #if ruleid == 'IMP.var-decl':
-                        #    print(f"conjunction: {self.rs.kprint.kore_to_pretty(m)}")
-                        #    print(f"substitution: {self.rs.kprint.kore_to_pretty(subst_to_pattern(self.rs, substitution))}")
                         normalized_substitution = normalize(substitution)
-                        # TODO maybe check if it is also not subsumed by other substitution?
-                        if normalized_substitution not in self.node_rule_info[(node, ruleid)].substitutions:
-                            #normalized_substitution_pretty = dict((k,self.rs.kprint.kore_to_pretty(v)) for k,v in normalized_substitution.mapping.items())
-                            #print(f"New substitution: {normalized_substitution_pretty}")
-                            self.node_rule_info[(node, ruleid)].substitutions.add(normalized_substitution)
-                            self.node_rule_info[(node, ruleid)].new_substitutions.add(normalized_substitution)
-                            #if not bool(normalized_substitution.mapping):
-                                #print(f"**Empty substitution for pattern {self.rs.kprint.kore_to_pretty(input_kore_renamed)}")
-                                #print(f"** Original substitution: {substitution}")
-                                #print(f"** Conjunction: {self.rs.kprint.kore_to_pretty(m)}")
-                        #eqs_pretty = dict((k,self.rs.kprint.kore_to_pretty(v)) for k,v in eqs.items())
-                        #print(f"eqs_pretty: {eqs_pretty}")
+                       
+                        if any([substitution_subsumed_by(self.rs, normalized_substitution, subst) for subst in nri.substitutions]):
+                            continue
+                        #impl_result = self.rs.kcs.client.implies(nsp, ecover)
+                        #if impl_result.satisfiable:
+                        #    continue
+                        print("Adding a substitution")
+                        nri.substitutions.add(normalized_substitution)
+                        nri.new_substitutions.add(normalized_substitution)
 
     def choose(self) -> Optional[Tuple[Node,str,Substitution]]:
         for (node, ruleid),nri in self.node_rule_info.items():
@@ -300,6 +330,8 @@ def is_linear_combination_of(
     
     
     match candidate:
+        case Kore.EVar(_, _):
+            return True, subpatterns, allowed_outliers, remaining_unary_size
         # There is only finitely many nullary constructors, so we allow these
         case Kore.App(_, _, ()):
             return True,subpatterns,allowed_outliers, remaining_unary_size
@@ -307,11 +339,8 @@ def is_linear_combination_of(
         # We assume that `inj` is used for upcasting only.
         case Kore.App('inj', _, (arg,)):
             return is_linear_combination_of(subpatterns, allowed_outliers=allowed_outliers, allowed_outlier_size=allowed_outlier_size, candidate=arg, remaining_unary_size=remaining_unary_size)
-        # We prohibit other constructors of arity 1, since they might be chained indefinitely.
-        # TODO: we may want to relax it to allow chains of length at most `k` for some fixed `k`
         # The problem is that we often get chains of freezers of length that is linear to the size of the input program.
         # like, the expression `(x+y)+z` will lead to a chain similar to `x ~> #freezer+R(y) ~> #freezer+R(z)`
-        # But another problem is what happens after such sequence gets evaluated, which is what worries me now.
         case Kore.App(_, _, (arg,)):
             if remaining_unary_size <= 0:
                 pass
