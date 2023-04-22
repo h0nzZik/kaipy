@@ -83,6 +83,11 @@ def get_symbol_sort(definition: Kore.Definition, main_module_name: str, symbol_n
     decl = get_symbol_decl_from_definition(definition, main_module_name, symbol_name)
     return decl.sort
 
+def is_nonhooked_constructor_symbol(definition: Kore.Definition, main_module_name: str, symbol_name: str) -> bool:
+    decl = get_symbol_decl_from_definition(definition, main_module_name, symbol_name)
+    if decl.hooked:
+        return False
+    return ('constructor' in decl.attrs)
 
 def get_top_cell_initializer(definition: Kore.Definition) -> str:
     for a in definition.attrs:
@@ -167,6 +172,9 @@ def get_fresh_evars_with_sorts(avoid: List[Kore.EVar], sorts: List[Kore.Sort], p
     nums = list(range(n, n + len(sorts)))
     fresh_evars : List[Kore.EVar] = list(map(lambda m: Kore.EVar(name=prefix + str(m), sort=sorts[m - n]), nums))
     return fresh_evars
+
+def get_fresh_evar(avoid: List[Kore.EVar], sort: Kore.Sort, prefix="Fresh") -> Kore.EVar:
+    return get_fresh_evars_with_sorts(avoid, [sort], prefix=prefix)[0]
 
 def get_attr(attrs: tuple[Kore.App, ...], attr: str, default_value):
     for a in attrs:

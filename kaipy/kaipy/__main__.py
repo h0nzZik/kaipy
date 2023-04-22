@@ -38,6 +38,7 @@ from .ReachabilitySystem import ReachabilitySystem
 from .kore_utils import (
     free_evars_of_pattern,
     get_fresh_evars_with_sorts,
+    get_fresh_evar,
     rename_vars,
     axiom_uuid,
     axiom_label,
@@ -174,41 +175,47 @@ def make_conjunction(rs: ReachabilitySystem, l: List[Kore.Pattern]) -> Kore.Patt
     return result
 
 # TODO use make_conjunction
-def mapping_to_pattern(rs: ReachabilitySystem, m: Mapping[Kore.EVar, Kore.Pattern]) -> Kore.Pattern:
-    result: Kore.Pattern = Kore.Top(rs.top_sort)
+def mapping_to_pattern(sort: Kore.Sort, m: Mapping[Kore.EVar, Kore.Pattern]) -> Kore.Pattern:
+    result: Kore.Pattern = Kore.Top(sort)
     for lhs,rhs in m.items():
-        result = Kore.And(rs.top_sort, result, Kore.Equals(lhs.sort, rs.top_sort, lhs, rhs))
+        result = Kore.And(sort, result, Kore.Equals(lhs.sort, sort, lhs, rhs))
     return result
 
 
-def subst_to_pattern(rs: ReachabilitySystem, subst: Substitution) -> Kore.Pattern:
-    return mapping_to_pattern(rs, subst.mapping)
+def subst_to_pattern(sort: Kore.Sort, subst: Substitution) -> Kore.Pattern:
+    return mapping_to_pattern(sort, subst.mapping)
 
-def existentially_quantify_variables(rs: ReachabilitySystem, pattern: Kore.Pattern, vars: List[Kore.EVar]) -> Kore.Pattern:
-    return functools.reduce(lambda p, var: Kore.Exists(rs.top_sort, var, p), vars, pattern)
+def existentially_quantify_variables(sort, pattern: Kore.Pattern, vars: List[Kore.EVar]) -> Kore.Pattern:
+    return functools.reduce(lambda p, var: Kore.Exists(sort, var, p), vars, pattern)
 
-def existentially_quantify_free_variables(rs: ReachabilitySystem, pattern: Kore.Pattern) -> Kore.Pattern:
-    return existentially_quantify_variables(rs, pattern, list(free_evars_of_pattern(pattern)))
+def existentially_quantify_free_variables(sort, pattern: Kore.Pattern) -> Kore.Pattern:
+    return existentially_quantify_variables(sort, pattern, list(free_evars_of_pattern(pattern)))
 
-def substitution_subsumed_by(rs: ReachabilitySystem, subst1: Substitution, subst2: Substitution) -> bool:
-    pattern1 = subst_to_pattern(rs, subst1)
-    pattern2 = subst_to_pattern(rs, subst2)
+def substitution_subsumed_by(rs: ReachabilitySystem, subst1: Substitution, subst2: Substitution, verbose: bool) -> bool:
+    sortList = Kore.SortApp('SortList', ())
+    pattern1 = subst_to_pattern(sortList, subst1)
+    pattern2 = subst_to_pattern(sortList, subst2)
     fes = subst1.free_evars().union(subst2.free_evars())
     keys = set(subst1.mapping.keys()).union(subst2.mapping.keys())
     list_pattern = Kore.App("Lbl'Stop'List", (), ())
     for k in keys:
-        list_pattern = Kore.App("Lbl'Unds'List'Unds'", (), (list_pattern, Kore.App("LblListItem", (), (k,))))
+        inj = Kore.App("inj", (k.sort, Kore.SortApp('SortKItem', ()),), (k,))
+        list_pattern = Kore.App("Lbl'Unds'List'Unds'", (), (list_pattern, Kore.App("LblListItem", (), (inj,))))
     
-    lhs = Kore.And(Kore.SortApp('SortList', ()), list_pattern, pattern1)
-    rhs = Kore.And(Kore.SortApp('SortList', ()), list_pattern, pattern2)
+    lhs = Kore.And(sortList, list_pattern, pattern1)
+    rhs = Kore.And(sortList, list_pattern, pattern2)
     renaming = compute_renaming0(vars_to_avoid=list(keys.union(fes)), vars_to_rename=list(subst2.free_evars()))
     rhs_renamed = rename_vars(renaming, rhs)
-    rhs_renamed_quantified = existentially_quantify_variables(rs, rhs_renamed, list(subst2.free_evars()))
-    print("Subsumption?")
-    print(f"lhs = {rs.kprint.kore_to_pretty(lhs)}")
-    print(f"rhs = {rs.kprint.kore_to_pretty(rhs_renamed_quantified)}")
+    #lhs = rs.kcs.client.simplify(lhs)
+    #rhs_renamed = rs.kcs.client.simplify(rhs_renamed)
+    rhs_renamed_quantified = existentially_quantify_variables(sortList, rhs_renamed, [Kore.EVar(renaming[x.name], x.sort) for x in subst2.free_evars()])
+    if verbose:
+        print("Subsumption?")
+        print(f"lhs = {rs.kprint.kore_to_pretty(lhs)}")
+        print(f"rhs = {rs.kprint.kore_to_pretty(rhs_renamed_quantified)}")
     impl_result = rs.kcs.client.implies(lhs, rhs_renamed_quantified)
-    print(f"sat? {impl_result.satisfiable}")
+    if verbose:
+        print(f"sat? {impl_result.satisfiable}")
     return impl_result.satisfiable
 
 # The graph on which we do the analysis
@@ -272,8 +279,9 @@ class SCFG:
                         
                         substitution = Substitution(frozendict.frozendict(eqs))
                         normalized_substitution = normalize(substitution)
-                       
-                        if any([substitution_subsumed_by(self.rs, normalized_substitution, subst) for subst in nri.substitutions]):
+
+                        verbose = ruleid == 'IMP.while-unroll'
+                        if any([substitution_subsumed_by(self.rs, normalized_substitution, subst, verbose=verbose) for subst in nri.substitutions]):
                             continue
                         #impl_result = self.rs.kcs.client.implies(nsp, ecover)
                         #if impl_result.satisfiable:
@@ -364,8 +372,31 @@ def is_linear_combination_of(
 
     return False,{},0,0
 
+def make_constructor_pattern(rs: ReachabilitySystem, pattern: Kore.Pattern) -> Kore.Pattern:
+    
+    def go(p: Kore.Pattern, avoid: Set[Kore.EVar]) -> Tuple[Kore.Pattern, Set[Kore.EVar]]:
+        match p:
+            case Kore.App(symbol, sorts, args):
+                if not rs.is_nonhooked_constructor(symbol):
+                    x = get_fresh_evar(list(avoid), rs.get_symbol_sort(symbol))
+                    return x, avoid.union({x})
 
-def make_normalizer(rs, pattern: Kore.Pattern) -> Callable[[Substitution],Substitution]:
+                new_args: List[Kore.Pattern] = []
+                a = avoid
+                for arg in args:
+                    r, a = go(arg, a)
+                    new_args.append(r)
+                return Kore.App(symbol, sorts, new_args), a
+            case Kore.EVar(_, _):
+                return p, avoid
+            case _:
+                raise NotImplementedError()
+
+    fvs = free_evars_of_pattern(pattern)
+    new_pattern, _ = go(pattern, fvs)
+    return new_pattern
+
+def make_normalizer(rs: ReachabilitySystem, pattern: Kore.Pattern) -> Callable[[Substitution],Substitution]:
     print(f"Make normalizer from {rs.kprint.kore_to_pretty(pattern)}")
     #subpatterns = [s for s in some_subpatterns_of(pattern) if type(s) is not Kore.EVar]
     subpatterns = some_subpatterns_of(pattern)
@@ -405,7 +436,8 @@ def make_normalizer(rs, pattern: Kore.Pattern) -> Callable[[Substitution],Substi
         return False
 
     def f(s: Substitution):
-        return Substitution(frozendict.frozendict({k : v for k,v in s.mapping.items() if is_there(k.sort, v)}))
+        s2 = {k : make_constructor_pattern(rs, v) for k,v in s.mapping.items()}
+        return Substitution(frozendict.frozendict({k : v for k,v in s2.items() if is_there(k.sort, v)}))
 
     return f
 
@@ -418,10 +450,10 @@ def perform_analysis(rs: ReachabilitySystem, spg, normalize, input_kore):
             return scfg
         (node,ruleid,substitution) = x
         print(f"Choosing node {node.original_rule_label}")
-        sp = subst_to_pattern(rs, substitution)
+        sp = subst_to_pattern(rs.top_sort, substitution)
         patt: Kore.Pattern = Kore.And(rs.top_sort, node.pattern, sp)
         simplified_patt = cleanup_pattern(rs, rs.kcs.client.simplify(patt))
-        print(f"Executing pattern: {rs.kprint.kore_to_pretty(simplified_patt)}")
+        #print(f"Executing pattern: {rs.kprint.kore_to_pretty(simplified_patt)}")
         #exec_result = rs.kcs.client.execute(pattern=patt, max_depth=1)
         exec_result = rs.kcs.client.execute(pattern=simplified_patt, max_depth=1)
         
@@ -439,7 +471,7 @@ def print_analyze_results(rs, scfg: SCFG):
             ri = scfg.node_rule_info[(node, ruleid)]
             print(f"{node.original_rule_label}/{ruleid}")
             for sub in ri.substitutions:
-                print(f"  {rs.kprint.kore_to_pretty(subst_to_pattern(rs, sub))}")
+                print(f"  {rs.kprint.kore_to_pretty(subst_to_pattern(rs.top_sort, sub))}")
     
     print("States/rules without empty substitution")
     for node in scfg.nodes:
@@ -491,7 +523,7 @@ def to_axiom_list(rs: ReachabilitySystem, scfg: SCFG) -> List[Tuple[Kore.Axiom, 
                 case Kore.Axiom(vs, Kore.Rewrites(sort, lhs, rhs) as rewrites, _):
                     ri = scfg.node_rule_info[(node, rule_id)]
                     for sub in ri.substitutions:
-                        conjunction = rs.kcs.client.simplify(Kore.And(sort, lhs, subst_to_pattern(rs, sub)))
+                        conjunction = rs.kcs.client.simplify(Kore.And(sort, lhs, subst_to_pattern(rs.top_sort, sub)))
                         rewrite_axioms.append((Kore.Axiom(vs, Kore.Rewrites(sort, conjunction, rhs),()), ri.initial))
     return rewrite_axioms
 
@@ -549,7 +581,7 @@ def get_predicates(phi: Kore.Pattern) -> List[Kore.Pattern]:
 def cleanup_eqs(rs: ReachabilitySystem, main_part: Kore.Pattern, eqs: Dict[Kore.EVar, Kore.Pattern]) -> Kore.Pattern:
     fvs = free_evars_of_pattern(main_part)
     evs2 = {k:v for k,v in eqs.items() if (k in fvs)}
-    evs2_p = mapping_to_pattern(rs, evs2)
+    evs2_p = mapping_to_pattern(rs.top_sort, evs2)
     return evs2_p
 
 def cleanup_pattern(rs: ReachabilitySystem, phi: Kore.Pattern) -> Kore.Pattern:
@@ -591,7 +623,7 @@ def combine_rules(rs: ReachabilitySystem, first_rule: Kore.Axiom, second_rule: K
     #      maybe target only the reachable nodes from the initial ones...
 
     preds1_conj = make_conjunction(rs, preds1)
-    eqs1_p = mapping_to_pattern(rs, eqs1)
+    eqs1_p = mapping_to_pattern(rs.top_sort, eqs1)
     side_cond: Kore.Pattern = Kore.And(rs.top_sort, eqs1_p, preds1_conj)
     #print(f"preds1_conj: {rs.kprint.kore_to_pretty(preds1_conj)}")
     new_lhs = rs.kcs.client.simplify(Kore.And(rs.top_sort, curr_lhs, side_cond))
@@ -603,7 +635,7 @@ def combine_rules(rs: ReachabilitySystem, first_rule: Kore.Axiom, second_rule: K
         print(f"Axiom2 rhs {rs.kprint.kore_to_pretty(other_rhs_renamed)}")
         raise RuntimeError("new_lhs is unexpectedly bottom.")
     #new_lhs = rs.kcs.client.simplify(Kore.And(rs.top_sort, curr_lhs, mapping_to_pattern(rs, eqs1))) # FIXME I know this is not enough
-    new_rhs = rs.kcs.client.simplify(Kore.And(rs.top_sort, other_rhs_renamed, mapping_to_pattern(rs, eqs2)))
+    new_rhs = rs.kcs.client.simplify(Kore.And(rs.top_sort, other_rhs_renamed, mapping_to_pattern(rs.top_sort, eqs2)))
     # After the simplification, the intermediate variables (from 'other_renaming') should disappear
     #print(f"New lhs {rs.kprint.kore_to_pretty(new_lhs)}")
     #print(f"New rhs {rs.kprint.kore_to_pretty(new_rhs)}")

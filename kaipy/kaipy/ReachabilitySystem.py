@@ -37,7 +37,7 @@ from pyk.kore.syntax import (
 
 from .kcommands import KORE_RPC_COMMAND
 from .kore_utils import (
-    rewrite_axioms, get_symbol_sort, get_top_cell_initializer, axiom_label, free_evars_of_pattern,
+    rewrite_axioms, get_symbol_sort, get_top_cell_initializer, axiom_label, free_evars_of_pattern, is_nonhooked_constructor_symbol,
 )
 
 class KoreClientServer:
@@ -107,9 +107,12 @@ class ReachabilitySystem:
     def __exit__(self, *args: Any) -> None:
         self.kcs.__exit__()
 
+    def get_symbol_sort(self, symbol: str) -> Sort:
+        return get_symbol_sort(self.definition, self.main_module_name, symbol)
+
     @cached_property
     def top_sort(self) -> Sort:
-        return get_symbol_sort(self.definition, self.main_module_name, get_top_cell_initializer(self.definition))
+        return self.get_symbol_sort(get_top_cell_initializer(self.definition))
 
     @cached_property
     def kast_definition(self) -> KDefinition:
@@ -132,3 +135,6 @@ class ReachabilitySystem:
             evars = evars.union(free_evars_of_pattern(axiom.pattern))
         return evars
 
+
+    def is_nonhooked_constructor(self, name: str) -> bool:
+        return is_nonhooked_constructor_symbol(self.definition, self.main_module_name, name)
