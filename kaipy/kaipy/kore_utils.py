@@ -41,6 +41,17 @@ def get_all_imported_module_names(definition: Kore.Definition, module_name: str)
                 names.add(imported_module_name)
     return names
 
+def get_all_recursively_imported_module_names(definition: Kore.Definition, module_name: str) -> Set[str]:
+    names: Set[str] = {module_name}
+    new_names: Set[str] = {module_name}
+    while len(new_names) > 0:
+        curr_name = new_names.pop()
+        names_to_add = get_all_imported_module_names(definition, curr_name).difference(names)
+        names = names.union(names_to_add)
+        new_names = new_names.union(names_to_add)
+    return names
+        
+
 def get_symbol_decl_from_module(module: Kore.Module, symbol_name: str) -> Optional[Kore.SymbolDecl]:
     for s in module.sentences:
         match s:
@@ -50,7 +61,7 @@ def get_symbol_decl_from_module(module: Kore.Module, symbol_name: str) -> Option
     return None
 
 def axioms(definition: Kore.Definition, main_module_name: str) -> List[Kore.Axiom]:
-    module_names = {main_module_name}.union(get_all_imported_module_names(definition, main_module_name))
+    module_names = {main_module_name}.union(get_all_recursively_imported_module_names(definition, main_module_name))
     modules = map(lambda name: get_module_by_name(definition, name), module_names)
     axioms : List[Kore.Axiom] = []
     for m in modules:
@@ -72,7 +83,7 @@ def other_than_rewrite_axioms(definition: Kore.Definition, main_module_name: str
 
 
 def get_symbol_decl_from_definition(definition: Kore.Definition, main_module_name: str, symbol_name: str) -> Kore.SymbolDecl:
-    module_names = {main_module_name}.union(get_all_imported_module_names(definition, main_module_name))
+    module_names = {main_module_name}.union(get_all_recursively_imported_module_names(definition, main_module_name))
     modules = map(lambda name: get_module_by_name(definition, name), module_names)
     decls = [decl for decl in map(lambda module: get_symbol_decl_from_module(module, symbol_name), modules) if decl is not None]
     if len(list(decls)) >= 1:
