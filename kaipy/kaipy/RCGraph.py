@@ -17,6 +17,7 @@ from .kore_utils import (
     extract_equalities_and_rest_from_witness,
     extract_equalities_from_witness,
     mapping_to_pattern,
+    axiom_label,
 )
 
 from .rs_utils import (
@@ -116,7 +117,7 @@ class RCGraph:
         }
     
     @staticmethod
-    def from_dict(d: Type.Dict[str, Type.Any]) -> RCGraph:
+    def from_dict(d: Type.Dict[str, Type.Any]):
         rcg = RCGraph()
         nodes = d['nodes']
         edges = d['edges']
@@ -129,19 +130,24 @@ class RCGraph:
         return rcg
 
 def make_RCG_from_rs(rs: ReachabilitySystem) -> RCGraph:
-    rws: Type.List[Kore.Rewrites] = []
+    rws: Type.List[Type.Tuple[Kore.Rewrites, str]] = []
     for axiom in rs.rewrite_rules:
         match axiom:
             case Kore.Axiom(_, Kore.Rewrites(_, _, _) as rewrite, _):
-                rws.append(rewrite)
+                rws.append((rewrite, axiom_label(axiom)))
     
     rcg = RCGraph()
-    for rewrite in rws:
+    for rewrite,_ in rws:
         rcg.add_node(rewrite)
     
-    for rw1 in rws:
-        for rw2 in rws:
+    total = len(rws)*len(rws)
+    current = 1
+    for (rw1, name1) in rws:
+        for (rw2, name2) in rws:
+            print(f"Generating RCG: {current} / {total}")
+            print(f"{name1} * {name2}")
             rcg.try_add_edge(rs, rw1, rw2)
+            current = current + 1
     
     return rcg
 
