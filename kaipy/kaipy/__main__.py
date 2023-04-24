@@ -45,6 +45,19 @@ from .kore_utils import (
     extract_equalities_and_rest_from_witness,
     extract_equalities_from_witness,
     some_subpatterns_of,
+    get_lhs,
+    get_rhs,
+    compute_renaming0,
+    compute_renaming,
+    get_predicates,
+    is_bottom,
+    mapping_to_pattern,
+)
+
+from .rs_utils import (
+    make_conjunction,
+    cleanup_pattern,
+    cleanup_eqs,
 )
 
 def get_input_kore(rs: ReachabilitySystem, definition_dir: Path, program: Path) -> Kore.Pattern:
@@ -72,16 +85,6 @@ def get_input_kore(rs: ReachabilitySystem, definition_dir: Path, program: Path) 
     assert parser.eof
     return res
 
-def compute_renaming0(vars_to_avoid: List[Kore.EVar], vars_to_rename: List[Kore.EVar]) -> Dict[str, str]:
-    vars_to_avoid = vars_to_rename + vars_to_avoid
-    new_vars = get_fresh_evars_with_sorts(avoid=list(vars_to_avoid), sorts=list(map(lambda ev: ev.sort, vars_to_rename)))
-    vars_fr : List[str] = list(map(lambda e: e.name, vars_to_rename))
-    vars_to : List[str] = list(map(lambda e: e.name, new_vars))
-    renaming = dict(zip(vars_fr, vars_to))
-    return renaming
-
-def compute_renaming(patt: Kore.Pattern, vars_to_avoid: List[Kore.EVar]) -> Dict[str, str]:
-    return compute_renaming0(vars_to_avoid=vars_to_avoid, vars_to_rename=list(free_evars_of_pattern(patt)))
 
 def compute_conjunction(rs: ReachabilitySystem, a: Kore.Pattern, b: Kore.Pattern) -> Kore.Pattern:
     return rs.simplify(Kore.And(rs.top_sort, a, b))
@@ -96,12 +99,6 @@ def compute_match(rs: ReachabilitySystem, patt_from: Kore.Pattern, axiom: Kore.R
     axiom_left = rename_vars(renaming, axiom.left)
     lhs_match = compute_conjunction(rs, patt_from, axiom_left)
     return lhs_match,renaming
-
-def is_bottom(pattern: Kore.Pattern) -> bool:
-    match pattern:
-        case Kore.Bottom(_):
-            return True
-    return False
 
 def may_transit(rs: ReachabilitySystem, patt_from: Kore.Pattern, axiom: Kore.Rewrites) -> bool:
     lhs_match,_ = compute_match(rs, patt_from, axiom)
@@ -167,20 +164,6 @@ class Substitution:
         for _,p in self.mapping.items():
             fe = fe.union(free_evars_of_pattern(p))
         return fe
-
-def make_conjunction(rs: ReachabilitySystem, l: List[Kore.Pattern]) -> Kore.Pattern:
-    result: Kore.Pattern = Kore.Top(rs.top_sort)
-    for x in l:
-        result = Kore.And(rs.top_sort, result, x)
-    return result
-
-# TODO use make_conjunction
-def mapping_to_pattern(sort: Kore.Sort, m: Mapping[Kore.EVar, Kore.Pattern]) -> Kore.Pattern:
-    result: Kore.Pattern = Kore.Top(sort)
-    for lhs,rhs in m.items():
-        result = Kore.And(sort, result, Kore.Equals(lhs.sort, sort, lhs, rhs))
-    return result
-
 
 def subst_to_pattern(sort: Kore.Sort, subst: Substitution) -> Kore.Pattern:
     return mapping_to_pattern(sort, subst.mapping)
@@ -517,17 +500,6 @@ def next_patterns_of(rs: ReachabilitySystem, pattern: Kore.Pattern):
     next_patterns: List[Kore.Pattern] = [exec_result.state.kore] if exec_result.next_states is None else [s.kore for s in exec_result.next_states]    
     return next_patterns
 
-def get_lhs(rule: Kore.Axiom) -> Kore.Pattern:
-    match rule:
-        case Kore.Axiom(vs, Kore.Rewrites(sort, lhs, rhs) as rewrites, _):
-            return lhs
-    raise RuntimeError("Not a rewrite rule")
-
-def get_rhs(rule: Kore.Axiom) -> Kore.Pattern:
-    match rule:
-        case Kore.Axiom(vs, Kore.Rewrites(sort, lhs, rhs) as rewrites, _):
-            return rhs
-    raise RuntimeError("Not a rewrite rule")
 
 
 def can_self_loop(rs: ReachabilitySystem, rule: Kore.Axiom):
@@ -587,40 +559,6 @@ def generate_analyzer(rs: ReachabilitySystem, args) -> int:
         fw.write(json.dumps(semantics_pregraph.dict))
     return 0
 
-def filter_out_predicates(phi: Kore.Pattern) -> Tuple[Optional[Kore.Pattern], List[Kore.Pattern]]:
-    if issubclass(type(phi), Kore.MLPred):
-        return None,[phi]
-    match phi:
-        case Kore.And(sort, left, right):
-            lf,ps1 = filter_out_predicates(left)
-            rf,ps2 = filter_out_predicates(right)
-            if lf is None:
-                return rf,(ps1+ps2)
-            if rf is None:
-                return lf,(ps1+ps2)
-            return Kore.And(sort, lf, rf),(ps1+ps2)
-        case _:
-            return phi,[]
-
-def get_predicates(phi: Kore.Pattern) -> List[Kore.Pattern]:
-    _, preds = filter_out_predicates(phi)
-    return preds
-
-def cleanup_eqs(rs: ReachabilitySystem, main_part: Kore.Pattern, eqs: Dict[Kore.EVar, Kore.Pattern]) -> Kore.Pattern:
-    fvs = free_evars_of_pattern(main_part)
-    evs2 = {k:v for k,v in eqs.items() if (k in fvs)}
-    evs2_p = mapping_to_pattern(rs.top_sort, evs2)
-    return evs2_p
-
-def cleanup_pattern(rs: ReachabilitySystem, phi: Kore.Pattern) -> Kore.Pattern:
-    main_part,_ = filter_out_predicates(phi)
-    assert(main_part is not None)
-    fvphi = free_evars_of_pattern(phi)
-    eqs, rest = extract_equalities_and_rest_from_witness({v.name for v in fvphi}, phi)
-    evs2_p = cleanup_eqs(rs, main_part, eqs)
-    if rest is None:
-        return evs2_p
-    return Kore.And(rs.top_sort, rest, evs2_p)
 
 def combine_rules(rs: ReachabilitySystem, first_rule: Kore.Axiom, second_rule: Kore.Axiom, vars_to_avoid: Set[Kore.EVar]) -> Optional[Tuple[Kore.Axiom, Kore.Pattern]]:
     curr_lhs = get_lhs(first_rule)
