@@ -134,6 +134,12 @@ def make_RCG_from_rs(rs: ReachabilitySystem) -> RCGraph:
     for axiom in rs.rewrite_rules:
         match axiom:
             case Kore.Axiom(_, Kore.Rewrites(_, _, _) as rewrite, _):
+                # For some reason, the frontend is able to generate a rule with unsatisfiable lhs.
+                # We skip such rules.
+                left_simplified = rs.simplify(rewrite.left)
+                if is_bottom(left_simplified):
+                    print(f"skipping {axiom_label(axiom)} (unsat lhs)")
+                    continue
                 rws.append((rewrite, axiom_label(axiom)))
     
     rcg = RCGraph()
