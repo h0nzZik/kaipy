@@ -25,12 +25,12 @@ from .rs_utils import (
     cleanup_pattern,
 )
 
-def compose_rules(rs: ReachabilitySystem, first_rule: Kore.Axiom, second_rule: Kore.Axiom, vars_to_avoid: Type.Set[Kore.EVar]) -> Type.Optional[Kore.Rewrites]:
-    curr_lhs = get_lhs(first_rule)
+def compose_rules(rs: ReachabilitySystem, first_rule: Kore.Rewrites, second_rule: Kore.Rewrites, vars_to_avoid: Type.Set[Kore.EVar]) -> Type.Optional[Kore.Rewrites]:
+    curr_lhs = first_rule.left
     curr_lhs = rs.simplify(curr_lhs)
-    curr_rhs = get_rhs(first_rule)
-    other_lhs = get_lhs(second_rule)
-    other_rhs = get_rhs(second_rule)
+    curr_rhs = first_rule.right
+    other_lhs = second_rule.left
+    other_rhs = second_rule.right
     vars_to_avoid = vars_to_avoid.union(free_evars_of_pattern(curr_rhs)).union(free_evars_of_pattern(curr_lhs))
     other_renaming = compute_renaming(other_lhs, list(vars_to_avoid))
     other_lhs_renamed: Kore.Pattern = rename_vars(other_renaming, other_lhs)
@@ -98,4 +98,19 @@ class RCGraph:
     def __add_edge(self, fr: Kore.Rewrites, to: Kore.Rewrites, edge: Kore.Rewrites):
         self.g.add_edge(u_of_edge=fr, v_of_edge=to, composition=edge)
     
+    def try_add_edge(self, rs: ReachabilitySystem, fr: Kore.Rewrites, to: Kore.Rewrites):
+        edge = compose_rules(rs, fr, to, set())
+        if edge:
+            self.__add_edge(fr, to, edge)
+    
 
+    def to_dict(self) -> Type.Dict[str, Type.Any]:
+        nodes: Type.Dict[int, Kore.Rewrites] = {i:n for i,n in enumerate(self.g.nodes) if type(n) is Kore.Rewrites}
+        edges: Type.List[Type.Tuple[int, int, Kore.Rewrites]] = [
+            (i1, i2, self.g.get_edge_data(r1, r2)['composition'])
+            for i1,r1 in nodes.items() for i2,r2 in nodes.items() if self.g.has_edge(r1, r2)
+        ]
+        return {
+            'nodes' : nodes,
+            'edges' : edges,
+        }
