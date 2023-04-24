@@ -41,6 +41,7 @@
               python.pkgs.matplotlib
               #python.pkgs.pyqt5
               python.pkgs.tkinter
+              python.pkgs.mpi4py
             ];
             postInstall = ''
               substituteInPlace $out/lib/*/site-packages/kaipy/kcommands.py \
