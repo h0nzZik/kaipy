@@ -26,6 +26,15 @@ IMP_ANALYZER := ${IMP_KOMPILED_DIR}/analyzer.json
 ${IMP_ANALYZER}: ${IMP_TIMESTAMP}
 	kaipy --definition ${IMP_KOMPILED_DIR}/imp-kompiled/ generate-analyzer --analyzer ${IMP_ANALYZER}
 
+IMP_RCG := ${IMP_KOMPILED_DIR}/rcg.json
+
+${IMP_RCG}: ${IMP_TIMESTAMP}
+	kaipy --definition ${IMP_KOMPILED_DIR}/imp-kompiled/ mk-rcgraph --store-rcg ${IMP_RCG}
+
+.PHONY: imp-rcg
+imp-rcg: ${IMP_RCG}
+
+
 # --print-rpc-logs
 analyzed_sum.json: ${IMP_TIMESTAMP} ${IMP_ANALYZER}
 	kaipy --definition ${IMP_KOMPILED_DIR}/imp-kompiled/ analyze --analyzer ${IMP_ANALYZER} --input ./lang/imp/sum.imp --output analyzed_sum.json

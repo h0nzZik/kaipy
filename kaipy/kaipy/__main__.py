@@ -60,6 +60,11 @@ from .rs_utils import (
     cleanup_eqs,
 )
 
+from .RCGraph import (
+    RCGraph,
+    make_RCG_from_rs,
+)
+
 def get_input_kore(rs: ReachabilitySystem, definition_dir: Path, program: Path) -> Kore.Pattern:
     # we have to invent a name which does not occur among variables of the semantic rules
     n: int = 0
@@ -835,6 +840,12 @@ def do_print(rs: ReachabilitySystem, args) -> int:
         print_rewrite_axioms(rs, axiom_list)
     return 0
 
+def do_mk_rcgraph(rs: ReachabilitySystem, args) -> int:
+    with open(args['store_rcg'], mode="w") as fw:
+        rcg: RCGraph = make_RCG_from_rs(rs)
+        fw.write(json.dumps(rcg.to_dict(), sort_keys=True, indent=True))
+    return 0
+
 def create_argument_parser() -> argparse.ArgumentParser:
     argument_parser = argparse.ArgumentParser(
         prog="kaipy",
@@ -845,6 +856,9 @@ def create_argument_parser() -> argparse.ArgumentParser:
 
     subparsers = argument_parser.add_subparsers(dest='command')
     
+    subparser_mk_rcgraph = subparsers.add_parser('mk-rcgraph', help="Create a Rule-Composition graph from the semantics")
+    subparser_mk_rcgraph.add_argument('--store-rcg', required=True)
+
     subparser_generate_analyzer = subparsers.add_parser('generate-analyzer', help='Create an analyzer from given semantics')
     subparser_generate_analyzer.add_argument('--analyzer', required=True)
 
@@ -883,6 +897,8 @@ def main():
 
         if args['command'] == 'analyze':
             retval = analyze(rs, args)
+        elif args['command'] == 'mk-rcgraph':
+            retval = do_mk_rcgraph(rs, args)
         elif args['command'] == 'generate-analyzer':
             retval = generate_analyzer(rs, args)
         elif args['command'] == 'optimize':

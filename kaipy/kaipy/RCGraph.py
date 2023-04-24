@@ -127,3 +127,21 @@ class RCGraph:
             rcg.__add_edge(nodes[i1], nodes[i2], c)
         
         return rcg
+
+def make_RCG_from_rs(rs: ReachabilitySystem) -> RCGraph:
+    rws: Type.List[Kore.Rewrites] = []
+    for axiom in rs.rewrite_rules:
+        match axiom:
+            case Kore.Axiom(_, Kore.Rewrites(_, _, _) as rewrite, _):
+                rws.append(rewrite)
+    
+    rcg = RCGraph()
+    for rewrite in rws:
+        rcg.add_node(rewrite)
+    
+    for rw1 in rws:
+        for rw2 in rws:
+            rcg.try_add_edge(rs, rw1, rw2)
+    
+    return rcg
+
