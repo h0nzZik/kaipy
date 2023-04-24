@@ -112,8 +112,8 @@ class RCGraph:
             for i1,r1 in nodes.items() for i2,r2 in nodes.items() if self.g.has_edge(r1, r2)
         ]
         return {
-            'nodes' : nodes,
-            'edges' : edges,
+            'nodes' : {i:n.dict for i,n in nodes.items()},
+            'edges' : [(i1,i2,c.dict) for i1,i2,c in edges],
         }
     
     @staticmethod
@@ -122,10 +122,10 @@ class RCGraph:
         nodes = d['nodes']
         edges = d['edges']
         for r in nodes:
-            rcg.add_node(r)
+            rcg.add_node(Kore.Rewrites.from_dict(r))
         
         for i1,i2,c in edges:
-            rcg.__add_edge(nodes[i1], nodes[i2], c)
+            rcg.__add_edge(nodes[i1], nodes[i2], Kore.Rewrites.from_dict(c))
         
         return rcg
 
