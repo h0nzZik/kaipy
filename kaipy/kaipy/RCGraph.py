@@ -114,3 +114,16 @@ class RCGraph:
             'nodes' : nodes,
             'edges' : edges,
         }
+    
+    @staticmethod
+    def from_dict(d: Type.Dict[str, Type.Any]) -> RCGraph:
+        rcg = RCGraph()
+        nodes = d['nodes']
+        edges = d['edges']
+        for r in nodes:
+            rcg.add_node(r)
+        
+        for i1,i2,c in edges:
+            rcg.__add_edge(nodes[i1], nodes[i2], c)
+        
+        return rcg
