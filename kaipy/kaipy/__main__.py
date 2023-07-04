@@ -4,7 +4,7 @@ import sys
 import json
 import argparse
 from dataclasses import dataclass
-import frozendict
+from immutabledict import immutabledict
 import functools
 
 
@@ -280,7 +280,7 @@ class SCFG:
                         #if ruleid == 'IMP.getArg':
                         #    print(self.rs.kprint.kore_to_pretty(m))
                         
-                        substitution = Substitution(frozendict.frozendict(eqs))
+                        substitution = Substitution(immutabledict(eqs))
                         normalized_substitution = normalize(free_evars_of_pattern(lhs).union(free_evars_of_pattern(node.pattern)), substitution)
 
                         verbose = ruleid == 'IMP.while-unroll'
@@ -447,7 +447,7 @@ def make_normalizer(rs: ReachabilitySystem, pattern: Kore.Pattern, avoid: Set[Ko
             avoid2 = avoid2.union(free_evars_of_pattern(constr))
             s2[k] = constr
         #s2 = {k : make_constructor_pattern(rs, v, avoid=avoid2.union(avoid)) for k,v in s.mapping.items()}
-        new_subst = Substitution(frozendict.frozendict({k : v for k,v in s2.items() if is_there(k.sort, v)}))
+        new_subst = Substitution(immutabledict({k : v for k,v in s2.items() if is_there(k.sort, v)}))
         # Try validatiny
         #print(f"new subst: {subst_to_pattern(rs.top_sort, new_subst).text}")
         #print(f"new subst simplified: {rs.simplify(subst_to_pattern(rs.top_sort, new_subst)).text}")

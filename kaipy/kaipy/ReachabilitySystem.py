@@ -142,7 +142,7 @@ class ReachabilitySystem:
     
     def simplify(self, pattern: Pattern) -> Pattern:
         try:
-            return self.kcs.client.simplify(pattern)
+            return self.kcs.client.simplify(pattern)[0]
         except:
             print(f"Error when simplifying: {self.kprint.kore_to_pretty(pattern)}")
             raise
