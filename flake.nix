@@ -27,7 +27,6 @@
         stdenv = pkgs.${system}.stdenv;
         pythonPackages = pkgs.${system}.python311Packages;
         k = k-framework.packages.${system}.k;
-        #kore-rpc = k-haskell-backend.project.${system}.hsPkgs.kore.components.exes.kore-rpc;
         python-pyk = pyk.packages.${system}.pyk-python311 ;
       in {
         kaipy = python.pkgs.buildPythonApplication {
@@ -43,6 +42,7 @@
               #python.pkgs.pyqt5
               python.pkgs.tkinter
               python.pkgs.mypy
+              python.pkgs.pytest
             ];
             postInstall = ''
               substituteInPlace $out/lib/*/site-packages/kaipy/kcommands.py \
