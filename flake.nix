@@ -72,5 +72,15 @@
 
         default = self.outputs.packages.${system}.kaipy ;
       });
+      devShells = forAllSystems(system: {
+        kaipy = pkgs.${system}.mkShell {
+          inputsFrom = [self.outputs.packages.${system}.kaipy];
+          packages = [
+              pkgs.${system}.autoflake
+              pkgs.${system}.isort
+              pkgs.${system}.black
+          ];
+        };
+      });
     };
 }
