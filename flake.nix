@@ -14,10 +14,9 @@
     #k-framework.inputs.haskell-backend.follows = "k-haskell-backend";
   };
 
-  outputs = { self, nixpkgs, pyk, k-framework, k-haskell-backend, ...}:
+  outputs = { self, nixpkgs, pyk, k-framework, ...}:
     let
-      supportedSystems = [ "x86_64-linux" "x86_64-darwin" "aarch64-linux" "aarch64-darwin" ];
-      forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
+      forAllSystems = f: nixpkgs.lib.genAttrs nixpkgs.lib.systems.flakeExposed (system: f system);
       pkgs = forAllSystems (system: nixpkgs.legacyPackages.${system});
     in
     {
