@@ -12,7 +12,7 @@ jobs:
         with:
           extra_nix_config: |
             access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
-      - uses: workflow/nix-shell-action@v3
+      - uses: workflow/nix-shell-action@v3.2.1
         with:
           flakes: .#kaipy, nixpkgs#python311Packages.pytest
           script: |
