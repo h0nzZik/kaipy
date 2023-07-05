@@ -5,17 +5,18 @@ jobs:
   tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: Install Nix
-        uses: cachix/install-nix-action@v18
+      - name: 'Check out code'
+        uses: actions/checkout@v3
+      - name: 'Install Nix/Cachix'
+        uses: cachix/install-nix-action@v19
         with:
+          install_url: https://releases.nixos.org/nix/nix-2.13.3/install
           extra_nix_config: |
             access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
       - uses: cachix/cachix-action@v12
         with:
           name: k-framework
-      - uses: workflow/nix-shell-action@v3.2.1
-        with:
-          flakes: .#kaipy, nixpkgs#python311Packages.pytest
-          script: |
-            pytest ./kaipy/
+      - name: 'Build kaipy'
+        run: GC_DONT_GC=1 nix build --print-build-logs '.#kaipy'
+      - name: 'Test kaipy'
+        run: GC_DONT_GC=1 nix develop --print-build-logs '.#kaipy' --command 'pytest ./kaipy/'
