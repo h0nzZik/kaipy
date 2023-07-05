@@ -1,6 +1,5 @@
 import typing as Type
 
-import networkx as nx  # type: ignore
 import pyk.kore.syntax as Kore
 
 from .kore_utils import (
@@ -97,84 +96,81 @@ def compose_rules(
     return rewrite
 
 
-class RCGraph:
-    """RCGraph means 'Rule-Composition Graph'. Nodes are rewrite rules, edges are compositions of such rules"""
+# class RCGraph:
+#     """RCGraph means 'Rule-Composition Graph'. Nodes are rewrite rules, edges are compositions of such rules"""
 
-    g: nx.DiGraph
+#     def __init__(self):
+#         self.fresh_int = 0
+#         self.node_labels = dict()
+#         pass
 
-    def __init__(self):
-        self.fresh_int = 0
-        self.g = nx.DiGraph()
-        self.node_labels = dict()
-        pass
+#     def add_node(self, rule: Kore.Rewrites) -> None:
+#         self.g.add_node(rule)
 
-    def add_node(self, rule: Kore.Rewrites) -> None:
-        self.g.add_node(rule)
+#     # Assume: `edge` is a composition of `fr` and `to`
+#     def __add_edge(self, fr: Kore.Rewrites, to: Kore.Rewrites, edge: Kore.Rewrites):
+#         self.g.add_edge(u_of_edge=fr, v_of_edge=to, composition=edge)
 
-    # Assume: `edge` is a composition of `fr` and `to`
-    def __add_edge(self, fr: Kore.Rewrites, to: Kore.Rewrites, edge: Kore.Rewrites):
-        self.g.add_edge(u_of_edge=fr, v_of_edge=to, composition=edge)
+#     def try_add_edge(
+#         self, rs: ReachabilitySystem, fr: Kore.Rewrites, to: Kore.Rewrites
+#     ):
+#         edge = compose_rules(rs, fr, to, set())
+#         if edge:
+#             self.__add_edge(fr, to, edge)
 
-    def try_add_edge(
-        self, rs: ReachabilitySystem, fr: Kore.Rewrites, to: Kore.Rewrites
-    ):
-        edge = compose_rules(rs, fr, to, set())
-        if edge:
-            self.__add_edge(fr, to, edge)
+#     def to_dict(self) -> Type.Dict[str, Type.Any]:
+#         nodes: Type.Dict[int, Kore.Rewrites] = {
+#             i: n for i, n in enumerate(self.g.nodes) if type(n) is Kore.Rewrites
+#         }
+#         edges: Type.List[Type.Tuple[int, int, Kore.Rewrites]] = [
+#             (i1, i2, self.g.get_edge_data(r1, r2)["composition"])
+#             for i1, r1 in nodes.items()
+#             for i2, r2 in nodes.items()
+#             if self.g.has_edge(r1, r2)
+#         ]
+#         return {
+#             "nodes": {i: n.dict for i, n in nodes.items()},
+#             "edges": [(i1, i2, c.dict) for i1, i2, c in edges],
+#         }
 
-    def to_dict(self) -> Type.Dict[str, Type.Any]:
-        nodes: Type.Dict[int, Kore.Rewrites] = {
-            i: n for i, n in enumerate(self.g.nodes) if type(n) is Kore.Rewrites
-        }
-        edges: Type.List[Type.Tuple[int, int, Kore.Rewrites]] = [
-            (i1, i2, self.g.get_edge_data(r1, r2)["composition"])
-            for i1, r1 in nodes.items()
-            for i2, r2 in nodes.items()
-            if self.g.has_edge(r1, r2)
-        ]
-        return {
-            "nodes": {i: n.dict for i, n in nodes.items()},
-            "edges": [(i1, i2, c.dict) for i1, i2, c in edges],
-        }
+#     @staticmethod
+#     def from_dict(d: Type.Dict[str, Type.Any]):
+#         rcg = RCGraph()
+#         nodes = d["nodes"]
+#         edges = d["edges"]
+#         for r in nodes:
+#             rcg.add_node(Kore.Rewrites.from_dict(r))
 
-    @staticmethod
-    def from_dict(d: Type.Dict[str, Type.Any]):
-        rcg = RCGraph()
-        nodes = d["nodes"]
-        edges = d["edges"]
-        for r in nodes:
-            rcg.add_node(Kore.Rewrites.from_dict(r))
+#         for i1, i2, c in edges:
+#             rcg.__add_edge(nodes[i1], nodes[i2], Kore.Rewrites.from_dict(c))
 
-        for i1, i2, c in edges:
-            rcg.__add_edge(nodes[i1], nodes[i2], Kore.Rewrites.from_dict(c))
-
-        return rcg
+#         return rcg
 
 
-def make_RCG_from_rs(rs: ReachabilitySystem) -> RCGraph:
-    rws: Type.List[Type.Tuple[Kore.Rewrites, str]] = []
-    for axiom in rs.rewrite_rules:
-        match axiom:
-            case Kore.Axiom(_, Kore.Rewrites(_, _, _) as rewrite, _):
-                # For some reason, the frontend is able to generate a rule with unsatisfiable lhs.
-                # We skip such rules.
-                left_simplified = rs.simplify(rewrite.left)
-                if is_bottom(left_simplified):
-                    print(f"skipping {axiom_label(axiom)} (unsat lhs)")
-                    continue
-                rws.append((rewrite, axiom_label(axiom)))
+# def make_RCG_from_rs(rs: ReachabilitySystem) -> RCGraph:
+#     rws: Type.List[Type.Tuple[Kore.Rewrites, str]] = []
+#     for axiom in rs.kdw.rewrite_rules:
+#         match axiom:
+#             case Kore.Axiom(_, Kore.Rewrites(_, _, _) as rewrite, _):
+#                 # For some reason, the frontend is able to generate a rule with unsatisfiable lhs.
+#                 # We skip such rules.
+#                 left_simplified = rs.simplify(rewrite.left)
+#                 if is_bottom(left_simplified):
+#                     print(f"skipping {axiom_label(axiom)} (unsat lhs)")
+#                     continue
+#                 rws.append((rewrite, axiom_label(axiom)))
 
-    rcg = RCGraph()
-    for rewrite, _ in rws:
-        rcg.add_node(rewrite)
+#     rcg = RCGraph()
+#     for rewrite, _ in rws:
+#         rcg.add_node(rewrite)
 
-    total = len(rws) * len(rws)
-    current = 1
-    for rw1, name1 in rws:
-        for rw2, name2 in rws:
-            print(f"Generating RCG: {current} / {total}")
-            print(f"{name1} * {name2}")
-            rcg.try_add_edge(rs, rw1, rw2)
-            current = current + 1
-
-    return rcg
+#     total = len(rws) * len(rws)
+#     current = 1
+#     for rw1, name1 in rws:
+#         for rw2, name2 in rws:
+#             print(f"Generating RCG: {current} / {total}")
+#             print(f"{name1} * {name2}")
+#             rcg.try_add_edge(rs, rw1, rw2)
+#             current = current + 1
+#
+#    return rcg

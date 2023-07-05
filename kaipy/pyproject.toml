@@ -19,3 +19,4 @@ kaipy = "kaipy.__main__:main"
 addopts = [
     "--import-mode=importlib",
 ]
+pythonpath = ["src"]

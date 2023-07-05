@@ -47,7 +47,7 @@ from .kore_utils import (
     rename_vars,
     some_subpatterns_of,
 )
-from .RCGraph import RCGraph, make_RCG_from_rs
+#from .RCGraph import RCGraph, make_RCG_from_rs
 from .ReachabilitySystem import ReachabilitySystem
 from .rs_utils import cleanup_eqs, cleanup_pattern, make_conjunction
 
@@ -149,13 +149,13 @@ class SemanticsPreGraph:
 def compute_semantics_pregraph(rs: ReachabilitySystem) -> SemanticsPreGraph:
     nodes: List[SemanticsPreGraph.Node] = []
 
-    for axiom in rs.rewrite_rules:
+    for axiom in rs.kdw.rewrite_rules:
         match axiom:
             case Kore.Axiom(_, Kore.Rewrites(_, lhs, _), _):
                 pattern: Kore.Pattern = lhs
                 original_rule_label: str = axiom_label(axiom)
                 applicable_rules: List[str] = []
-                for rule_to_apply in rs.rewrite_rules:
+                for rule_to_apply in rs.kdw.rewrite_rules:
                     match rule_to_apply:
                         case Kore.Axiom(_, Kore.Rewrites(_, _, _) as r, _):
                             if may_transit(rs, pattern, r):
@@ -834,7 +834,7 @@ def optimize(
     rs: ReachabilitySystem, rewrite_axioms: List[Tuple[Kore.Axiom, bool]], treshold=2
 ) -> List[Tuple[Kore.Axiom, bool]]:
     print(
-        f"Total axioms: {len(rewrite_axioms)} (original was: {len(rs.rewrite_rules)})"
+        f"Total axioms: {len(rewrite_axioms)} (original was: {len(rs.kdw.rewrite_rules)})"
     )
 
     plt.ion()
@@ -1044,11 +1044,11 @@ def do_print(rs: ReachabilitySystem, args) -> int:
     return 0
 
 
-def do_mk_rcgraph(rs: ReachabilitySystem, args) -> int:
-    with open(args["store_rcg"], mode="w") as fw:
-        rcg: RCGraph = make_RCG_from_rs(rs)
-        fw.write(json.dumps(rcg.to_dict(), sort_keys=True, indent=True))
-    return 0
+#def do_mk_rcgraph(rs: ReachabilitySystem, args) -> int:
+#    with open(args["store_rcg"], mode="w") as fw:
+#        rcg: RCGraph = make_RCG_from_rs(rs)
+#        fw.write(json.dumps(rcg.to_dict(), sort_keys=True, indent=True))
+#    return 0
 
 
 def create_argument_parser() -> argparse.ArgumentParser:
@@ -1105,8 +1105,8 @@ def main():
     ) as rs:
         if args["command"] == "analyze":
             retval = analyze(rs, args)
-        elif args["command"] == "mk-rcgraph":
-            retval = do_mk_rcgraph(rs, args)
+        #elif args["command"] == "mk-rcgraph":
+        #    retval = do_mk_rcgraph(rs, args)
         elif args["command"] == "generate-analyzer":
             retval = generate_analyzer(rs, args)
         elif args["command"] == "optimize":

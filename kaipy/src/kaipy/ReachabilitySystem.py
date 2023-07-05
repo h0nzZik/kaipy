@@ -1,14 +1,16 @@
-from functools import cached_property
+import typing as T
+import functools as F
+
 from pathlib import Path
-from typing import IO, Any, Final, Iterable, List, Optional, Set
 
 from pyk.kast.outer import KDefinition
 from pyk.kore.parser import KoreParser
 from pyk.kore.rpc import KoreClient, KoreServer
-from pyk.kore.syntax import Axiom, Definition, EVar, Pattern, Sort
+import pyk.kore.syntax as Kore
 from pyk.ktool.kprint import KPrint
 
 from .kcommands import KORE_RPC_COMMAND
+from .KompiledDefinitionWrapper import KompiledDefinitionWrapper
 from .kore_utils import (
     axiom_label,
     free_evars_of_pattern,
@@ -20,15 +22,15 @@ from .kore_utils import (
 
 
 class KoreClientServer:
-    server: Optional[KoreServer]
+    server: T.Optional[KoreServer]
     client: KoreClient
 
     def __init__(
         self,
         definition_dir: Path,
         main_module_name: str,
-        kore_rpc_args: Iterable[str] = (),
-        connect_to_port: Optional[str] = None,
+        kore_rpc_args: T.Iterable[str] = (),
+        connect_to_port: T.Optional[str] = None,
     ):
         if connect_to_port is not None:
             port = int(connect_to_port)
@@ -48,7 +50,7 @@ class KoreClientServer:
     def __enter__(self) -> "KoreClientServer":
         return self
 
-    def __exit__(self, *args: Any) -> None:
+    def __exit__(self, *args: T.Any) -> None:
         self.client.close()
         if self.server is not None:
             self.server.close()
@@ -57,7 +59,8 @@ class KoreClientServer:
 
 class ReachabilitySystem:
     kcs: KoreClientServer
-    definition: Definition
+    kdw: KompiledDefinitionWrapper
+    #definition: Definition
     main_module_name: str
     kprint: KPrint
     definition_dir: Path
@@ -65,17 +68,18 @@ class ReachabilitySystem:
     def __init__(
         self,
         definition_dir: Path,
-        kore_rpc_args: Iterable[str] = (),
-        connect_to_port: Optional[str] = None,
+        kore_rpc_args: T.Iterable[str] = (),
+        connect_to_port: T.Optional[str] = None,
     ):
         self.definition_dir = definition_dir
         with open(definition_dir / "mainModule.txt", "r") as mm:
             self.main_module_name = mm.read()
         with open(definition_dir / "definition.kore", "r") as dc:
             d = dc.read()
-        kparser = KoreParser(d)
+        #kparser = KoreParser(d)
 
-        self.definition = kparser.definition()
+        #definition = kparser.definition()
+        self.kdw = KompiledDefinitionWrapper(definition_dir)
         self.kprint = KPrint(definition_dir)
         self.kcs = KoreClientServer(
             definition_dir=definition_dir,
@@ -87,34 +91,35 @@ class ReachabilitySystem:
     def __enter__(self) -> "ReachabilitySystem":
         return self
 
-    def __exit__(self, *args: Any) -> None:
+    def __exit__(self, *args: T.Any) -> None:
         self.kcs.__exit__()
 
-    def get_symbol_sort(self, symbol: str) -> Sort:
+    def get_symbol_sort(self, symbol: str) -> Kore.Sort:
         return get_symbol_sort(self.definition, self.main_module_name, symbol)
 
-    @cached_property
-    def top_sort(self) -> Sort:
+    @F.cached_property
+    def definition(self) -> Kore.Definition:
+        return self.kdw.kompiled_kore.definition
+
+    @F.cached_property
+    def top_sort(self) -> Kore.Sort:
         return self.get_symbol_sort(get_top_cell_initializer(self.definition))
 
-    @cached_property
+    @F.cached_property
     def kast_definition(self) -> KDefinition:
         return self.kprint.definition
 
-    @cached_property
-    def rewrite_rules(self) -> List[Axiom]:
-        return list(rewrite_axioms(self.definition, self.main_module_name))
 
-    def rule_by_id(self, ruleid: str) -> Axiom:
-        for axiom in self.rewrite_rules:
+    def rule_by_id(self, ruleid: str) -> Kore.Axiom:
+        for axiom in self.kdw.rewrite_rules:
             if axiom_label(axiom) == ruleid:
                 return axiom
         raise ValueError(f"Axiom with id {ruleid} not found.")
 
-    @cached_property
-    def rules_variables(self) -> Set[EVar]:
-        evars: Set[EVar] = set()
-        for axiom in self.rewrite_rules:
+    @F.cached_property
+    def rules_variables(self) -> T.Set[Kore.EVar]:
+        evars: T.Set[Kore.EVar] = set()
+        for axiom in self.kdw.rewrite_rules:
             evars = evars.union(free_evars_of_pattern(axiom.pattern))
         return evars
 
@@ -123,7 +128,7 @@ class ReachabilitySystem:
             self.definition, self.main_module_name, name
         )
 
-    def simplify(self, pattern: Pattern) -> Pattern:
+    def simplify(self, pattern: Kore.Pattern) -> Kore.Pattern:
         try:
             return self.kcs.client.simplify(pattern)[0]
         except:
