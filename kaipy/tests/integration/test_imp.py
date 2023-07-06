@@ -65,6 +65,6 @@ class TestImp(MyTest):
             #print(execute_result.state.kore.text)
             print(rs_heatonly.kprint.kore_to_pretty(last))
             mapping = RSUtils.match_ca(rs_heatonly, context_alias, last)
-            print(mapping)
+            print(mapping[Kore.EVar(name="VARHERE", sort=Kore.SortApp(name="SortKItem"))])
 
         assert False
