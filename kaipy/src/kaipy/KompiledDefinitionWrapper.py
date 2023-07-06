@@ -95,7 +95,7 @@ class KompiledDefinitionWrapper:
         result = krun._krun(
             command=(kcommands.KRUN_COMMAND),
             input_file=Path(program),
-            definition_dir=self.kompiled_kore.path,
+            definition_dir=self.definition_dir,
             output=krun.KRunOutput.KORE,
             depth=0,
             cmap={"ARGS": (args_name + r":SortList{}")},
@@ -110,9 +110,9 @@ class KompiledDefinitionWrapper:
     @F.cached_property
     def heat_only(self):
         new_definition = heat_only_definition(self.kompiled_kore.definition)
-        tmp_kompiled_kore = TmpKompiledKore(new_definition)
+        tmp_kompiled_kore = TmpKompiledKore(definition=new_definition, old_dir=self.definition_dir)
         return KompiledDefinitionWrapper(
             tmp_kompiled_kore,
             main_module_name=self.main_module_name,
-            definition_dir=self.definition_dir,
+            definition_dir=tmp_kompiled_kore.definition_dir,
         )

@@ -1,8 +1,9 @@
 import typing as T
 from pathlib import Path
-
 import pytest
+
 from pyk.testing._kompiler import KompiledTest
+import pyk.kore.syntax as Kore
 
 from kaipy.KompiledDefinitionWrapper import KompiledDefinitionWrapper
 
@@ -31,4 +32,7 @@ class TestImp(MyTest):
         assert len(heat_only_def.rewrite_rules) < len(
             kompiled_definition_wrapper.rewrite_rules
         )
+        input_pattern: Kore.Pattern = heat_only_def.get_input_kore(LANGUAGES / "imp/sum.imp")
+        print(input_pattern.text)
+
         assert True
