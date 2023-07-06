@@ -27,11 +27,11 @@
               src = ./kaipy;
               format = "pyproject";
               propagatedBuildInputs = [
+                k
                 prev.pyk-python311
                 python.pkgs.setuptools
                 python.pkgs.networkx
                 python.pkgs.immutabledict
-                
                 python.pkgs.pytest
               ];
               postInstall = ''
