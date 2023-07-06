@@ -17,7 +17,7 @@ class TmpKompiledKore(IManagedKompiledKore):
     def __init__(self, definition: Kore.Definition):
         self._tmp_directory = tempfile.TemporaryDirectory()
         (Path(self._tmp_directory.name) / 'timestamp').touch()
-        with open((Path(self._tmp_directory.name) / 'definition.kore')) as fw:
+        with open((Path(self._tmp_directory.name) / 'definition.kore'), mode='w') as fw:
             fw.write(definition.text)
 
         self._kompiled_kore = KompiledKore(self._tmp_directory.name)

@@ -4,9 +4,7 @@ from pathlib import Path
 import pytest
 from pyk.testing._kompiler import KompiledTest
 
-#import kaipy
 from kaipy.KompiledDefinitionWrapper import KompiledDefinitionWrapper
-from kaipy.HeatonlyDefinition import heat_only_definition
 
 LANGUAGES: T.Final = (Path(__file__).parent / "languages").resolve(strict=True)
 
@@ -28,4 +26,7 @@ class TestImp(MyTest):
         assert True
 
     def test_heatonly(self, kompiled_definition_wrapper: KompiledDefinitionWrapper):
+        heat_only_def: KompiledDefinitionWrapper = kompiled_definition_wrapper.heat_only
+        # We assume that Imp has some non-heat rules
+        assert len(heat_only_def.rewrite_rules) < len(kompiled_definition_wrapper.rewrite_rules)
         assert True
