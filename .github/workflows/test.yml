@@ -18,5 +18,7 @@ jobs:
           name: k-framework
       - name: 'Build kaipy'
         run: GC_DONT_GC=1 nix build --print-build-logs '.#kaipy'
+      - name: 'MyPy kaipy'
+        run: GC_DONT_GC=1 nix develop --print-build-logs '.#kaipy' --command 'mypy ./kaipy'
       - name: 'Test kaipy'
-        run: GC_DONT_GC=1 nix develop --print-build-logs '.#kaipy' --command 'pytest'
+        run: GC_DONT_GC=1 nix develop --print-build-logs '.#kaipy' --command 'pytest ./kaipy'
