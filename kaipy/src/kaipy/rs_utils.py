@@ -1,9 +1,12 @@
-import typing as Type
+import typing as T
 
 import pyk.kore.syntax as Kore
+import pyk.kore.rpc as KoreRpc
 
 from .kore_utils import (
     extract_equalities_and_rest_from_witness,
+    extract_equalities_from_witness,
+    existentially_quantify_free_variables,
     filter_out_predicates,
     free_evars_of_pattern,
     mapping_to_pattern,
@@ -12,7 +15,7 @@ from .ReachabilitySystem import ReachabilitySystem
 
 
 def make_conjunction(
-    rs: ReachabilitySystem, l: Type.List[Kore.Pattern]
+    rs: ReachabilitySystem, l: T.List[Kore.Pattern]
 ) -> Kore.Pattern:
     result: Kore.Pattern = Kore.Top(rs.top_sort)
     for x in l:
@@ -34,9 +37,21 @@ def cleanup_pattern(rs: ReachabilitySystem, phi: Kore.Pattern) -> Kore.Pattern:
 def cleanup_eqs(
     rs: ReachabilitySystem,
     main_part: Kore.Pattern,
-    eqs: Type.Dict[Kore.EVar, Kore.Pattern],
+    eqs: T.Dict[Kore.EVar, Kore.Pattern],
 ) -> Kore.Pattern:
     fvs = free_evars_of_pattern(main_part)
     evs2 = {k: v for k, v in eqs.items() if (k in fvs)}
     evs2_p = mapping_to_pattern(rs.top_sort, evs2)
     return evs2_p
+
+
+
+def match_ca(rs: ReachabilitySystem, ca : Kore.Pattern, data: Kore.Pattern) -> T.Dict[Kore.EVar, Kore.Pattern]:
+    eca = existentially_quantify_free_variables(rs.top_sort, ca)
+    ir: KoreRpc.ImpliesResult = rs.kcs.client.implies(data, eca)
+    if not ir.satisfiable:
+        raise ValueError("No match. Bad context?")
+    if ir.substitution is None:
+        raise ValueError("No substitution. Bad context?")
+    fev = {fv.name for fv in free_evars_of_pattern(ca)}
+    return extract_equalities_from_witness(fev, ir.substitution)

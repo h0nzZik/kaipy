@@ -46,6 +46,8 @@ from .kore_utils import (
     mapping_to_pattern,
     rename_vars,
     some_subpatterns_of,
+    existentially_quantify_free_variables,
+    existentially_quantify_variables,
 )
 
 # from .RCGraph import RCGraph, make_RCG_from_rs
@@ -161,17 +163,6 @@ class Substitution:
 def subst_to_pattern(sort: Kore.Sort, subst: Substitution) -> Kore.Pattern:
     return mapping_to_pattern(sort, subst.mapping)
 
-
-def existentially_quantify_variables(
-    sort, pattern: Kore.Pattern, vars: List[Kore.EVar]
-) -> Kore.Pattern:
-    return functools.reduce(lambda p, var: Kore.Exists(sort, var, p), vars, pattern)
-
-
-def existentially_quantify_free_variables(sort, pattern: Kore.Pattern) -> Kore.Pattern:
-    return existentially_quantify_variables(
-        sort, pattern, list(free_evars_of_pattern(pattern))
-    )
 
 
 def substitution_subsumed_by(

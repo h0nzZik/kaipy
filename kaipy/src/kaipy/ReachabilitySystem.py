@@ -17,6 +17,7 @@ from .kore_utils import (
     get_top_cell_initializer,
     is_nonhooked_constructor_symbol,
     rewrite_axioms,
+    existentially_quantify_free_variables,
 )
 import kaipy.utils as utils
 
@@ -118,3 +119,4 @@ class ReachabilitySystem:
         except:
             print(f"Error when simplifying: {self.kprint.kore_to_pretty(pattern)}")
             raise
+

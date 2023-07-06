@@ -1,5 +1,6 @@
-import typing as Type
+import typing as T
 from itertools import chain, product
+import functools
 
 import pyk.kore.syntax as Kore
 from pyk.kore.manip import free_occs
@@ -20,9 +21,9 @@ def get_module_by_name(definition: Kore.Definition, module_name: str) -> Kore.Mo
 
 def get_all_imported_module_names(
     definition: Kore.Definition, module_name: str
-) -> Type.Set[str]:
+) -> T.Set[str]:
     module = get_module_by_name(definition, module_name)
-    names: Type.Set[str] = set()
+    names: T.Set[str] = set()
     for s in module.sentences:
         match s:
             case Kore.Import(imported_module_name, _):
@@ -32,9 +33,9 @@ def get_all_imported_module_names(
 
 def get_all_recursively_imported_module_names(
     definition: Kore.Definition, module_name: str
-) -> Type.Set[str]:
-    names: Type.Set[str] = {module_name}
-    new_names: Type.Set[str] = {module_name}
+) -> T.Set[str]:
+    names: T.Set[str] = {module_name}
+    new_names: T.Set[str] = {module_name}
     while len(new_names) > 0:
         curr_name = new_names.pop()
         names_to_add = get_all_imported_module_names(definition, curr_name).difference(
@@ -47,7 +48,7 @@ def get_all_recursively_imported_module_names(
 
 def get_symbol_decl_from_module(
     module: Kore.Module, symbol_name: str
-) -> Type.Optional[Kore.SymbolDecl]:
+) -> T.Optional[Kore.SymbolDecl]:
     for s in module.sentences:
         match s:
             case Kore.SymbolDecl(symbol, _, _, _, _):
@@ -56,12 +57,12 @@ def get_symbol_decl_from_module(
     return None
 
 
-def axioms(definition: Kore.Definition, main_module_name: str) -> Type.List[Kore.Axiom]:
+def axioms(definition: Kore.Definition, main_module_name: str) -> T.List[Kore.Axiom]:
     module_names = {main_module_name}.union(
         get_all_recursively_imported_module_names(definition, main_module_name)
     )
     modules = map(lambda name: get_module_by_name(definition, name), module_names)
-    axioms: Type.List[Kore.Axiom] = []
+    axioms: T.List[Kore.Axiom] = []
     for m in modules:
         axioms.extend(m.axioms)
     return axioms
@@ -69,7 +70,7 @@ def axioms(definition: Kore.Definition, main_module_name: str) -> Type.List[Kore
 
 def rewrite_axioms(
     definition: Kore.Definition, main_module_name: str
-) -> Type.Iterable[Kore.Axiom]:
+) -> T.Iterable[Kore.Axiom]:
     for a in axioms(definition, main_module_name):
         match a:
             case Kore.Axiom(_, Kore.Rewrites(_, _, _), _):
@@ -78,7 +79,7 @@ def rewrite_axioms(
 
 def other_than_rewrite_axioms(
     definition: Kore.Definition, main_module_name: str
-) -> Type.Iterable[Kore.Axiom]:
+) -> T.Iterable[Kore.Axiom]:
     for a in axioms(definition, main_module_name):
         match a:
             case Kore.Axiom(_, Kore.Rewrites(_, _, _), _):
@@ -143,7 +144,7 @@ def get_top_cell_initializer(definition: Kore.Definition) -> str:
     raise DefinitionError("topCellInitializer not found")
 
 
-def rename_vars(renaming: Type.Dict[str, str], phi: Kore.Pattern) -> Kore.Pattern:
+def rename_vars(renaming: T.Dict[str, str], phi: Kore.Pattern) -> Kore.Pattern:
     match phi:
         # The main case
         case Kore.EVar(name, sort):
@@ -211,11 +212,22 @@ def rename_vars(renaming: Type.Dict[str, str], phi: Kore.Pattern) -> Kore.Patter
     raise NotImplementedError()
 
 
-def free_evars_of_pattern(p: Kore.Pattern) -> Type.Set[Kore.EVar]:
+def free_evars_of_pattern(p: Kore.Pattern) -> T.Set[Kore.EVar]:
     return set(chain.from_iterable(free_occs(p).values()))
 
 
-def int_or_None(s: str) -> Type.Optional[int]:
+def existentially_quantify_variables(
+    sort, pattern: Kore.Pattern, vars: T.List[Kore.EVar]
+) -> Kore.Pattern:
+    return functools.reduce(lambda p, var: Kore.Exists(sort, var, p), vars, pattern)
+
+
+def existentially_quantify_free_variables(sort: Kore.Sort, pattern: Kore.Pattern) -> Kore.Pattern:
+    return existentially_quantify_variables(
+        sort, pattern, list(free_evars_of_pattern(pattern))
+    )
+
+def int_or_None(s: str) -> T.Optional[int]:
     try:
         return int(s)
     except:
@@ -223,16 +235,16 @@ def int_or_None(s: str) -> Type.Optional[int]:
 
 
 def get_fresh_evars_with_sorts(
-    avoid: Type.List[Kore.EVar], sorts: Type.List[Kore.Sort], prefix="Fresh"
-) -> Type.List[Kore.EVar]:
+    avoid: T.List[Kore.EVar], sorts: T.List[Kore.Sort], prefix="Fresh"
+) -> T.List[Kore.EVar]:
     names_to_avoid = map(lambda ev: ev.name, avoid)
-    names_with_prefix_to_avoid: Type.List[str] = [
+    names_with_prefix_to_avoid: T.List[str] = [
         name for name in names_to_avoid if name.startswith(prefix)
     ]
-    suffixes_to_avoid: Type.List[str] = [
+    suffixes_to_avoid: T.List[str] = [
         name.removeprefix(prefix) for name in names_with_prefix_to_avoid
     ]
-    nums_to_avoid: Type.List[int] = [
+    nums_to_avoid: T.List[int] = [
         ion for ion in map(int_or_None, suffixes_to_avoid) if ion is not None
     ]
     if len(list(nums_to_avoid)) >= 1:
@@ -240,14 +252,14 @@ def get_fresh_evars_with_sorts(
     else:
         n = 0
     nums = list(range(n, n + len(sorts)))
-    fresh_evars: Type.List[Kore.EVar] = list(
+    fresh_evars: T.List[Kore.EVar] = list(
         map(lambda m: Kore.EVar(name=prefix + str(m), sort=sorts[m - n]), nums)
     )
     return fresh_evars
 
 
 def get_fresh_evar(
-    avoid: Type.List[Kore.EVar], sort: Kore.Sort, prefix="Fresh"
+    avoid: T.List[Kore.EVar], sort: Kore.Sort, prefix="Fresh"
 ) -> Kore.EVar:
     return get_fresh_evars_with_sorts(avoid, [sort], prefix=prefix)[0]
 
@@ -278,10 +290,10 @@ def axiom_label(axiom: Kore.Axiom) -> str:
 
 
 def extract_equalities_and_rest_from_witness(
-    expected_vars: Type.Set[str], witness: Kore.Pattern
-) -> Type.Tuple[Type.Dict[Kore.EVar, Kore.Pattern], Type.Optional[Kore.Pattern]]:
-    result: Type.Dict[Kore.EVar, Kore.Pattern] = dict()
-    rest: Type.Optional[Kore.Pattern] = None
+    expected_vars: T.Set[str], witness: Kore.Pattern
+) -> T.Tuple[T.Dict[Kore.EVar, Kore.Pattern], T.Optional[Kore.Pattern]]:
+    result: T.Dict[Kore.EVar, Kore.Pattern] = dict()
+    rest: T.Optional[Kore.Pattern] = None
 
     def add_to_rest(p: Kore.Pattern):
         nonlocal rest
@@ -314,14 +326,14 @@ def extract_equalities_and_rest_from_witness(
 
 
 def extract_equalities_from_witness(
-    expected_vars: Type.Set[str], witness: Kore.Pattern
-) -> Type.Dict[Kore.EVar, Kore.Pattern]:
+    expected_vars: T.Set[str], witness: Kore.Pattern
+) -> T.Dict[Kore.EVar, Kore.Pattern]:
     equalities, rest = extract_equalities_and_rest_from_witness(expected_vars, witness)
     return equalities
 
 
-def some_subpatterns_of(phi: Kore.Pattern) -> Type.Dict[Kore.Pattern, int]:
-    subs: Type.Dict[Kore.Pattern, int] = dict()
+def some_subpatterns_of(phi: Kore.Pattern) -> T.Dict[Kore.Pattern, int]:
+    subs: T.Dict[Kore.Pattern, int] = dict()
 
     def go(phi):
         subs[phi] = subs.get(phi, 0) + 1
@@ -350,21 +362,21 @@ def get_rhs(rule: Kore.Axiom) -> Kore.Pattern:
 
 
 def compute_renaming0(
-    vars_to_avoid: Type.List[Kore.EVar], vars_to_rename: Type.List[Kore.EVar]
-) -> Type.Dict[str, str]:
+    vars_to_avoid: T.List[Kore.EVar], vars_to_rename: T.List[Kore.EVar]
+) -> T.Dict[str, str]:
     vars_to_avoid = vars_to_rename + vars_to_avoid
     new_vars = get_fresh_evars_with_sorts(
         avoid=list(vars_to_avoid), sorts=list(map(lambda ev: ev.sort, vars_to_rename))
     )
-    vars_fr: Type.List[str] = list(map(lambda e: e.name, vars_to_rename))
-    vars_to: Type.List[str] = list(map(lambda e: e.name, new_vars))
+    vars_fr: T.List[str] = list(map(lambda e: e.name, vars_to_rename))
+    vars_to: T.List[str] = list(map(lambda e: e.name, new_vars))
     renaming = dict(zip(vars_fr, vars_to))
     return renaming
 
 
 def compute_renaming(
-    patt: Kore.Pattern, vars_to_avoid: Type.List[Kore.EVar]
-) -> Type.Dict[str, str]:
+    patt: Kore.Pattern, vars_to_avoid: T.List[Kore.EVar]
+) -> T.Dict[str, str]:
     return compute_renaming0(
         vars_to_avoid=vars_to_avoid, vars_to_rename=list(free_evars_of_pattern(patt))
     )
@@ -372,7 +384,7 @@ def compute_renaming(
 
 def filter_out_predicates(
     phi: Kore.Pattern,
-) -> Type.Tuple[Type.Optional[Kore.Pattern], Type.List[Kore.Pattern]]:
+) -> T.Tuple[T.Optional[Kore.Pattern], T.List[Kore.Pattern]]:
     if issubclass(type(phi), Kore.MLPred):
         return None, [phi]
     match phi:
@@ -388,7 +400,7 @@ def filter_out_predicates(
             return phi, []
 
 
-def get_predicates(phi: Kore.Pattern) -> Type.List[Kore.Pattern]:
+def get_predicates(phi: Kore.Pattern) -> T.List[Kore.Pattern]:
     _, preds = filter_out_predicates(phi)
     return preds
 
@@ -402,7 +414,7 @@ def is_bottom(pattern: Kore.Pattern) -> bool:
 
 # TODO use make_conjunction
 def mapping_to_pattern(
-    sort: Kore.Sort, m: Type.Mapping[Kore.EVar, Kore.Pattern]
+    sort: Kore.Sort, m: T.Mapping[Kore.EVar, Kore.Pattern]
 ) -> Kore.Pattern:
     result: Kore.Pattern = Kore.Top(sort)
     for lhs, rhs in m.items():

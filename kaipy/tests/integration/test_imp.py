@@ -8,6 +8,7 @@ import pyk.kore.rpc as KoreRpc
 from pyk.ktool.kprint import KPrint
 from pyk.kore.parser import KoreParser
 
+import kaipy.rs_utils as RSUtils
 from kaipy.KompiledDefinitionWrapper import KompiledDefinitionWrapper
 from kaipy.ReachabilitySystem import ReachabilitySystem
 
@@ -60,7 +61,10 @@ class TestImp(MyTest):
             # This will stop because we have only heating rules in the semantics
             execute_result = rs_heatonly.kcs.client.execute(input_pattern, max_depth=50)
             assert(execute_result.reason == KoreRpc.StopReason.STUCK)
+            last = execute_result.state.kore
             #print(execute_result.state.kore.text)
-            print(rs_heatonly.kprint.kore_to_pretty(execute_result.state.kore))
+            print(rs_heatonly.kprint.kore_to_pretty(last))
+            mapping = RSUtils.match_ca(rs_heatonly, context_alias, last)
+            print(mapping)
 
         assert False
