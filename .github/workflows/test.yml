@@ -19,4 +19,4 @@ jobs:
       - name: 'Build kaipy'
         run: GC_DONT_GC=1 nix build --print-build-logs '.#kaipy'
       - name: 'Test kaipy'
-        run: GC_DONT_GC=1 nix develop --print-build-logs '.#kaipy' --command 'pytest ./kaipy/'
+        run: GC_DONT_GC=1 nix develop --print-build-logs '.#kaipy' --command 'pytest'
