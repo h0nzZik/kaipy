@@ -70,7 +70,7 @@ class ReachabilitySystem:
     ):
         self.definition_dir = definition_dir
 
-        self.kdw = KompiledDefinitionWrapper(definition_dir)
+        self.kdw = KompiledDefinitionWrapper.load_from_dir(definition_dir)
         self.kprint = KPrint(definition_dir)
         self.kcs = KoreClientServer(
             definition_dir=definition_dir,

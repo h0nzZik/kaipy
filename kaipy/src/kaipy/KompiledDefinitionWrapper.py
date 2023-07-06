@@ -15,21 +15,34 @@ from .kore_utils import (  # axiom_label,; get_symbol_sort,; get_top_cell_initia
     rewrite_axioms,
 )
 
+from .IManagedKompiledKore import IManagedKompiledKore
+from .TriviallyManagedKompiledKore import TriviallyManagedKompiledKore
+from .TmpKompiledKore import TmpKompiledKore
+from .HeatonlyDefinition import heat_only_definition
+
 RuleID: T.TypeAlias = int
 
 
 @T.final
 @dataclass(frozen=True)
 class KompiledDefinitionWrapper:
-    kompiled_kore: KompiledKore
+    managed_kompiled_kore: IManagedKompiledKore
     main_module_name: str
 
-    def __init__(self, definition_dir: Path):
+    def __init__(self, managed_kompiled_kore: IManagedKompiledKore, main_module_name: str):
+        object.__setattr__(self, "main_module_name", main_module_name)
+        object.__setattr__(self, "managed_kompiled_kore", managed_kompiled_kore)
+
+    @classmethod
+    def load_from_dir(cls, definition_dir: Path):
         kompiled_kore = KompiledKore(definition_dir)
         with open(definition_dir / "mainModule.txt", "r") as mm:
             main_module_name = mm.read()
-        object.__setattr__(self, "main_module_name", main_module_name)
-        object.__setattr__(self, "kompiled_kore", kompiled_kore)
+        return KompiledDefinitionWrapper(TriviallyManagedKompiledKore(kompiled_kore), main_module_name)
+
+    @property
+    def kompiled_kore(self) -> KompiledKore:
+        return self.managed_kompiled_kore.kompiled_kore
 
     @property
     def rule_ids(self) -> T.Set[RuleID]:
@@ -79,3 +92,10 @@ class KompiledDefinitionWrapper:
         res = parser.pattern()
         assert parser.eof
         return res
+
+    @F.cached_property
+    def heat_only(self):
+        new_definition = heat_only_definition(self.kompiled_kore.definition)
+        tmp_kompiled_kore = TmpKompiledKore(new_definition)
+        return KompiledDefinitionWrapper(tmp_kompiled_kore, self.main_module_name)
+

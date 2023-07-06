@@ -4,8 +4,9 @@ from pathlib import Path
 import pytest
 from pyk.testing._kompiler import KompiledTest
 
-import kaipy
+#import kaipy
 from kaipy.KompiledDefinitionWrapper import KompiledDefinitionWrapper
+from kaipy.HeatonlyDefinition import heat_only_definition
 
 LANGUAGES: T.Final = (Path(__file__).parent / "languages").resolve(strict=True)
 
@@ -15,7 +16,7 @@ class MyTest(KompiledTest):
     def kompiled_definition_wrapper(
         self, definition_dir: Path
     ) -> KompiledDefinitionWrapper:
-        return KompiledDefinitionWrapper(definition_dir)
+        return KompiledDefinitionWrapper.load_from_dir(definition_dir)
 
 
 class TestImp(MyTest):
@@ -24,4 +25,7 @@ class TestImp(MyTest):
 
     def test_hello(self, kompiled_definition_wrapper: KompiledDefinitionWrapper):
         print(kompiled_definition_wrapper.main_module_name)
+        assert True
+
+    def test_heatonly(self, kompiled_definition_wrapper: KompiledDefinitionWrapper):
         assert True
