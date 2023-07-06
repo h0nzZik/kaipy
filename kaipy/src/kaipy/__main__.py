@@ -26,7 +26,6 @@ import pyk.kore.rpc
 import pyk.kore.syntax as Kore
 from immutabledict import immutabledict
 from pyk.kore.parser import KoreParser
-from pyk.ktool import krun
 
 from .kcommands import KRUN_COMMAND
 from .kore_utils import (
@@ -47,37 +46,10 @@ from .kore_utils import (
     rename_vars,
     some_subpatterns_of,
 )
-#from .RCGraph import RCGraph, make_RCG_from_rs
+
+# from .RCGraph import RCGraph, make_RCG_from_rs
 from .ReachabilitySystem import ReachabilitySystem
 from .rs_utils import cleanup_eqs, cleanup_pattern, make_conjunction
-
-
-def get_input_kore(
-    rs: ReachabilitySystem, definition_dir: Path, program: Path
-) -> Kore.Pattern:
-    # we have to invent a name which does not occur among variables of the semantic rules
-    n: int = 0
-    names = [v.name for v in rs.rules_variables]
-    while ("VarARGS" + str(n)) in names:
-        n = n + 1
-
-    args_name = "VarARGS" + str(n)
-    print(f"args_name: {args_name}")
-
-    result = krun._krun(
-        command=(KRUN_COMMAND),
-        input_file=Path(program),
-        definition_dir=definition_dir,
-        output=krun.KRunOutput.KORE,
-        depth=0,
-        cmap={"ARGS": (args_name + r":SortList{}")},
-        pmap={"ARGS": "cat"},
-    )
-    krun.KRun._check_return_code(result.returncode, 0)
-    parser = KoreParser(result.stdout)
-    res = parser.pattern()
-    assert parser.eof
-    return res
 
 
 def compute_conjunction(
@@ -304,7 +276,7 @@ class SCFG:
         # print(f"Original {self.rs.kprint.kore_to_pretty(pattern)}")
         # vars_to_rename = [v for v in self.rs.rules_variables if v.name != 'VarARGS']
 
-        vars_to_rename = [v for v in self.rs.rules_variables]
+        vars_to_rename = [v for v in self.rs.kdw.rules_variables]
         renaming = compute_renaming0(
             list(free_evars_of_pattern(pattern)), vars_to_rename
         )
@@ -674,12 +646,10 @@ def analyze(rs: ReachabilitySystem, args) -> int:
     with open(args["analyzer"], mode="r") as fr:
         jsa = json.load(fr)
     spg: SemanticsPreGraph = SemanticsPreGraph.from_dict(jsa)
-    input_kore: Kore.Pattern = get_input_kore(
-        rs, Path(args["definition"]), Path(args["input"])
-    )
+    input_kore: Kore.Pattern = rs.kdw.get_input_kore(Path(args["input"]))
 
     input_kore_simplified = rs.simplify(input_kore)
-    normalize = make_normalizer(rs, input_kore_simplified, avoid=rs.rules_variables)
+    normalize = make_normalizer(rs, input_kore_simplified, avoid=rs.kdw.rules_variables)
     scfg = perform_analysis(rs, spg, normalize, input_kore_simplified)
     print_analyze_results(rs, scfg)
     axiom_list: List[Tuple[Kore.Axiom, bool]] = to_axiom_list(rs, scfg)
@@ -1044,7 +1014,7 @@ def do_print(rs: ReachabilitySystem, args) -> int:
     return 0
 
 
-#def do_mk_rcgraph(rs: ReachabilitySystem, args) -> int:
+# def do_mk_rcgraph(rs: ReachabilitySystem, args) -> int:
 #    with open(args["store_rcg"], mode="w") as fw:
 #        rcg: RCGraph = make_RCG_from_rs(rs)
 #        fw.write(json.dumps(rcg.to_dict(), sort_keys=True, indent=True))
@@ -1105,7 +1075,7 @@ def main():
     ) as rs:
         if args["command"] == "analyze":
             retval = analyze(rs, args)
-        #elif args["command"] == "mk-rcgraph":
+        # elif args["command"] == "mk-rcgraph":
         #    retval = do_mk_rcgraph(rs, args)
         elif args["command"] == "generate-analyzer":
             retval = generate_analyzer(rs, args)

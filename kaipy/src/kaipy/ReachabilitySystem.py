@@ -1,12 +1,11 @@
-import typing as T
 import functools as F
-
+import typing as T
 from pathlib import Path
 
+import pyk.kore.syntax as Kore
 from pyk.kast.outer import KDefinition
 from pyk.kore.parser import KoreParser
 from pyk.kore.rpc import KoreClient, KoreServer
-import pyk.kore.syntax as Kore
 from pyk.ktool.kprint import KPrint
 
 from .kcommands import KORE_RPC_COMMAND
@@ -101,19 +100,11 @@ class ReachabilitySystem:
     def kast_definition(self) -> KDefinition:
         return self.kprint.definition
 
-
     def rule_by_id(self, ruleid: str) -> Kore.Axiom:
         for axiom in self.kdw.rewrite_rules:
             if axiom_label(axiom) == ruleid:
                 return axiom
         raise ValueError(f"Axiom with id {ruleid} not found.")
-
-    @F.cached_property
-    def rules_variables(self) -> T.Set[Kore.EVar]:
-        evars: T.Set[Kore.EVar] = set()
-        for axiom in self.kdw.rewrite_rules:
-            evars = evars.union(free_evars_of_pattern(axiom.pattern))
-        return evars
 
     def is_nonhooked_constructor(self, name: str) -> bool:
         return is_nonhooked_constructor_symbol(
