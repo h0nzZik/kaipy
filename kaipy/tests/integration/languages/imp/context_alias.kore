@@ -1,0 +1,13 @@
+Lbl'-LT-'generatedTop'-GT-'{}(
+    Lbl'-LT-'T'-GT-'{}(
+        Lbl'-LT-'k'-GT-'{}(
+            kseq{}(
+                VARHERE:SortK{},
+                VARREST:SortK{}
+            )
+        ),
+        VARSTATECELL:SortStateCell{},
+        VARARGSCELL:SortArgsCell{}
+    ),
+    VARGENCOUNTERCELL:SortGeneratedCounterCell{}
+)
