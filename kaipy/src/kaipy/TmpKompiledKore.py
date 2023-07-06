@@ -1,14 +1,15 @@
-import functools as F
-import typing as T
 import contextlib
+import functools as F
+import tempfile
+import typing as T
 from dataclasses import dataclass
 from pathlib import Path
-import tempfile
 
 import pyk.kore.syntax as Kore
 from pyk.kore.kompiled import KompiledKore
 
 from .IManagedKompiledKore import IManagedKompiledKore
+
 
 class TmpKompiledKore(IManagedKompiledKore):
     _tmp_directory: tempfile.TemporaryDirectory
@@ -16,12 +17,12 @@ class TmpKompiledKore(IManagedKompiledKore):
 
     def __init__(self, definition: Kore.Definition):
         self._tmp_directory = tempfile.TemporaryDirectory()
-        (Path(self._tmp_directory.name) / 'timestamp').touch()
-        with open((Path(self._tmp_directory.name) / 'definition.kore'), mode='w') as fw:
+        (Path(self._tmp_directory.name) / "timestamp").touch()
+        with open((Path(self._tmp_directory.name) / "definition.kore"), mode="w") as fw:
             fw.write(definition.text)
 
         self._kompiled_kore = KompiledKore(self._tmp_directory.name)
-    
+
     def __enter__(self):
         return self
 

@@ -60,24 +60,25 @@ class ReachabilitySystem:
     kcs: KoreClientServer
     kdw: KompiledDefinitionWrapper
     kprint: KPrint
-    definition_dir: Path
 
     def __init__(
         self,
-        definition_dir: Path,
+        kdw: KompiledDefinitionWrapper,
         kore_rpc_args: T.Iterable[str] = (),
         connect_to_port: T.Optional[str] = None,
     ):
-        self.definition_dir = definition_dir
-
-        self.kdw = KompiledDefinitionWrapper.load_from_dir(definition_dir)
-        self.kprint = KPrint(definition_dir)
+        self.kdw = kdw
+        self.kprint = KPrint(kdw.definition_dir)
         self.kcs = KoreClientServer(
-            definition_dir=definition_dir,
+            definition_dir=kdw.definition_dir,
             main_module_name=self.kdw.main_module_name,
             kore_rpc_args=kore_rpc_args,
             connect_to_port=connect_to_port,
         )
+
+    @property
+    def definition_dir(self) -> Path:
+        return self.kdw.definition_dir
 
     def __enter__(self) -> "ReachabilitySystem":
         return self

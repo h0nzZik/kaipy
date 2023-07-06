@@ -27,6 +27,8 @@ class TestImp(MyTest):
 
     def test_heatonly(self, kompiled_definition_wrapper: KompiledDefinitionWrapper):
         heat_only_def: KompiledDefinitionWrapper = kompiled_definition_wrapper.heat_only
-        # We assume that Imp has some non-heat rules
-        assert len(heat_only_def.rewrite_rules) < len(kompiled_definition_wrapper.rewrite_rules)
+        # We assume that Imp has some non-heat rules in the main module
+        assert len(heat_only_def.rewrite_rules) < len(
+            kompiled_definition_wrapper.rewrite_rules
+        )
         assert True

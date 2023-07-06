@@ -10,15 +10,14 @@ from pyk.ktool import krun
 
 import kaipy.kcommands as kcommands
 
+from .HeatonlyDefinition import heat_only_definition
+from .IManagedKompiledKore import IManagedKompiledKore
 from .kore_utils import (  # axiom_label,; get_symbol_sort,; get_top_cell_initializer,; is_nonhooked_constructor_symbol,
     free_evars_of_pattern,
     rewrite_axioms,
 )
-
-from .IManagedKompiledKore import IManagedKompiledKore
-from .TriviallyManagedKompiledKore import TriviallyManagedKompiledKore
 from .TmpKompiledKore import TmpKompiledKore
-from .HeatonlyDefinition import heat_only_definition
+from .TriviallyManagedKompiledKore import TriviallyManagedKompiledKore
 
 RuleID: T.TypeAlias = int
 
@@ -28,17 +27,32 @@ RuleID: T.TypeAlias = int
 class KompiledDefinitionWrapper:
     managed_kompiled_kore: IManagedKompiledKore
     main_module_name: str
+    _definition_dir: Path
 
-    def __init__(self, managed_kompiled_kore: IManagedKompiledKore, main_module_name: str):
+    def __init__(
+        self,
+        managed_kompiled_kore: IManagedKompiledKore,
+        main_module_name: str,
+        definition_dir: Path,
+    ):
         object.__setattr__(self, "main_module_name", main_module_name)
         object.__setattr__(self, "managed_kompiled_kore", managed_kompiled_kore)
+        object.__setattr__(self, "_definition_dir", definition_dir)
+
+    @property
+    def definition_dir(self) -> Path:
+        return self._definition_dir
 
     @classmethod
     def load_from_dir(cls, definition_dir: Path):
         kompiled_kore = KompiledKore(definition_dir)
         with open(definition_dir / "mainModule.txt", "r") as mm:
             main_module_name = mm.read()
-        return KompiledDefinitionWrapper(TriviallyManagedKompiledKore(kompiled_kore), main_module_name)
+        return KompiledDefinitionWrapper(
+            TriviallyManagedKompiledKore(kompiled_kore),
+            main_module_name,
+            definition_dir=definition_dir,
+        )
 
     @property
     def kompiled_kore(self) -> KompiledKore:
@@ -98,4 +112,3 @@ class KompiledDefinitionWrapper:
         new_definition = heat_only_definition(self.kompiled_kore.definition)
         tmp_kompiled_kore = TmpKompiledKore(new_definition)
         return KompiledDefinitionWrapper(tmp_kompiled_kore, self.main_module_name)
-

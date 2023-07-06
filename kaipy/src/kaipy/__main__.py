@@ -24,6 +24,7 @@ import matplotlib.pyplot as plt  # type: ignore
 import networkx as nx  # type: ignore
 import pyk.kore.rpc
 import pyk.kore.syntax as Kore
+from pyk.kore.kompiled import KompiledKore
 from immutabledict import immutabledict
 from pyk.kore.parser import KoreParser
 
@@ -50,7 +51,7 @@ from .kore_utils import (
 # from .RCGraph import RCGraph, make_RCG_from_rs
 from .ReachabilitySystem import ReachabilitySystem
 from .rs_utils import cleanup_eqs, cleanup_pattern, make_conjunction
-
+from .TriviallyManagedKompiledKore import TriviallyManagedKompiledKore
 
 def compute_conjunction(
     rs: ReachabilitySystem, a: Kore.Pattern, b: Kore.Pattern
@@ -1068,22 +1069,24 @@ def main():
     logging.getLogger("pyk.ktool.kprint").disabled = True
     logging.getLogger("pyk.kast.inner").disabled = True
 
-    with ReachabilitySystem(
-        definition_dir=Path(args["definition"]),
-        kore_rpc_args=(),
-        connect_to_port=None,
-    ) as rs:
-        if args["command"] == "analyze":
-            retval = analyze(rs, args)
-        # elif args["command"] == "mk-rcgraph":
-        #    retval = do_mk_rcgraph(rs, args)
-        elif args["command"] == "generate-analyzer":
-            retval = generate_analyzer(rs, args)
-        elif args["command"] == "optimize":
-            retval = do_optimize(rs, args)
-        elif args["command"] == "print":
-            retval = do_print(rs, args)
-        else:
-            retval = 1
+    kk = KompiledKore(definition_dir=Path(args["definition"]))
+    with KompiledDefinitionWrapper(managed_kompiled_kore=TriviallyManagedKompiledKore(kk)) as kdw:
+        with ReachabilitySystem(
+            kore_rpc_args=(),
+            connect_to_port=None,
+            kdw=kdw,
+        ) as rs:
+            if args["command"] == "analyze":
+                retval = analyze(rs, args)
+            # elif args["command"] == "mk-rcgraph":
+            #    retval = do_mk_rcgraph(rs, args)
+            elif args["command"] == "generate-analyzer":
+                retval = generate_analyzer(rs, args)
+            elif args["command"] == "optimize":
+                retval = do_optimize(rs, args)
+            elif args["command"] == "print":
+                retval = do_print(rs, args)
+            else:
+                retval = 1
 
-    sys.exit(retval)
+        sys.exit(retval)
