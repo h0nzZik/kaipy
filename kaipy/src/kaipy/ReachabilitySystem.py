@@ -60,8 +60,6 @@ class KoreClientServer:
 class ReachabilitySystem:
     kcs: KoreClientServer
     kdw: KompiledDefinitionWrapper
-    #definition: Definition
-    main_module_name: str
     kprint: KPrint
     definition_dir: Path
 
@@ -72,18 +70,12 @@ class ReachabilitySystem:
         connect_to_port: T.Optional[str] = None,
     ):
         self.definition_dir = definition_dir
-        with open(definition_dir / "mainModule.txt", "r") as mm:
-            self.main_module_name = mm.read()
-        with open(definition_dir / "definition.kore", "r") as dc:
-            d = dc.read()
-        #kparser = KoreParser(d)
 
-        #definition = kparser.definition()
         self.kdw = KompiledDefinitionWrapper(definition_dir)
         self.kprint = KPrint(definition_dir)
         self.kcs = KoreClientServer(
             definition_dir=definition_dir,
-            main_module_name=self.main_module_name,
+            main_module_name=self.kdw.main_module_name,
             kore_rpc_args=kore_rpc_args,
             connect_to_port=connect_to_port,
         )
@@ -95,7 +87,7 @@ class ReachabilitySystem:
         self.kcs.__exit__()
 
     def get_symbol_sort(self, symbol: str) -> Kore.Sort:
-        return get_symbol_sort(self.definition, self.main_module_name, symbol)
+        return get_symbol_sort(self.definition, self.kdw.main_module_name, symbol)
 
     @F.cached_property
     def definition(self) -> Kore.Definition:
@@ -125,7 +117,7 @@ class ReachabilitySystem:
 
     def is_nonhooked_constructor(self, name: str) -> bool:
         return is_nonhooked_constructor_symbol(
-            self.definition, self.main_module_name, name
+            self.definition, self.kdw.main_module_name, name
         )
 
     def simplify(self, pattern: Kore.Pattern) -> Kore.Pattern:
