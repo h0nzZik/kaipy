@@ -10,7 +10,7 @@ def attr_is_heating(attr: Kore.App):
 
 def sentence_is_heating_or_other(sentence: Kore.Sentence) -> bool:
     match sentence:
-        case Kore.Axiom(_,_,attrs):
+        case Kore.Axiom(_,Kore.Rewrites(_, _, _),attrs):
             return any(map(attr_is_heating, attrs))
     return True
 

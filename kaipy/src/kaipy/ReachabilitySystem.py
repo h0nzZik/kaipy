@@ -18,7 +18,7 @@ from .kore_utils import (
     is_nonhooked_constructor_symbol,
     rewrite_axioms,
 )
-
+import kaipy.utils as utils
 
 class KoreClientServer:
     server: T.Optional[KoreServer]
@@ -36,7 +36,7 @@ class KoreClientServer:
             timeout = 1500
             self.server = None
         else:
-            port = 3000
+            port = utils.find_free_port()
             self.server = KoreServer(
                 kompiled_dir=definition_dir,
                 module_name=main_module_name,
