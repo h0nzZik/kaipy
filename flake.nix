@@ -77,21 +77,4 @@
             };
           })  
       ));
-    
-    # {
-
-    #   packages = forAllSystems (system:
-    #   let
-    #     stdenv = pkgs.${system}.stdenv;
-    #     pythonPackages = pkgs.${system}.python311Packages;
-    #     k = k-framework.packages.${system}.k;
-    #     python-pyk = pyk.packages.${system}.pyk-python311 ;
-    #   in {
-          
-    #     };
-
-    #     default = self.outputs.packages.${system}.kaipy ;
-    #   });
-
-    #};
 }
