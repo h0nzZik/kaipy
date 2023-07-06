@@ -24,8 +24,8 @@ import matplotlib.pyplot as plt  # type: ignore
 import networkx as nx  # type: ignore
 import pyk.kore.rpc
 import pyk.kore.syntax as Kore
-from pyk.kore.kompiled import KompiledKore
 from immutabledict import immutabledict
+from pyk.kore.kompiled import KompiledKore
 from pyk.kore.parser import KoreParser
 
 from .kcommands import KRUN_COMMAND
@@ -52,6 +52,7 @@ from .kore_utils import (
 from .ReachabilitySystem import ReachabilitySystem
 from .rs_utils import cleanup_eqs, cleanup_pattern, make_conjunction
 from .TriviallyManagedKompiledKore import TriviallyManagedKompiledKore
+
 
 def compute_conjunction(
     rs: ReachabilitySystem, a: Kore.Pattern, b: Kore.Pattern
@@ -1070,7 +1071,9 @@ def main():
     logging.getLogger("pyk.kast.inner").disabled = True
 
     kk = KompiledKore(definition_dir=Path(args["definition"]))
-    with KompiledDefinitionWrapper(managed_kompiled_kore=TriviallyManagedKompiledKore(kk)) as kdw:
+    with KompiledDefinitionWrapper(
+        managed_kompiled_kore=TriviallyManagedKompiledKore(kk)
+    ) as kdw:
         with ReachabilitySystem(
             kore_rpc_args=(),
             connect_to_port=None,
