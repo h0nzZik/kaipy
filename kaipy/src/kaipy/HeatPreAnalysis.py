@@ -27,7 +27,7 @@ def collect_rests(
 ) -> T.Set[Kore.Pattern]:
     # TODO we have to make sure that the variable names do not clash
     collected: T.Set[Kore.Pattern] = set()
-    rest: Kore.Pattern = Kore.EVar(name="VARREST2", sort=Kore.SortApp(name="SortKItem"))
+    rest: Kore.Pattern = Kore.EVar(name="VARREST2", sort=Kore.SortApp(name="SortK"))
     while True:
         # plug 'term' into the 'before' part of the alias
         input_pattern = Kore.And(
@@ -36,15 +36,15 @@ def collect_rests(
                 rs.top_sort,
                 ca.before,
                 Kore.Equals(
-                    rs.top_sort,
                     Kore.SortApp(name="SortKItem"),
+                    rs.top_sort,
                     Kore.EVar(name="VARHERE", sort=Kore.SortApp(name="SortKItem")),
                     term,
                 ),
             ),
             Kore.Equals(
+                Kore.SortApp(name="SortK"),
                 rs.top_sort,
-                Kore.SortApp(name="SortKItem"),
                 Kore.EVar(name="VARREST", sort=Kore.SortApp(name="SortK")),
                 rest,
             ),
@@ -55,7 +55,7 @@ def collect_rests(
         print(f"Stop reason: {execute_result.reason}")
         if execute_result.reason == KoreRpc.StopReason.STUCK:
             return collected
-        assert execute_result.reason == KoreRpc.StopReason.STUCK
+        assert execute_result.reason == KoreRpc.StopReason.DEPTH_BOUND
         mapping = RSUtils.match_ca(rs, ca.after, execute_result.state.kore)
         new_term: Kore.Pattern = mapping[
             Kore.EVar(name="VARHERE", sort=Kore.SortApp(name="SortKItem"))

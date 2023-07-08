@@ -48,8 +48,8 @@ class MyTest(KompiledTest):
 class TestImp(MyTest):
     KOMPILE_MAIN_FILE = LANGUAGES / "imp/imp.k"
     KOMPILE_BACKEND = "haskell"
-    MYTEST_CONTEXT_ALIAS_BEFORE = LANGUAGES / "imp/context_alias.kore"
-    MYTEST_CONTEXT_ALIAS_AFTER = LANGUAGES / "imp/context_alias.kore"
+    MYTEST_CONTEXT_ALIAS_BEFORE = LANGUAGES / "imp/context_alias_before.kore"
+    MYTEST_CONTEXT_ALIAS_AFTER = LANGUAGES / "imp/context_alias_after.kore"
 
     def test_hello(self, kompiled_definition_wrapper: KompiledDefinitionWrapper):
         print(kompiled_definition_wrapper.main_module_name)
