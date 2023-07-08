@@ -42,7 +42,7 @@ class MyTest(KompiledTest):
     def context_aliases(self) -> ContextAliases:
         before = self._pattern_from_file(self.MYTEST_CONTEXT_ALIAS_BEFORE)
         after = self._pattern_from_file(self.MYTEST_CONTEXT_ALIAS_AFTER)
-        return ContextAliases((ContextAlias(before,after),))
+        return ContextAliases((ContextAlias(before, after),))
 
 
 class TestImp(MyTest):
@@ -70,10 +70,16 @@ class TestImp(MyTest):
 
         with ReachabilitySystem(heat_only_def) as rs_heatonly:
             input_simplified = rs_heatonly.simplify(input_pattern)
-            mapping = RSUtils.match_ca(rs_heatonly, context_aliases.aliases[0].before, input_simplified)
-            initial_here = mapping[Kore.EVar(name="VARHERE", sort=Kore.SortApp(name="SortKItem"))]
-            collected = collect_rests(rs_heatonly, context_aliases.aliases[0], initial_here)
-            
+            mapping = RSUtils.match_ca(
+                rs_heatonly, context_aliases.aliases[0].before, input_simplified
+            )
+            initial_here = mapping[
+                Kore.EVar(name="VARHERE", sort=Kore.SortApp(name="SortKItem"))
+            ]
+            collected = collect_rests(
+                rs_heatonly, context_aliases.aliases[0], initial_here
+            )
+
             # print(input_simplified.text)
             # print(rs_heatonly.kprint.kore_to_pretty(input_simplified))
             # # This will stop because we have only heating rules in the semantics
