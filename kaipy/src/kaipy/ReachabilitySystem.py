@@ -8,18 +8,20 @@ from pyk.kore.parser import KoreParser
 from pyk.kore.rpc import KoreClient, KoreServer
 from pyk.ktool.kprint import KPrint
 
+import kaipy.utils as utils
+
 from .kcommands import KORE_RPC_COMMAND
 from .KompiledDefinitionWrapper import KompiledDefinitionWrapper
 from .kore_utils import (
     axiom_label,
+    existentially_quantify_free_variables,
     free_evars_of_pattern,
     get_symbol_sort,
     get_top_cell_initializer,
     is_nonhooked_constructor_symbol,
     rewrite_axioms,
-    existentially_quantify_free_variables,
 )
-import kaipy.utils as utils
+
 
 class KoreClientServer:
     server: T.Optional[KoreServer]
@@ -119,4 +121,3 @@ class ReachabilitySystem:
         except:
             print(f"Error when simplifying: {self.kprint.kore_to_pretty(pattern)}")
             raise
-

@@ -1,8 +1,8 @@
 import contextlib
 import functools as F
+import shutil
 import tempfile
 import typing as T
-import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -25,16 +25,18 @@ class TmpKompiledKore(IManagedKompiledKore):
         with open((self.definition_dir / "definition.kore"), mode="w") as fw:
             fw.write(definition.text)
         self._kompiled_kore = KompiledKore(self._tmp_directory.name)
+
         def cp(filename: str):
-            shutil.copy(src=old_dir/filename, dst=self.definition_dir/filename)
+            shutil.copy(src=old_dir / filename, dst=self.definition_dir / filename)
+
         cp("mainModule.txt")
         cp("mainSyntaxModule.txt")
         cp("scanner")
-        cp('syntaxDefinition.kore')
-        cp('configVars.sh')
-        cp('compiled.bin')
-        cp('macros.kore')
-        cp('backend.txt')
+        cp("syntaxDefinition.kore")
+        cp("configVars.sh")
+        cp("compiled.bin")
+        cp("macros.kore")
+        cp("backend.txt")
 
     def __enter__(self):
         return self

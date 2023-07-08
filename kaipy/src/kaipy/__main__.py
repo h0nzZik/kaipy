@@ -34,6 +34,8 @@ from .kore_utils import (
     axiom_uuid,
     compute_renaming,
     compute_renaming0,
+    existentially_quantify_free_variables,
+    existentially_quantify_variables,
     extract_equalities_and_rest_from_witness,
     extract_equalities_from_witness,
     free_evars_of_pattern,
@@ -46,8 +48,6 @@ from .kore_utils import (
     mapping_to_pattern,
     rename_vars,
     some_subpatterns_of,
-    existentially_quantify_free_variables,
-    existentially_quantify_variables,
 )
 
 # from .RCGraph import RCGraph, make_RCG_from_rs
@@ -162,7 +162,6 @@ class Substitution:
 
 def subst_to_pattern(sort: Kore.Sort, subst: Substitution) -> Kore.Pattern:
     return mapping_to_pattern(sort, subst.mapping)
-
 
 
 def substitution_subsumed_by(

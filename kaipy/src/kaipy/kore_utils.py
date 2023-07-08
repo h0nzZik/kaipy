@@ -1,6 +1,6 @@
+import functools
 import typing as T
 from itertools import chain, product
-import functools
 
 import pyk.kore.syntax as Kore
 from pyk.kore.manip import free_occs
@@ -222,10 +222,13 @@ def existentially_quantify_variables(
     return functools.reduce(lambda p, var: Kore.Exists(sort, var, p), vars, pattern)
 
 
-def existentially_quantify_free_variables(sort: Kore.Sort, pattern: Kore.Pattern) -> Kore.Pattern:
+def existentially_quantify_free_variables(
+    sort: Kore.Sort, pattern: Kore.Pattern
+) -> Kore.Pattern:
     return existentially_quantify_variables(
         sort, pattern, list(free_evars_of_pattern(pattern))
     )
+
 
 def int_or_None(s: str) -> T.Optional[int]:
     try:

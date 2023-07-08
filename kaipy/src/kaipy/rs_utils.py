@@ -1,12 +1,12 @@
 import typing as T
 
-import pyk.kore.syntax as Kore
 import pyk.kore.rpc as KoreRpc
+import pyk.kore.syntax as Kore
 
 from .kore_utils import (
+    existentially_quantify_free_variables,
     extract_equalities_and_rest_from_witness,
     extract_equalities_from_witness,
-    existentially_quantify_free_variables,
     filter_out_predicates,
     free_evars_of_pattern,
     mapping_to_pattern,
@@ -14,9 +14,7 @@ from .kore_utils import (
 from .ReachabilitySystem import ReachabilitySystem
 
 
-def make_conjunction(
-    rs: ReachabilitySystem, l: T.List[Kore.Pattern]
-) -> Kore.Pattern:
+def make_conjunction(rs: ReachabilitySystem, l: T.List[Kore.Pattern]) -> Kore.Pattern:
     result: Kore.Pattern = Kore.Top(rs.top_sort)
     for x in l:
         result = Kore.And(rs.top_sort, result, x)
@@ -45,8 +43,9 @@ def cleanup_eqs(
     return evs2_p
 
 
-
-def match_ca(rs: ReachabilitySystem, ca : Kore.Pattern, data: Kore.Pattern) -> T.Dict[Kore.EVar, Kore.Pattern]:
+def match_ca(
+    rs: ReachabilitySystem, ca: Kore.Pattern, data: Kore.Pattern
+) -> T.Dict[Kore.EVar, Kore.Pattern]:
     eca = existentially_quantify_free_variables(rs.top_sort, ca)
     ir: KoreRpc.ImpliesResult = rs.kcs.client.implies(data, eca)
     if not ir.satisfiable:
