@@ -10,7 +10,7 @@ from pyk.ktool import krun
 
 import kaipy.kcommands as kcommands
 
-from .HeatonlyDefinition import heat_only_definition
+from .HeatonlyDefinition import heat_cool_only_definition
 from .IManagedKompiledKore import IManagedKompiledKore
 from .kore_utils import (  # axiom_label,; get_symbol_sort,; get_top_cell_initializer,; is_nonhooked_constructor_symbol,
     free_evars_of_pattern,
@@ -108,8 +108,8 @@ class KompiledDefinitionWrapper:
         return res
 
     @F.cached_property
-    def heat_only(self):
-        new_definition = heat_only_definition(self.kompiled_kore.definition)
+    def heat_cool_only(self):
+        new_definition = heat_cool_only_definition(self.kompiled_kore.definition)
         tmp_kompiled_kore = TmpKompiledKore(
             definition=new_definition, old_dir=self.definition_dir
         )

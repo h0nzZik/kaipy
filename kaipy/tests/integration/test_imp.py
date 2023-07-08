@@ -55,42 +55,28 @@ class TestImp(MyTest):
         print(kompiled_definition_wrapper.main_module_name)
         assert True
 
-    def test_heatonly(
+    def test_heatcoolonly(
         self, reachability_system: ReachabilitySystem, context_aliases: ContextAliases
     ):
-        # print(f"CA: {context_alias.text}")
-        heat_only_def: KompiledDefinitionWrapper = reachability_system.kdw.heat_only
-        # We assume that Imp has some non-heat rules in the main module
-        assert len(heat_only_def.rewrite_rules) < len(
+        heat_cool_only_def: KompiledDefinitionWrapper = reachability_system.kdw.heat_cool_only
+        # We check that Imp has some non-heat or non-cool rules in the main module
+        assert len(heat_cool_only_def.rewrite_rules) < len(
             reachability_system.kdw.rewrite_rules
         )
-        input_pattern: Kore.Pattern = heat_only_def.get_input_kore(
+        input_pattern: Kore.Pattern = heat_cool_only_def.get_input_kore(
             LANGUAGES / "imp/sum.imp"
         )
 
-        with ReachabilitySystem(heat_only_def) as rs_heatonly:
-            input_simplified = rs_heatonly.simplify(input_pattern)
+        with ReachabilitySystem(heat_cool_only_def) as rs_heatcoolonly:
+            input_simplified = rs_heatcoolonly.simplify(input_pattern)
             mapping = RSUtils.match_ca(
-                rs_heatonly, context_aliases.aliases[0].before, input_simplified
+                rs_heatcoolonly, context_aliases.aliases[0].before, input_simplified
             )
             initial_here = mapping[
                 Kore.EVar(name="VARHERE", sort=Kore.SortApp(name="SortKItem"))
             ]
             collected = collect_rests(
-                rs_heatonly, context_aliases.aliases[0], initial_here
+                rs_heatcoolonly, context_aliases.aliases[0], initial_here
             )
-
-            # print(input_simplified.text)
-            # print(rs_heatonly.kprint.kore_to_pretty(input_simplified))
-            # # This will stop because we have only heating rules in the semantics
-            # execute_result = rs_heatonly.kcs.client.execute(input_pattern, max_depth=50)
-            # assert execute_result.reason == KoreRpc.StopReason.STUCK
-            # last = execute_result.state.kore
-            # # print(execute_result.state.kore.text)
-            # print(rs_heatonly.kprint.kore_to_pretty(last))
-            # mapping = RSUtils.match_ca(rs_heatonly, context_aliases.aliases[0][0], last)
-            # print(
-            #     mapping[Kore.EVar(name="VARHERE", sort=Kore.SortApp(name="SortKItem"))]
-            # )
 
         assert False
