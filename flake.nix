@@ -4,7 +4,7 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.05";
     flake-utils.url = "github:numtide/flake-utils";
     pyk.url = "github:runtimeverification/pyk/v0.1.358";
-    k-framework.url = "github:runtimeverification/k/v6.0.1";
+    k-framework.url = "github:runtimeverification/k/v6.0.10";
     #k-haskell-backend.follows = "k-framework/haskell-backend";
     #k-haskell-backend.url = "github:runtimeverification/haskell-backend/remove-rewrite-antileft";
     #k-llvm-backend.url = "github:runtimeverification/llvm-backend";

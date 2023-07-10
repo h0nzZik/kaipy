@@ -1,6 +1,8 @@
 import contextlib
 import functools as F
 import shutil
+
+# import os
 import tempfile
 import typing as T
 from dataclasses import dataclass
@@ -37,6 +39,9 @@ class TmpKompiledKore(IManagedKompiledKore):
         cp("compiled.bin")
         cp("macros.kore")
         cp("backend.txt")
+
+        # TODO DEBUG ONLY
+        # shutil.copy(src=self.definition_dir / "definition.kore", dst=os.path.expanduser("~/mydefinition.kore"))
 
     def __enter__(self):
         return self

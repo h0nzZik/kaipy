@@ -111,7 +111,8 @@ class KompiledDefinitionWrapper:
     def heat_cool_only(self):
         new_definition = heat_cool_only_definition(self.kompiled_kore.definition)
         tmp_kompiled_kore = TmpKompiledKore(
-            definition=new_definition, old_dir=self.definition_dir
+            definition=new_definition,
+            old_dir=self.definition_dir,
         )
         return KompiledDefinitionWrapper(
             tmp_kompiled_kore,

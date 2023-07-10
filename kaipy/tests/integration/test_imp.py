@@ -1,6 +1,7 @@
 import typing as T
 from pathlib import Path
 
+import pyk.kore.prelude as KorePrelude
 import pyk.kore.rpc as KoreRpc
 import pyk.kore.syntax as Kore
 import pytest
@@ -58,7 +59,9 @@ class TestImp(MyTest):
     def test_heatcoolonly(
         self, reachability_system: ReachabilitySystem, context_aliases: ContextAliases
     ):
-        heat_cool_only_def: KompiledDefinitionWrapper = reachability_system.kdw.heat_cool_only
+        heat_cool_only_def: KompiledDefinitionWrapper = (
+            reachability_system.kdw.heat_cool_only
+        )
         # We check that Imp has some non-heat or non-cool rules in the main module
         assert len(heat_cool_only_def.rewrite_rules) < len(
             reachability_system.kdw.rewrite_rules
@@ -79,4 +82,55 @@ class TestImp(MyTest):
                 rs_heatcoolonly, context_aliases.aliases[0], initial_here
             )
 
+        assert False
+
+    def test_simplify_kresult_kitem(self, reachability_system: ReachabilitySystem):
+        x = Kore.EVar("VARX", KorePrelude.SORT_K_ITEM)
+        x_k = KorePrelude.inj(KorePrelude.SORT_K_ITEM, KorePrelude.SORT_K, x)
+        input_pattern = Kore.And(
+            KorePrelude.SORT_K_ITEM,
+            x,
+            Kore.Equals(
+                KorePrelude.BOOL,
+                KorePrelude.SORT_K_ITEM,
+                KorePrelude.TRUE,
+                Kore.App("LblisKResult", (), (x_k,)),
+            ),
+        )
+        # input_pattern = Kore.And(KorePrelude.SORT_K_ITEM, input_pattern, Kore.Equals(KorePrelude.SORT_K_ITEM, KorePrelude.SORT_K_ITEM, x, KorePrelude.inj(KorePrelude.INT, KorePrelude.SORT_K_ITEM, KorePrelude.int_dv(3))))
+        print(
+            f"input_pattern: {reachability_system.kprint.kore_to_pretty(input_pattern)}"
+        )
+        simp = reachability_system.kcs.client.simplify(input_pattern)[0]
+        print(f"simplified: {reachability_system.kprint.kore_to_pretty(simp)}")
+        assert False
+
+    def test_simplify_kresult_3(self, reachability_system: ReachabilitySystem):
+        krterm = Kore.App(
+            "LblisKResult",
+            (),
+            (
+                KorePrelude.inj(
+                    KorePrelude.INT, KorePrelude.SORT_K, KorePrelude.int_dv(3)
+                ),
+            ),
+        )
+
+        print(
+            f"krterm: {reachability_system.kprint.kore_to_pretty(krterm)}"
+        )
+        simp = reachability_system.kcs.client.simplify(krterm)[0]
+        print(f"simplified: {reachability_system.kprint.kore_to_pretty(simp)}")
+
+        input_pattern = Kore.Equals(
+            KorePrelude.BOOL,
+            KorePrelude.SORT_K_ITEM,
+            KorePrelude.TRUE,
+            krterm,
+        )
+        print(
+            f"input_pattern: {reachability_system.kprint.kore_to_pretty(input_pattern)}"
+        )
+        simp = reachability_system.kcs.client.simplify(input_pattern)[0]
+        print(f"simplified: {reachability_system.kprint.kore_to_pretty(simp)}")
         assert False

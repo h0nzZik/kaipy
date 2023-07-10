@@ -5,7 +5,7 @@ import pyk.kore.syntax as Kore
 
 
 def attr_is_heating_cooling(attr: Kore.App):
-    return attr.symbol in { "heat", "cool" }
+    return attr.symbol in {"heat", "cool"}
 
 
 def sentence_is_heating_cooling_or_other(sentence: Kore.Sentence) -> bool:

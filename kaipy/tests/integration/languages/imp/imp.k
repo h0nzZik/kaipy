@@ -7,6 +7,7 @@
 
 module IMP-SYNTAX
   imports DOMAINS-SYNTAX
+  syntax KResult ::= Int
   syntax AExp  ::= Int | Id
                  | "-" Int                    [seqstrict(1)]
                  | AExp "/" AExp              [left, seqstrict]
