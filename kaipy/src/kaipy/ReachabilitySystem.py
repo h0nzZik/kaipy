@@ -8,8 +8,6 @@ from pyk.kore.parser import KoreParser
 from pyk.kore.rpc import KoreClient, KoreServer
 from pyk.ktool.kprint import KPrint
 
-import kaipy.utils as utils
-
 from .kcommands import KORE_RPC_COMMAND
 from .KompiledDefinitionWrapper import KompiledDefinitionWrapper
 from .kore_utils import (
@@ -32,22 +30,22 @@ class KoreClientServer:
         definition_dir: Path,
         main_module_name: str,
         kore_rpc_args: T.Iterable[str] = (),
-        connect_to_port: T.Optional[str] = None,
+        #connect_to_port: T.Optional[str] = None,
     ):
-        if connect_to_port is not None:
-            port = int(connect_to_port)
-            timeout = 1500
-            self.server = None
-        else:
-            port = utils.find_free_port()
-            self.server = KoreServer(
-                kompiled_dir=definition_dir,
-                module_name=main_module_name,
-                command=(KORE_RPC_COMMAND,) + tuple(kore_rpc_args),
-                port=port,
-            )
-            timeout = None
-        self.client = KoreClient("localhost", port=port, timeout=timeout)
+        #if connect_to_port is not None:
+        #    port = int(connect_to_port)
+        #    timeout = 1500
+        #    self.server = None
+        #else:
+        #port = utils.find_free_port()
+        self.server = KoreServer(
+            kompiled_dir=definition_dir,
+            module_name=main_module_name,
+            command=(KORE_RPC_COMMAND,) + tuple(kore_rpc_args),
+            #port=port,
+        )
+        timeout = None
+        self.client = KoreClient("localhost", port=self.server.port, timeout=timeout)
 
     def __enter__(self) -> "KoreClientServer":
         return self
@@ -68,7 +66,7 @@ class ReachabilitySystem:
         self,
         kdw: KompiledDefinitionWrapper,
         kore_rpc_args: T.Iterable[str] = (),
-        connect_to_port: T.Optional[str] = None,
+        #connect_to_port: T.Optional[str] = None,
     ):
         self.kdw = kdw
         self.kprint = KPrint(kdw.definition_dir)
@@ -76,7 +74,7 @@ class ReachabilitySystem:
             definition_dir=kdw.definition_dir,
             main_module_name=self.kdw.main_module_name,
             kore_rpc_args=kore_rpc_args,
-            connect_to_port=connect_to_port,
+            #connect_to_port=connect_to_port,
         )
 
     @property
