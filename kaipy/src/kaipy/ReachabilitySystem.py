@@ -29,7 +29,7 @@ class KoreClientServer:
         self,
         definition_dir: Path,
         main_module_name: str,
-        kore_rpc_args: T.Iterable[str] = (),
+        kore_rpc_args: T.Iterable[str] = ("--enable-log-timestamps"),
         #connect_to_port: T.Optional[str] = None,
     ):
         #if connect_to_port is not None:

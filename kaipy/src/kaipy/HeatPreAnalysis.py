@@ -137,7 +137,8 @@ def collect_rests(
                 var_result = Kore.EVar(
                     name=var_result_name, sort=Kore.SortApp(name="SortKItem")
                 )
-                var_result_k = KorePrelude.kseq([var_result])
+                var_result_k = Kore.App(KorePrelude.KSEQ, (), (var_result,KorePrelude.DOTK))
+                #var_result_k = KorePrelude.kseq([var_result])
                 side_condition = Kore.And(
                     rs.top_sort,
                     side_condition,

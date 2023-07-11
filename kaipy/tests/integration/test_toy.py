@@ -37,6 +37,9 @@ class TestToy(ToyTestBase):
 
     def test_toy_exec(self, reachability_system: ReachabilitySystem):
         rs = reachability_system
+        #varx = Kore.EVar('VARX', KorePrelude.SORT_K_ITEM)
+        varx0 = Kore.EVar('VARX', Kore.SortApp('SortAExp'))
+        varx = KorePrelude.inj(Kore.SortApp('SortAExp'), KorePrelude.SORT_K_ITEM, varx0)
         p: Kore.Pattern = Kore.App(
             "Lbl'-LT-'generatedTop'-GT-'",
             (),
@@ -45,18 +48,43 @@ class TestToy(ToyTestBase):
                     "Lbl'-LT-'k'-GT-'",
                     (),
                     (
-                        KorePrelude.kseq([
-                            Kore.EVar('VARX', KorePrelude.SORT_K_ITEM),
-                            Kore.App(
-                                "Lbl'Hash'freezerfoo'LParUndsRParUnds'TOY-SYNTAX'Unds'Stmt'Unds'AExp0'Unds'"
+                        Kore.App(
+                            KorePrelude.KSEQ, (), (
+                                varx,
+                                Kore.App(
+                                    KorePrelude.KSEQ, (), (
+                                        Kore.App(
+                                            "Lbl'Hash'freezerfoo'LParUndsRParUnds'TOY-SYNTAX'Unds'Stmt'Unds'AExp0'Unds'"
+                                        ),
+                                        KorePrelude.DOTK
+                                    )
+                                )
                             )
-                        ]),
+                        ),
                     )
                 ),
                 Kore.EVar("VARGENERATEDCOUNTER", Kore.SortApp('SortGeneratedCounterCell'))
             ),
         )
-        er = rs.kcs.client.execute(p, max_depth=1)
-        print(f"er: {er.reason}")
-        print(f"new term: {rs.kprint.kore_to_pretty(er.state.kore)}")
+        varx_k = Kore.App(KorePrelude.KSEQ, (), (varx, KorePrelude.DOTK))
+        p_w_side = Kore.And(
+                    rs.top_sort,
+                    p,
+                    Kore.Equals(
+                        KorePrelude.BOOL,
+                        rs.top_sort,
+                        KorePrelude.TRUE,
+                        Kore.App("LblisKResult", (), (varx_k,)),
+                    ),
+        )
+        
+        print(f"old: {rs.kprint.kore_to_pretty(p_w_side)}")
+        print(f"old (kore): {p_w_side.text}")
+        er = rs.kcs.client.execute(p_w_side, max_depth=1, log_failed_rewrites=True, log_successful_rewrites=True)
+        print(f"er.reason: {er.reason}")
+        print(f"er: {er}")
+        
+        print(f"new: {rs.kprint.kore_to_pretty(er.state.kore)}")
+        print(f"new (kore): {er.state.kore.text}")
+        #print(f"len(next_states): {len(er.next_states)}")
         assert False
