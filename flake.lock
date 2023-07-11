@@ -1957,11 +1957,11 @@
         "poetry2nix": "poetry2nix"
       },
       "locked": {
-        "lastModified": 1689085393,
-        "narHash": "sha256-19Qo4YdBIl6rIFI15gKE9LGdadwHKCVy+W5KpqVVtAY=",
+        "lastModified": 1689087146,
+        "narHash": "sha256-5HJMLEhqM1uLSXhXhFoZXc8UkXStA+phA8MuoYMWJ4o=",
         "owner": "runtimeverification",
         "repo": "pyk",
-        "rev": "d46b3de46702ca7405a10f66e4c04438ba3f7f2f",
+        "rev": "a7196a3017b49787872eb025db6eb130ad7f0e87",
         "type": "github"
       },
       "original": {
