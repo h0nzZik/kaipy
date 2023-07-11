@@ -84,41 +84,65 @@ class TestImp(MyTest):
 
         assert False
 
-    def test_simplify_kresult_kitem(self, reachability_system: ReachabilitySystem):
-        x = Kore.EVar("VARX", KorePrelude.SORT_K_ITEM)
-        x_k = KorePrelude.inj(KorePrelude.SORT_K_ITEM, KorePrelude.SORT_K, x)
-        input_pattern = Kore.And(
-            KorePrelude.SORT_K_ITEM,
-            x,
-            Kore.Equals(
-                KorePrelude.BOOL,
-                KorePrelude.SORT_K_ITEM,
-                KorePrelude.TRUE,
-                Kore.App("LblisKResult", (), (x_k,)),
-            ),
-        )
-        # input_pattern = Kore.And(KorePrelude.SORT_K_ITEM, input_pattern, Kore.Equals(KorePrelude.SORT_K_ITEM, KorePrelude.SORT_K_ITEM, x, KorePrelude.inj(KorePrelude.INT, KorePrelude.SORT_K_ITEM, KorePrelude.int_dv(3))))
-        print(
-            f"input_pattern: {reachability_system.kprint.kore_to_pretty(input_pattern)}"
-        )
-        simp = reachability_system.kcs.client.simplify(input_pattern)[0]
-        print(f"simplified: {reachability_system.kprint.kore_to_pretty(simp)}")
+    def test_step_adds_assumption(
+        self, reachability_system: ReachabilitySystem, context_aliases: ContextAliases
+    ):
+        context_aliases.aliases[0]
         assert False
+
+    # def test_execute_var(self, reachability_system: ReachabilitySystem):
+    #     #x = Kore.EVar("VARX", KorePrelude.SORT_K_ITEM)
+    #     #x_k: Kore.Pattern = KorePrelude.kseq([x])
+    #     x_k = Kore.EVar("VARX", KorePrelude.SORT_K)
+    #     er = reachability_system.kcs.client.execute(x_k, max_depth=1)
+    #     print(er)
+    #     assert False
+
+    # def test_simplify_kresult_kitem(self, reachability_system: ReachabilitySystem):
+    #     x = Kore.EVar("VARX", KorePrelude.SORT_K_ITEM)
+    #     #x_k = KorePrelude.inj(KorePrelude.SORT_K_ITEM, KorePrelude.SORT_K, x)
+    #     x_k = KorePrelude.kseq([x])
+    #     input_pattern = Kore.And(
+    #         KorePrelude.SORT_K_ITEM,
+    #         x,
+    #         Kore.Equals(
+    #             KorePrelude.BOOL,
+    #             KorePrelude.SORT_K_ITEM,
+    #             KorePrelude.TRUE,
+    #             Kore.App("LblisKResult", (), (x_k,)),
+    #         ),
+    #     )
+    #     # input_pattern = Kore.And(KorePrelude.SORT_K_ITEM, input_pattern, Kore.Equals(KorePrelude.SORT_K_ITEM, KorePrelude.SORT_K_ITEM, x, KorePrelude.inj(KorePrelude.INT, KorePrelude.SORT_K_ITEM, KorePrelude.int_dv(3))))
+    #     print(
+    #         f"input_pattern: {reachability_system.kprint.kore_to_pretty(input_pattern)}"
+    #     )
+    #     simp = reachability_system.kcs.client.simplify(input_pattern)[0]
+    #     print(f"simplified: {reachability_system.kprint.kore_to_pretty(simp)}")
+    #     mr = reachability_system.kcs.client.get_model(input_pattern)
+    #     #print(f"sat? {mr}")
+    #     #match mr:
+    #     #    case KoreRpc.SatResult(pat):
+    #     #        print(f"simplified: {reachability_system.kprint.kore_to_pretty(pat)}")
+    #     assert False
 
     def test_simplify_kresult_3(self, reachability_system: ReachabilitySystem):
         krterm = Kore.App(
             "LblisKResult",
             (),
             (
-                KorePrelude.inj(
-                    KorePrelude.INT, KorePrelude.SORT_K, KorePrelude.int_dv(3)
+                KorePrelude.kseq(
+                    [
+                        KorePrelude.inj(
+                            KorePrelude.INT,
+                            KorePrelude.SORT_K_ITEM,
+                            KorePrelude.int_dv(3),
+                        ),
+                    ]
                 ),
             ),
         )
 
-        print(
-            f"krterm: {reachability_system.kprint.kore_to_pretty(krterm)}"
-        )
+        print(f"krterm: {reachability_system.kprint.kore_to_pretty(krterm)}")
         simp = reachability_system.kcs.client.simplify(krterm)[0]
         print(f"simplified: {reachability_system.kprint.kore_to_pretty(simp)}")
 
@@ -133,4 +157,4 @@ class TestImp(MyTest):
         )
         simp = reachability_system.kcs.client.simplify(input_pattern)[0]
         print(f"simplified: {reachability_system.kprint.kore_to_pretty(simp)}")
-        assert False
+        assert type(simp) is Kore.Top

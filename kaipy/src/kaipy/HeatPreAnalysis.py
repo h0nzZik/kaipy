@@ -95,13 +95,13 @@ def collect_rests(
         input_pattern_with_side: Kore.Pattern = Kore.And(
             rs.top_sort, input_pattern, side_condition
         )
-        print(
-            f"input_pattern_with_side: {rs.kprint.kore_to_pretty(input_pattern_with_side)}"
-        )
+        # print(
+        #    f"input_pattern_with_side: {rs.kprint.kore_to_pretty(input_pattern_with_side)}"
+        # )
         input_pattern_simplified0 = rs.kcs.client.simplify(input_pattern_with_side)[0]
-        print(
-            f"input_pattern_simplified0: {rs.kprint.kore_to_pretty(input_pattern_simplified0)}"
-        )
+        # print(
+        #    f"input_pattern_simplified0: {rs.kprint.kore_to_pretty(input_pattern_simplified0)}"
+        # )
         input_pattern_simplified = cleanup_pattern(rs, input_pattern_simplified0)
         print(
             f"input_pattern_simplified: {rs.kprint.kore_to_pretty(input_pattern_simplified)}"
@@ -112,9 +112,10 @@ def collect_rests(
             input_pattern_simplified, max_depth=1
         )
         # print(f"input_pattern_with_side (kore): {input_pattern_with_side.text}")
-        # print(f"execute result: {execute_result.logs}")
+        print(f"execute result depth: {execute_result.depth}")
+        print(f"execute result reason: {execute_result.reason}")
         if execute_result.reason == KoreRpc.StopReason.STUCK:
-            print("Stuck")
+            print(f"Stuck {stage}")
             if stage == "heating":
                 stage = "cooling"
 
@@ -133,31 +134,66 @@ def collect_rests(
                     n = n + 1
                 var_result_name = prefix + str(n)
 
-                # var_result = Kore.EVar(name=var_result_name, sort=Kore.SortApp(name="SortKItem"))
-                # var_result_k = KorePrelude.inj(KorePrelude.SORT_K_ITEM, KorePrelude.SORT_K, var_result)
-                # side_condition = Kore.And(rs.top_sort, side_condition, Kore.Equals(KorePrelude.BOOL, rs.top_sort, KorePrelude.TRUE, Kore.App("LblisKResult", (), (var_result_k,))))
-                # term = var_result
                 var_result = Kore.EVar(
-                    name=var_result_name, sort=Kore.SortApp(name="SortKResult")
+                    name=var_result_name, sort=Kore.SortApp(name="SortKItem")
                 )
-                var_result_kitem = KorePrelude.inj(
-                    Kore.SortApp(name="SortKResult"),
-                    KorePrelude.SORT_K_ITEM,
-                    var_result,
+                var_result_k = KorePrelude.kseq([var_result])
+                side_condition = Kore.And(
+                    rs.top_sort,
+                    side_condition,
+                    Kore.Equals(
+                        KorePrelude.BOOL,
+                        rs.top_sort,
+                        KorePrelude.TRUE,
+                        Kore.App("LblisKResult", (), (var_result_k,)),
+                    ),
                 )
-                # side_condition = Kore.And(rs.top_sort, side_condition, Kore.Equals(KorePrelude.BOOL, rs.top_sort, KorePrelude.TRUE, Kore.App("LblisKResult", (), (var_result,))))
-                # Maybe we do not even need a side condition, as that gets generated automatically?
-                term = var_result_kitem
+                term = var_result
                 continue
-
-                # TODO check whether it has model!
             else:
                 return collected
-        assert execute_result.reason == KoreRpc.StopReason.DEPTH_BOUND
-        new_state = execute_result.state.kore
+        if execute_result.reason == KoreRpc.StopReason.BRANCHING and stage == "cooling":
+            assert execute_result.next_states is not None
+            # Now it gets tricky. For some reason, when we execute a configuration with a KResult
+            # to be cooled, there are two resulting branches. In one branch, the configuration gets rewritten,
+            # so a step is taken; in the other branch, the configuration does not get rewritten but is stuck.
+            # So, in one branch there remains the freezer, while in the other branch it will not.
+            # On that branch which gets rewritten, we will have something like
+            # ```
+            # <k> foo(KR1, 5*6) ~> Rest2 </k> /\ isKResult(KR1 ~> .)
+            # ```
+            # We do not want to take the rest of this into our collected set, because the whole is not a rest of anything.
+            # Instead, we want to execute one more time. So what should be our `term` and what should be our `rest`?
+            # Well, `term` should be the head of the <k> cell, and `rest`` should be the rest of it.
+            #
+            # TODO: we have to write a test for this
+            assert len(execute_result.next_states) == 2
+            for ns in execute_result.next_states:
+                br = ns.kore
+                print(f"branch: {rs.kprint.kore_to_pretty(br)}")
+            # assert False
+            #    br_simplified = rs.kcs.client.simplify(br)[0]
+            #    print(f"br_simplified: {rs.kprint.kore_to_pretty(br_simplified)}")
+            brs = [ns.kore for ns in execute_result.next_states]
+            # It is a bit stupid that we execute every branch only to figure out which one is the good one
+            ers = [(br, rs.kcs.client.execute(br, max_depth=1)) for br in brs]
+            good_ones = [
+                (br, er)
+                for (br, er) in ers
+                if er.reason == KoreRpc.StopReason.DEPTH_BOUND
+            ]
+            assert len(good_ones) == 1
+            new_state = good_ones[0][0]
+            # new_state = good_ones[0].state.kore
+            # assert False
+        else:
+            assert execute_result.reason == KoreRpc.StopReason.DEPTH_BOUND
+            new_state = execute_result.state.kore
         print(f"new state: {rs.kprint.kore_to_pretty(new_state)}")
         # print(f"new state (kore): {new_state.text}")
+        # mapping = RSUtils.match_ca(rs, ca.after if stage == "heating" else ca.before, new_state)
         mapping = RSUtils.match_ca(rs, ca.after, new_state)
+
         new_term: Kore.Pattern = mapping[
             Kore.EVar(name="VARHERE", sort=Kore.SortApp(name="SortKItem"))
         ]
@@ -166,8 +202,10 @@ def collect_rests(
         ]
         print(f"new term: {rs.kprint.kore_to_pretty(new_term)}")
         print(f"new rest: {rs.kprint.kore_to_pretty(new_rest)}")
-        # print(f"(kore): {new_rest.text}")
-        collected.add(new_rest)
+        if stage == "heating":
+            print(f"adding new rest")
+            collected.add(new_rest)
 
         term = new_term
         rest = new_rest
+        stage = "heating"
