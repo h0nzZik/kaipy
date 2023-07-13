@@ -15,7 +15,7 @@ from kaipy.KompiledDefinitionWrapper import KompiledDefinitionWrapper
 from kaipy.ReachabilitySystem import ReachabilitySystem
 from kaipy.rs_utils import cleanup_pattern
 
-from tests.testing_base import RSTestBase
+from kaipy.testing.testingbase import RSTestBase
 
 class ToyTestBase(RSTestBase):
     ...

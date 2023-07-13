@@ -14,7 +14,7 @@ from kaipy.HeatPreAnalysis import ContextAlias, ContextAliases, collect_rests
 from kaipy.KompiledDefinitionWrapper import KompiledDefinitionWrapper
 from kaipy.ReachabilitySystem import ReachabilitySystem
 
-from tests.testing_base import RSTestBase
+from kaipy.testing.testingbase import RSTestBase
 
 
 class MyTest(RSTestBase):
