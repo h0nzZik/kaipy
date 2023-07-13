@@ -14,24 +14,12 @@ from kaipy.HeatPreAnalysis import ContextAlias, ContextAliases, collect_rests
 from kaipy.KompiledDefinitionWrapper import KompiledDefinitionWrapper
 from kaipy.ReachabilitySystem import ReachabilitySystem
 
-LANGUAGES: T.Final = (Path(__file__).parent / "languages").resolve(strict=True)
+from tests.testing_base import RSTestBase
 
 
-class MyTest(KompiledTest):
+class MyTest(RSTestBase):
     MYTEST_CONTEXT_ALIAS_BEFORE: T.ClassVar[Path]
     MYTEST_CONTEXT_ALIAS_AFTER: T.ClassVar[Path]
-
-    @pytest.fixture
-    def kompiled_definition_wrapper(
-        self, definition_dir: Path
-    ) -> KompiledDefinitionWrapper:
-        return KompiledDefinitionWrapper.load_from_dir(definition_dir)
-
-    @pytest.fixture
-    def reachability_system(
-        self, kompiled_definition_wrapper: KompiledDefinitionWrapper
-    ) -> ReachabilitySystem:
-        return ReachabilitySystem(kdw=kompiled_definition_wrapper)
 
     def _pattern_from_file(self, filename: Path) -> Kore.Pattern:
         with open(filename, mode="r") as fr:
@@ -47,10 +35,10 @@ class MyTest(KompiledTest):
 
 
 class TestImp(MyTest):
-    KOMPILE_MAIN_FILE = LANGUAGES / "imp/imp.k"
+    KOMPILE_MAIN_FILE = RSTestBase.LANGUAGES / "imp/imp.k"
     KOMPILE_BACKEND = "haskell"
-    MYTEST_CONTEXT_ALIAS_BEFORE = LANGUAGES / "imp/context_alias_before.kore"
-    MYTEST_CONTEXT_ALIAS_AFTER = LANGUAGES / "imp/context_alias_after.kore"
+    MYTEST_CONTEXT_ALIAS_BEFORE = RSTestBase.LANGUAGES / "imp/context_alias_before.kore"
+    MYTEST_CONTEXT_ALIAS_AFTER = RSTestBase.LANGUAGES / "imp/context_alias_after.kore"
 
     def test_hello(self, kompiled_definition_wrapper: KompiledDefinitionWrapper):
         print(kompiled_definition_wrapper.main_module_name)
@@ -67,7 +55,7 @@ class TestImp(MyTest):
             reachability_system.kdw.rewrite_rules
         )
         input_pattern: Kore.Pattern = heat_cool_only_def.get_input_kore(
-            LANGUAGES / "imp/sum.imp"
+            RSTestBase.LANGUAGES / "imp/sum.imp"
         )
 
         with ReachabilitySystem(heat_cool_only_def) as rs_heatcoolonly:

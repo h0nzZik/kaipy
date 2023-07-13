@@ -29,7 +29,7 @@ class KoreClientServer:
         self,
         definition_dir: Path,
         main_module_name: str,
-        kore_rpc_args: T.Iterable[str] = ("--enable-log-timestamps"),
+        kore_rpc_args: T.Iterable[str] = ["--enable-log-timestamps"],
         #connect_to_port: T.Optional[str] = None,
     ):
         #if connect_to_port is not None:
@@ -41,7 +41,7 @@ class KoreClientServer:
         self.server = KoreServer(
             kompiled_dir=definition_dir,
             module_name=main_module_name,
-            command=(KORE_RPC_COMMAND,) + tuple(kore_rpc_args),
+            command=list((KORE_RPC_COMMAND,)) + list(kore_rpc_args),
             #port=port,
         )
         timeout = None
@@ -65,7 +65,7 @@ class ReachabilitySystem:
     def __init__(
         self,
         kdw: KompiledDefinitionWrapper,
-        kore_rpc_args: T.Iterable[str] = (),
+        #kore_rpc_args: T.Iterable[str] = (),
         #connect_to_port: T.Optional[str] = None,
     ):
         self.kdw = kdw
@@ -73,7 +73,7 @@ class ReachabilitySystem:
         self.kcs = KoreClientServer(
             definition_dir=kdw.definition_dir,
             main_module_name=self.kdw.main_module_name,
-            kore_rpc_args=kore_rpc_args,
+            #kore_rpc_args=kore_rpc_args,
             #connect_to_port=connect_to_port,
         )
 

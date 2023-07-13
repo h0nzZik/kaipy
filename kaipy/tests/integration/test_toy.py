@@ -15,26 +15,56 @@ from kaipy.KompiledDefinitionWrapper import KompiledDefinitionWrapper
 from kaipy.ReachabilitySystem import ReachabilitySystem
 from kaipy.rs_utils import cleanup_pattern
 
-LANGUAGES: T.Final = (Path(__file__).parent / "languages").resolve(strict=True)
+from tests.testing_base import RSTestBase
 
-
-class ToyTestBase(KompiledTest):
-    @pytest.fixture
-    def kompiled_definition_wrapper(
-        self, definition_dir: Path
-    ) -> KompiledDefinitionWrapper:
-        return KompiledDefinitionWrapper.load_from_dir(definition_dir)
-
-    @pytest.fixture
-    def reachability_system(
-        self, kompiled_definition_wrapper: KompiledDefinitionWrapper
-    ) -> ReachabilitySystem:
-        return ReachabilitySystem(kdw=kompiled_definition_wrapper)
-
+class ToyTestBase(RSTestBase):
+    ...
 
 class TestToy(ToyTestBase):
-    KOMPILE_MAIN_FILE = LANGUAGES / "toy/toy.k"
+    KOMPILE_MAIN_FILE = ToyTestBase.LANGUAGES / "toy/toy.k"
     KOMPILE_BACKEND = "haskell"
+
+    def test_toy_get_model_1(self, reachability_system: ReachabilitySystem):
+        rs = reachability_system
+        phi = Kore.Equals(KorePrelude.BOOL, rs.top_sort, KorePrelude.TRUE, KorePrelude.FALSE)
+        m = rs.kcs.client.get_model(phi)
+        assert type(m) is KoreRpc.UnsatResult
+
+    def test_toy_get_model_2(self, reachability_system: ReachabilitySystem):
+        rs = reachability_system
+        varx = Kore.EVar('VARX', KorePrelude.BOOL)
+        phi = Kore.Equals(KorePrelude.BOOL, rs.top_sort, KorePrelude.TRUE, varx)
+        m = rs.kcs.client.get_model(phi)
+        assert type(m) is KoreRpc.SatResult
+
+    def test_toy_get_model_3(self, reachability_system: ReachabilitySystem):
+        rs = reachability_system
+        varx = Kore.EVar('VARX', KorePrelude.BOOL)
+        side = Kore.Equals(KorePrelude.BOOL, KorePrelude.BOOL, KorePrelude.TRUE, varx)
+        phi = Kore.And(KorePrelude.BOOL, varx, side)
+        m = rs.kcs.client.get_model(phi)
+        #print(m.model.text if m.model else "<empty-subst>")
+        assert type(m) is KoreRpc.SatResult
+
+    # def test_toy_get_model_4(self, reachability_system: ReachabilitySystem):
+    #     rs = reachability_system
+    #     varx = Kore.EVar('VARX', Kore.SortApp("SortInt"))
+    #     varx_kitem = KorePrelude.inj(Kore.SortApp("SortInt"), KorePrelude.SORT_K_ITEM, varx)
+    #     varx_k = Kore.App(KorePrelude.KSEQ, (), (varx_kitem, KorePrelude.DOTK))
+    #     #side = Kore.Top(KorePrelude.SORT_K) # This leads to UnknownResult, which is fine
+    #     side = Kore.Equals(
+    #                     KorePrelude.BOOL,
+    #                     KorePrelude.SORT_K,
+    #                     KorePrelude.TRUE,
+    #                     Kore.App("LblisKResult", (), (varx_k,)),
+    #                 )
+        
+    #     phi = Kore.And(KorePrelude.SORT_K, varx_k, side)
+    #     print(phi.text)
+    #     m = rs.kcs.client.get_model(phi)
+    #     print(m)
+    #     #assert type(m) is KoreRpc.SatResult
+    #     assert False
 
     def test_toy_exec(self, reachability_system: ReachabilitySystem):
         rs = reachability_system
