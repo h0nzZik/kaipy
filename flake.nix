@@ -3,9 +3,8 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.05";
     flake-utils.url = "github:numtide/flake-utils";
-    #pyk.url = "github:runtimeverification/pyk/v0.1.364";
-    pyk.url = "github:runtimeverification/pyk/empty-subst";
-    k-framework.url = "github:runtimeverification/k/v6.0.14";
+    pyk.url = "github:runtimeverification/pyk/v0.1.369";
+    k-framework.url = "github:runtimeverification/k/v6.0.22";
     k-framework.inputs.nixpkgs.follows = "nixpkgs";
     pyk.inputs.nixpkgs.follows = "nixpkgs";
   };

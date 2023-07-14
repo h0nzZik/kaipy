@@ -69,9 +69,6 @@ class TestToy(ToyTestBase):
     def test_toy_exec(self, reachability_system: ReachabilitySystem):
         rs = reachability_system
         varx = Kore.EVar('VARX', KorePrelude.SORT_K_ITEM)
-        # But we had to guess the sort of the the variable!
-        #varx0 = Kore.EVar('VARX', Kore.SortApp('SortAExp'))
-        #varx = KorePrelude.inj(Kore.SortApp('SortAExp'), KorePrelude.SORT_K_ITEM, varx0)
         p: Kore.Pattern = Kore.App(
             "Lbl'-LT-'generatedTop'-GT-'",
             (),
@@ -111,21 +108,17 @@ class TestToy(ToyTestBase):
                     side_cond,
         )
         
-        print(f"old: {rs.kprint.kore_to_pretty(p_w_side)}")
         er = rs.kcs.client.execute(p_w_side, max_depth=1, log_failed_rewrites=True, log_successful_rewrites=True)
-        #assert er.reason == KoreRpc.StopReason.DEPTH_BOUND
-        #print(f"er.reason: {er.reason}")
-        #print(f"er: {er}")
-        
-        #print(f"new: {rs.kprint.kore_to_pretty(er.state.kore)}")
-        
-        if er.next_states:
-            print(f"len(next_states): {len(er.next_states)}")
-            for st in er.next_states:
-                px = st.kore
-                print(f"branch: {rs.kprint.kore_to_pretty(px)}")
-                px = cleanup_pattern(rs, px)
-                print(f"clean: {rs.kprint.kore_to_pretty(px)}")
-                gmr = rs.kcs.client.get_model(px)
-                print(f"gmr: {gmr}")
-        assert False
+
+        assert er.reason == KoreRpc.StopReason.BRANCHING
+        assert er.next_states is not None
+        assert er.next_states[0].substitution is not None
+        assert er.next_states[1].substitution is None # the residual
+
+        # if er.next_states:
+        #     print(f"len(next_states): {len(er.next_states)}")
+        #     for st in er.next_states:
+        #         print(f"branch: {rs.kprint.kore_to_pretty(st.kore)}")
+        #         if st.substitution is not None:
+        #             print(f"(subst): {rs.kprint.kore_to_pretty(st.substitution)}")
+        # assert False
