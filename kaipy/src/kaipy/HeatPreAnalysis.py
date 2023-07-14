@@ -1,5 +1,6 @@
 import dataclasses
 import typing as T
+import logging
 
 import pyk.kore.prelude as KorePrelude
 import pyk.kore.rpc as KoreRpc
@@ -11,6 +12,7 @@ from .kore_utils import extract_equalities_from_witness, free_evars_of_pattern
 from .ReachabilitySystem import ReachabilitySystem
 from .rs_utils import cleanup_pattern
 
+_LOGGER: T.Final = logging.getLogger(__name__)
 
 @dataclasses.dataclass
 class ContextAlias:
@@ -64,9 +66,9 @@ class ContextAliases:
 # Assumes that rs has only heat rules, otherwise non-termination would happen.
 def collect_rests(
     rs: ReachabilitySystem, ca: ContextAlias, term: Kore.Pattern
-) -> T.Set[Kore.Pattern]:
+) -> T.Iterable[Kore.Pattern]:
     # TODO we have to make sure that the variable names do not clash
-    collected: T.Set[Kore.Pattern] = set()
+    collected: T.List[Kore.Pattern] = []
     rest: Kore.Pattern = Kore.EVar(name="VARREST2", sort=Kore.SortApp(name="SortK"))
     stage = "heating"
     side_condition: Kore.Pattern = Kore.Top(rs.top_sort)
@@ -95,27 +97,28 @@ def collect_rests(
         input_pattern_with_side: Kore.Pattern = Kore.And(
             rs.top_sort, input_pattern, side_condition
         )
-        # print(
+        # _LOGGER.info(
         #    f"input_pattern_with_side: {rs.kprint.kore_to_pretty(input_pattern_with_side)}"
         # )
         input_pattern_simplified0 = rs.kcs.client.simplify(input_pattern_with_side)[0]
-        # print(
+        # _LOGGER.info(
         #    f"input_pattern_simplified0: {rs.kprint.kore_to_pretty(input_pattern_simplified0)}"
         # )
         input_pattern_simplified = cleanup_pattern(rs, input_pattern_simplified0)
-        print(
-            f"input_pattern_simplified: {rs.kprint.kore_to_pretty(input_pattern_simplified)}"
-        )
+        #input_pattern_simplified = input_pattern_simplified0
+        #_LOGGER.info(
+        #    f"input_pattern_simplified: {rs.kprint.kore_to_pretty(input_pattern_simplified)}"
+        #)
 
         # print(f"input_pattern_with_side: {rs.kprint.kore_to_pretty(input_pattern_with_side)}")
         execute_result: KoreRpc.ExecuteResult = rs.kcs.client.execute(
             input_pattern_simplified, max_depth=1
         )
         # print(f"input_pattern_with_side (kore): {input_pattern_with_side.text}")
-        print(f"execute result depth: {execute_result.depth}")
-        print(f"execute result reason: {execute_result.reason}")
+        #_LOGGER.info(f"execute result depth: {execute_result.depth}")
+        #_LOGGER.info(f"execute result reason: {execute_result.reason}")
         if execute_result.reason == KoreRpc.StopReason.STUCK:
-            print(f"Stuck {stage}")
+            _LOGGER.info(f"Stuck {stage}")
             if stage == "heating":
                 stage = "cooling"
 
@@ -138,7 +141,7 @@ def collect_rests(
                     name=var_result_name, sort=Kore.SortApp(name="SortKItem")
                 )
                 var_result_k = Kore.App(KorePrelude.KSEQ, (), (var_result,KorePrelude.DOTK))
-                #var_result_k = KorePrelude.kseq([var_result])
+                # var_result_k = KorePrelude.kseq([var_result])
                 side_condition = Kore.And(
                     rs.top_sort,
                     side_condition,
@@ -149,48 +152,37 @@ def collect_rests(
                         Kore.App("LblisKResult", (), (var_result_k,)),
                     ),
                 )
+                # side_condition = Kore.Equals(
+                #     KorePrelude.BOOL,
+                #     rs.top_sort,
+                #     KorePrelude.TRUE,
+                #     Kore.App("LblisKResult", (), (var_result_k,)),
+                # )
                 term = var_result
                 continue
             else:
                 return collected
-        if execute_result.reason == KoreRpc.StopReason.BRANCHING and stage == "cooling":
+        elif execute_result.reason == KoreRpc.StopReason.BRANCHING: #and stage == "cooling":
             assert execute_result.next_states is not None
-            # Now it gets tricky. For some reason, when we execute a configuration with a KResult
-            # to be cooled, there are two resulting branches. In one branch, the configuration gets rewritten,
-            # so a step is taken; in the other branch, the configuration does not get rewritten but is stuck.
-            # So, in one branch there remains the freezer, while in the other branch it will not.
-            # On that branch which gets rewritten, we will have something like
-            # ```
-            # <k> foo(KR1, 5*6) ~> Rest2 </k> /\ isKResult(KR1 ~> .)
-            # ```
-            # We do not want to take the rest of this into our collected set, because the whole is not a rest of anything.
-            # Instead, we want to execute one more time. So what should be our `term` and what should be our `rest`?
-            # Well, `term` should be the head of the <k> cell, and `rest`` should be the rest of it.
-            #
-            # TODO: we have to write a test for this
+            # There should be one subsequent state and one residual
+            if len(execute_result.next_states) != 2:
+                _LOGGER.warning(f"Too much ({len(execute_result.next_states)}) next states; ending the analysis")
+                return collected
+                for i,ns in enumerate(execute_result.next_states):
+                    _LOGGER.warning(f"ns[{i}]: {rs.kprint.kore_to_pretty(ns.kore)}")
             assert len(execute_result.next_states) == 2
-            for ns in execute_result.next_states:
-                br = ns.kore
-                print(f"branch: {rs.kprint.kore_to_pretty(br)}")
-            # assert False
-            #    br_simplified = rs.kcs.client.simplify(br)[0]
-            #    print(f"br_simplified: {rs.kprint.kore_to_pretty(br_simplified)}")
-            brs = [ns.kore for ns in execute_result.next_states]
-            # It is a bit stupid that we execute every branch only to figure out which one is the good one
-            ers = [(br, rs.kcs.client.execute(br, max_depth=1)) for br in brs]
-            good_ones = [
-                (br, er)
-                for (br, er) in ers
-                if er.reason == KoreRpc.StopReason.DEPTH_BOUND
-            ]
-            assert len(good_ones) == 1
-            new_state = good_ones[0][0]
-            # new_state = good_ones[0].state.kore
-            # assert False
+            #if execute_result.next_states[0].substitution is None:
+            #    print(f"next_states[0]: {rs.kprint.kore_to_pretty(execute_result.next_states[0].kore)}")
+            #    print(f"next_states[1]: {rs.kprint.kore_to_pretty(execute_result.next_states[1].kore)}")
+            #assert execute_result.next_states[0].substitution is not None
+            assert execute_result.next_states[1].substitution is None # the residual
+            new_state = execute_result.next_states[0].kore
+            side_condition = execute_result.next_states[0].predicate or Kore.Top(rs.top_sort)
         else:
             assert execute_result.reason == KoreRpc.StopReason.DEPTH_BOUND
             new_state = execute_result.state.kore
-        print(f"new state: {rs.kprint.kore_to_pretty(new_state)}")
+            side_condition = execute_result.state.predicate or Kore.Top(rs.top_sort)
+        #_LOGGER.info(f"new state: {rs.kprint.kore_to_pretty(new_state)}")
         # print(f"new state (kore): {new_state.text}")
         # mapping = RSUtils.match_ca(rs, ca.after if stage == "heating" else ca.before, new_state)
         mapping = RSUtils.match_ca(rs, ca.after, new_state)
@@ -201,11 +193,11 @@ def collect_rests(
         new_rest: Kore.Pattern = mapping[
             Kore.EVar(name="VARREST", sort=Kore.SortApp(name="SortK"))
         ]
-        print(f"new term: {rs.kprint.kore_to_pretty(new_term)}")
-        print(f"new rest: {rs.kprint.kore_to_pretty(new_rest)}")
+        #_LOGGER.info(f"new term: {rs.kprint.kore_to_pretty(new_term)}")
+        #_LOGGER.info(f"new rest: {rs.kprint.kore_to_pretty(new_rest)}")
         if stage == "heating":
-            print(f"adding new rest")
-            collected.add(new_rest)
+            _LOGGER.info(f"adding new rest")
+            collected.append(new_rest)
 
         term = new_term
         rest = new_rest

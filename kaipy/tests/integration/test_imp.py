@@ -1,4 +1,5 @@
 import typing as T
+import logging
 from pathlib import Path
 
 import pyk.kore.prelude as KorePrelude
@@ -16,6 +17,7 @@ from kaipy.ReachabilitySystem import ReachabilitySystem
 
 from kaipy.testing.testingbase import RSTestBase
 
+_LOGGER: T.Final = logging.getLogger(__name__)
 
 class MyTest(RSTestBase):
     MYTEST_CONTEXT_ALIAS_BEFORE: T.ClassVar[Path]
@@ -66,16 +68,13 @@ class TestImp(MyTest):
             initial_here = mapping[
                 Kore.EVar(name="VARHERE", sort=Kore.SortApp(name="SortKItem"))
             ]
-            collected = collect_rests(
+            collected = list(collect_rests(
                 rs_heatcoolonly, context_aliases.aliases[0], initial_here
-            )
+            ))
+            print(f"len(collected) == {len(collected)}")
+            for i,c in enumerate(collected):
+                print(f"{i}: {rs_heatcoolonly.kprint.kore_to_pretty(c)}")
 
-        assert False
-
-    def test_step_adds_assumption(
-        self, reachability_system: ReachabilitySystem, context_aliases: ContextAliases
-    ):
-        context_aliases.aliases[0]
         assert False
 
     # def test_execute_var(self, reachability_system: ReachabilitySystem):
