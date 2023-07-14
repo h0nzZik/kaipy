@@ -68,12 +68,15 @@ class TestImp(MyTest):
             initial_here = mapping[
                 Kore.EVar(name="VARHERE", sort=Kore.SortApp(name="SortKItem"))
             ]
-            collected = list(collect_rests(
+            hparesult = collect_rests(
                 rs_heatcoolonly, context_aliases.aliases[0], initial_here
-            ))
-            print(f"len(collected) == {len(collected)}")
-            for i,c in enumerate(collected):
-                print(f"{i}: {rs_heatcoolonly.kprint.kore_to_pretty(c)}")
+            )
+            print("Rests:")
+            for i,a_rest in enumerate(hparesult.rests):
+                print(f"{i}: {rs_heatcoolonly.kprint.kore_to_pretty(a_rest)}")
+            print("Irreducibles:")
+            for i,an_ireducible in enumerate(hparesult.irreducibles):
+                print(f"{i}: {rs_heatcoolonly.kprint.kore_to_pretty(an_ireducible)}")
 
         assert False
 

@@ -62,18 +62,25 @@ class ContextAliases:
 # the value to have a certain sort. So, we can transform the semantics so that there is a new sort
 # that is a subsort to any other sort. But is that legal? Like, can we subsort hooked sort?
 
+@dataclasses.dataclass(frozen=True)
+class HPAResult:
+    rests: T.List[Kore.Pattern]
+    irreducibles: T.List[Kore.Pattern]
 
 # Assumes that rs has only heat rules, otherwise non-termination would happen.
 def collect_rests(
     rs: ReachabilitySystem, ca: ContextAlias, term: Kore.Pattern
-) -> T.Iterable[Kore.Pattern]:
+) -> HPAResult:
     # TODO we have to make sure that the variable names do not clash
     collected: T.List[Kore.Pattern] = []
+    irreducibles: T.List[Kore.Pattern] = []
     rest: Kore.Pattern = Kore.EVar(name="VARREST2", sort=Kore.SortApp(name="SortK"))
     stage = "heating"
     side_condition: Kore.Pattern = Kore.Top(rs.top_sort)
     while True:
         # plug 'term' into the 'before' part of the alias
+        # TODO: this is probably not the most efficient way of replacing `VARHERE` with `term`
+        # and `VARREST` with `rest`. It works for now, but we probably want to use a substitution instead.
         input_pattern = Kore.And(
             rs.top_sort,
             Kore.And(
@@ -119,6 +126,8 @@ def collect_rests(
         #_LOGGER.info(f"execute result reason: {execute_result.reason}")
         if execute_result.reason == KoreRpc.StopReason.STUCK:
             _LOGGER.info(f"Stuck {stage}")
+            irreducibles.append(term)
+            #_LOGGER.info(f"stuck with: {rs.kprint.kore_to_pretty(input_pattern_simplified)}")
             if stage == "heating":
                 stage = "cooling"
 
@@ -161,13 +170,13 @@ def collect_rests(
                 term = var_result
                 continue
             else:
-                return collected
+                return HPAResult(collected, irreducibles)
         elif execute_result.reason == KoreRpc.StopReason.BRANCHING: #and stage == "cooling":
             assert execute_result.next_states is not None
             # There should be one subsequent state and one residual
             if len(execute_result.next_states) != 2:
                 _LOGGER.warning(f"Too much ({len(execute_result.next_states)}) next states; ending the analysis")
-                return collected
+                return HPAResult(collected, irreducibles)
                 for i,ns in enumerate(execute_result.next_states):
                     _LOGGER.warning(f"ns[{i}]: {rs.kprint.kore_to_pretty(ns.kore)}")
             assert len(execute_result.next_states) == 2
