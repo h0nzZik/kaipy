@@ -9,6 +9,7 @@ import pyk.kore.syntax as Kore
 
 import kaipy.rs_utils as RSUtils
 
+from kaipy.KompiledDefinitionWrapper import KompiledDefinitionWrapper
 from .kore_utils import extract_equalities_from_witness, free_evars_of_pattern, some_subpatterns_of
 from .ReachabilitySystem import ReachabilitySystem
 from .rs_utils import cleanup_pattern
@@ -258,4 +259,19 @@ def collect_rests_recursively(rs: ReachabilitySystem, ca: ContextAlias, term: Ko
         to_reduce.update(flattened_filtered)
     
     return rests
-        
+
+
+def pre_analyze(rs: ReachabilitySystem, context_aliases: ContextAliases, initial_configuration: Kore.Pattern) -> T.List[Kore.Pattern]:
+    heat_cool_only_def: KompiledDefinitionWrapper = (
+            rs.kdw.heat_cool_only
+    )
+    with ReachabilitySystem(heat_cool_only_def) as rs_heatcoolonly:
+        input_simplified = rs_heatcoolonly.simplify(initial_configuration)
+        mapping = RSUtils.match_ca(
+            rs_heatcoolonly, context_aliases.aliases[0].before, input_simplified
+        )
+        initial_here = mapping[
+            Kore.EVar(name="VARHERE", sort=Kore.SortApp(name="SortKItem"))
+        ]
+        rests = collect_rests_recursively(rs_heatcoolonly, context_aliases.aliases[0], initial_here)
+    return rests
