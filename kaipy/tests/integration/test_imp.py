@@ -11,7 +11,7 @@ from pyk.ktool.kprint import KPrint
 from pyk.testing._kompiler import KompiledTest
 
 import kaipy.rs_utils as RSUtils
-from kaipy.HeatPreAnalysis import ContextAlias, ContextAliases, collect_rests
+from kaipy.HeatPreAnalysis import ContextAlias, ContextAliases, collect_rests, collect_rests_recursively
 from kaipy.KompiledDefinitionWrapper import KompiledDefinitionWrapper
 from kaipy.ReachabilitySystem import ReachabilitySystem
 
@@ -68,15 +68,19 @@ class TestImp(MyTest):
             initial_here = mapping[
                 Kore.EVar(name="VARHERE", sort=Kore.SortApp(name="SortKItem"))
             ]
-            hparesult = collect_rests(
-                rs_heatcoolonly, context_aliases.aliases[0], initial_here
-            )
-            print("Rests:")
-            for i,a_rest in enumerate(hparesult.rests):
-                print(f"{i}: {rs_heatcoolonly.kprint.kore_to_pretty(a_rest)}")
-            print("Irreducibles:")
-            for i,an_ireducible in enumerate(hparesult.irreducibles):
-                print(f"{i}: {rs_heatcoolonly.kprint.kore_to_pretty(an_ireducible)}")
+            rests = collect_rests_recursively(rs_heatcoolonly, context_aliases.aliases[0], initial_here)
+            _LOGGER.info("Rests:")
+            for i,a_rest in enumerate(rests):
+                _LOGGER.info(f"{i}: {rs_heatcoolonly.kprint.kore_to_pretty(a_rest)}")
+            # hparesult = collect_rests(
+            #     rs_heatcoolonly, context_aliases.aliases[0], initial_here
+            # )
+            # print("Rests:")
+            # for i,a_rest in enumerate(hparesult.rests):
+            #     print(f"{i}: {rs_heatcoolonly.kprint.kore_to_pretty(a_rest)}")
+            # print("Irreducibles:")
+            # for i,an_ireducible in enumerate(hparesult.irreducibles):
+            #     print(f"{i}: {rs_heatcoolonly.kprint.kore_to_pretty(an_ireducible)}")
 
         assert False
 

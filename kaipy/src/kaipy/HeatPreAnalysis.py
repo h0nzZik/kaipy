@@ -1,4 +1,5 @@
 import dataclasses
+import itertools
 import typing as T
 import logging
 
@@ -8,7 +9,7 @@ import pyk.kore.syntax as Kore
 
 import kaipy.rs_utils as RSUtils
 
-from .kore_utils import extract_equalities_from_witness, free_evars_of_pattern
+from .kore_utils import extract_equalities_from_witness, free_evars_of_pattern, some_subpatterns_of
 from .ReachabilitySystem import ReachabilitySystem
 from .rs_utils import cleanup_pattern
 
@@ -211,3 +212,50 @@ def collect_rests(
         term = new_term
         rest = new_rest
         stage = "heating"
+
+def get_direct_subterms(t: Kore.Pattern) -> T.List[Kore.Pattern]:
+    match t:
+        case Kore.App("inj", _, (arg,)):
+            return get_direct_subterms(arg)
+        case Kore.App(_, _, args):
+            return list(args)
+    return []
+
+def collect_rests_recursively(rs: ReachabilitySystem, ca: ContextAlias, term: Kore.Pattern) -> T.List[Kore.Pattern]:
+    subs = some_subpatterns_of(term)
+    to_reduce = {term}
+    rests: T.List[Kore.Pattern] = []
+    iteration = 0
+    while len(to_reduce) > 0:
+        iteration = iteration + 1
+        _LOGGER.info(f"***** Iteration {iteration} *****")
+        t = to_reduce.pop()
+        
+        # if it is not KItem, we have to inj{T, KItem} it
+        match t:
+            case Kore.App("inj", (_, to), _):
+                tsort = to
+            case Kore.App(sym, _, _):
+                tsort = rs.get_symbol_sort(sym)
+            case _:
+                assert False
+        if tsort != KorePrelude.SORT_K_ITEM:
+            t = KorePrelude.inj(tsort, KorePrelude.SORT_K_ITEM, t)
+        
+        #_LOGGER.info(f"collecting from (kore) {t.text}")
+        #_LOGGER.info(f"collecting from {rs.kprint.kore_to_pretty(t)}")
+        hparesult = collect_rests(rs, ca, t)
+        rests = rests + hparesult.rests
+        irs_sub = [get_direct_subterms(ir) for ir in hparesult.irreducibles]
+        flattened = list(itertools.chain(*irs_sub))
+        flattened_filtered = [x for x in flattened if x in subs and type(x) is Kore.App]
+        _LOGGER.info(f"Adding {len(flattened_filtered)} elements (out of {len(flattened)}) to be reduced")
+        if len(flattened_filtered) == 1:
+            _LOGGER.info(f"{rs.kprint.kore_to_pretty(flattened_filtered[0])}")
+        #for ff in flattened_filtered:
+        #    _LOGGER.info(f"{rs.kprint.kore_to_pretty(ff)}")
+        _LOGGER.info(f"{flattened_filtered}")
+        to_reduce.update(flattened_filtered)
+    
+    return rests
+        
