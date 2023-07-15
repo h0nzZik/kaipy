@@ -1,20 +1,25 @@
 import dataclasses
 import itertools
-import typing as T
 import logging
+import typing as T
 
 import pyk.kore.prelude as KorePrelude
 import pyk.kore.rpc as KoreRpc
 import pyk.kore.syntax as Kore
 
 import kaipy.rs_utils as RSUtils
-
 from kaipy.KompiledDefinitionWrapper import KompiledDefinitionWrapper
-from .kore_utils import extract_equalities_from_witness, free_evars_of_pattern, some_subpatterns_of
+
+from .kore_utils import (
+    extract_equalities_from_witness,
+    free_evars_of_pattern,
+    some_subpatterns_of,
+)
 from .ReachabilitySystem import ReachabilitySystem
 from .rs_utils import cleanup_pattern
 
 _LOGGER: T.Final = logging.getLogger(__name__)
+
 
 @dataclasses.dataclass
 class ContextAlias:
@@ -64,10 +69,12 @@ class ContextAliases:
 # the value to have a certain sort. So, we can transform the semantics so that there is a new sort
 # that is a subsort to any other sort. But is that legal? Like, can we subsort hooked sort?
 
+
 @dataclasses.dataclass(frozen=True)
 class HPAResult:
     rests: T.List[Kore.Pattern]
     irreducibles: T.List[Kore.Pattern]
+
 
 # Assumes that rs has only heat rules, otherwise non-termination would happen.
 def collect_rests(
@@ -114,22 +121,22 @@ def collect_rests(
         #    f"input_pattern_simplified0: {rs.kprint.kore_to_pretty(input_pattern_simplified0)}"
         # )
         input_pattern_simplified = cleanup_pattern(rs, input_pattern_simplified0)
-        #input_pattern_simplified = input_pattern_simplified0
-        #_LOGGER.info(
+        # input_pattern_simplified = input_pattern_simplified0
+        # _LOGGER.info(
         #    f"input_pattern_simplified: {rs.kprint.kore_to_pretty(input_pattern_simplified)}"
-        #)
+        # )
 
         # print(f"input_pattern_with_side: {rs.kprint.kore_to_pretty(input_pattern_with_side)}")
         execute_result: KoreRpc.ExecuteResult = rs.kcs.client.execute(
             input_pattern_simplified, max_depth=1
         )
         # print(f"input_pattern_with_side (kore): {input_pattern_with_side.text}")
-        #_LOGGER.info(f"execute result depth: {execute_result.depth}")
-        #_LOGGER.info(f"execute result reason: {execute_result.reason}")
+        # _LOGGER.info(f"execute result depth: {execute_result.depth}")
+        # _LOGGER.info(f"execute result reason: {execute_result.reason}")
         if execute_result.reason == KoreRpc.StopReason.STUCK:
             _LOGGER.info(f"Stuck {stage}")
             irreducibles.append(term)
-            #_LOGGER.info(f"stuck with: {rs.kprint.kore_to_pretty(input_pattern_simplified)}")
+            # _LOGGER.info(f"stuck with: {rs.kprint.kore_to_pretty(input_pattern_simplified)}")
             if stage == "heating":
                 stage = "cooling"
 
@@ -151,7 +158,9 @@ def collect_rests(
                 var_result = Kore.EVar(
                     name=var_result_name, sort=Kore.SortApp(name="SortKItem")
                 )
-                var_result_k = Kore.App(KorePrelude.KSEQ, (), (var_result,KorePrelude.DOTK))
+                var_result_k = Kore.App(
+                    KorePrelude.KSEQ, (), (var_result, KorePrelude.DOTK)
+                )
                 # var_result_k = KorePrelude.kseq([var_result])
                 side_condition = Kore.And(
                     rs.top_sort,
@@ -173,27 +182,33 @@ def collect_rests(
                 continue
             else:
                 return HPAResult(collected, irreducibles)
-        elif execute_result.reason == KoreRpc.StopReason.BRANCHING: #and stage == "cooling":
+        elif (
+            execute_result.reason == KoreRpc.StopReason.BRANCHING
+        ):  # and stage == "cooling":
             assert execute_result.next_states is not None
             # There should be one subsequent state and one residual
             if len(execute_result.next_states) != 2:
-                _LOGGER.warning(f"Too much ({len(execute_result.next_states)}) next states; ending the analysis")
+                _LOGGER.warning(
+                    f"Too much ({len(execute_result.next_states)}) next states; ending the analysis"
+                )
                 return HPAResult(collected, irreducibles)
-                for i,ns in enumerate(execute_result.next_states):
+                for i, ns in enumerate(execute_result.next_states):
                     _LOGGER.warning(f"ns[{i}]: {rs.kprint.kore_to_pretty(ns.kore)}")
             assert len(execute_result.next_states) == 2
-            #if execute_result.next_states[0].substitution is None:
+            # if execute_result.next_states[0].substitution is None:
             #    print(f"next_states[0]: {rs.kprint.kore_to_pretty(execute_result.next_states[0].kore)}")
             #    print(f"next_states[1]: {rs.kprint.kore_to_pretty(execute_result.next_states[1].kore)}")
-            #assert execute_result.next_states[0].substitution is not None
-            assert execute_result.next_states[1].substitution is None # the residual
+            # assert execute_result.next_states[0].substitution is not None
+            assert execute_result.next_states[1].substitution is None  # the residual
             new_state = execute_result.next_states[0].kore
-            side_condition = execute_result.next_states[0].predicate or Kore.Top(rs.top_sort)
+            side_condition = execute_result.next_states[0].predicate or Kore.Top(
+                rs.top_sort
+            )
         else:
             assert execute_result.reason == KoreRpc.StopReason.DEPTH_BOUND
             new_state = execute_result.state.kore
             side_condition = execute_result.state.predicate or Kore.Top(rs.top_sort)
-        #_LOGGER.info(f"new state: {rs.kprint.kore_to_pretty(new_state)}")
+        # _LOGGER.info(f"new state: {rs.kprint.kore_to_pretty(new_state)}")
         # print(f"new state (kore): {new_state.text}")
         # mapping = RSUtils.match_ca(rs, ca.after if stage == "heating" else ca.before, new_state)
         mapping = RSUtils.match_ca(rs, ca.after, new_state)
@@ -204,8 +219,8 @@ def collect_rests(
         new_rest: Kore.Pattern = mapping[
             Kore.EVar(name="VARREST", sort=Kore.SortApp(name="SortK"))
         ]
-        #_LOGGER.info(f"new term: {rs.kprint.kore_to_pretty(new_term)}")
-        #_LOGGER.info(f"new rest: {rs.kprint.kore_to_pretty(new_rest)}")
+        # _LOGGER.info(f"new term: {rs.kprint.kore_to_pretty(new_term)}")
+        # _LOGGER.info(f"new rest: {rs.kprint.kore_to_pretty(new_rest)}")
         if stage == "heating":
             _LOGGER.info(f"adding new rest")
             collected.append(new_rest)
@@ -213,6 +228,7 @@ def collect_rests(
         term = new_term
         rest = new_rest
         stage = "heating"
+
 
 def get_direct_subterms(t: Kore.Pattern) -> T.List[Kore.Pattern]:
     match t:
@@ -222,7 +238,10 @@ def get_direct_subterms(t: Kore.Pattern) -> T.List[Kore.Pattern]:
             return list(args)
     return []
 
-def collect_rests_recursively(rs: ReachabilitySystem, ca: ContextAlias, term: Kore.Pattern) -> T.List[Kore.Pattern]:
+
+def collect_rests_recursively(
+    rs: ReachabilitySystem, ca: ContextAlias, term: Kore.Pattern
+) -> T.List[Kore.Pattern]:
     subs = some_subpatterns_of(term)
     to_reduce = {term}
     rests: T.List[Kore.Pattern] = []
@@ -231,7 +250,7 @@ def collect_rests_recursively(rs: ReachabilitySystem, ca: ContextAlias, term: Ko
         iteration = iteration + 1
         _LOGGER.info(f"***** Iteration {iteration} *****")
         t = to_reduce.pop()
-        
+
         # if it is not KItem, we have to inj{T, KItem} it
         match t:
             case Kore.App("inj", (_, to), _):
@@ -242,29 +261,33 @@ def collect_rests_recursively(rs: ReachabilitySystem, ca: ContextAlias, term: Ko
                 assert False
         if tsort != KorePrelude.SORT_K_ITEM:
             t = KorePrelude.inj(tsort, KorePrelude.SORT_K_ITEM, t)
-        
-        #_LOGGER.info(f"collecting from (kore) {t.text}")
-        #_LOGGER.info(f"collecting from {rs.kprint.kore_to_pretty(t)}")
+
+        # _LOGGER.info(f"collecting from (kore) {t.text}")
+        # _LOGGER.info(f"collecting from {rs.kprint.kore_to_pretty(t)}")
         hparesult = collect_rests(rs, ca, t)
         rests = rests + hparesult.rests
         irs_sub = [get_direct_subterms(ir) for ir in hparesult.irreducibles]
         flattened = list(itertools.chain(*irs_sub))
         flattened_filtered = [x for x in flattened if x in subs and type(x) is Kore.App]
-        _LOGGER.info(f"Adding {len(flattened_filtered)} elements (out of {len(flattened)}) to be reduced")
+        _LOGGER.info(
+            f"Adding {len(flattened_filtered)} elements (out of {len(flattened)}) to be reduced"
+        )
         if len(flattened_filtered) == 1:
             _LOGGER.info(f"{rs.kprint.kore_to_pretty(flattened_filtered[0])}")
-        #for ff in flattened_filtered:
+        # for ff in flattened_filtered:
         #    _LOGGER.info(f"{rs.kprint.kore_to_pretty(ff)}")
         _LOGGER.info(f"{flattened_filtered}")
         to_reduce.update(flattened_filtered)
-    
+
     return rests
 
 
-def pre_analyze(rs: ReachabilitySystem, context_aliases: ContextAliases, initial_configuration: Kore.Pattern) -> T.List[Kore.Pattern]:
-    heat_cool_only_def: KompiledDefinitionWrapper = (
-            rs.kdw.heat_cool_only
-    )
+def pre_analyze(
+    rs: ReachabilitySystem,
+    context_aliases: ContextAliases,
+    initial_configuration: Kore.Pattern,
+) -> T.List[Kore.Pattern]:
+    heat_cool_only_def: KompiledDefinitionWrapper = rs.kdw.heat_cool_only
     with ReachabilitySystem(heat_cool_only_def) as rs_heatcoolonly:
         input_simplified = rs_heatcoolonly.simplify(initial_configuration)
         mapping = RSUtils.match_ca(
@@ -273,5 +296,7 @@ def pre_analyze(rs: ReachabilitySystem, context_aliases: ContextAliases, initial
         initial_here = mapping[
             Kore.EVar(name="VARHERE", sort=Kore.SortApp(name="SortKItem"))
         ]
-        rests = collect_rests_recursively(rs_heatcoolonly, context_aliases.aliases[0], initial_here)
+        rests = collect_rests_recursively(
+            rs_heatcoolonly, context_aliases.aliases[0], initial_here
+        )
     return rests

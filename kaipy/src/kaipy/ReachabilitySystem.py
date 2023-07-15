@@ -30,19 +30,19 @@ class KoreClientServer:
         definition_dir: Path,
         main_module_name: str,
         kore_rpc_args: T.Iterable[str] = ["--enable-log-timestamps"],
-        #connect_to_port: T.Optional[str] = None,
+        # connect_to_port: T.Optional[str] = None,
     ):
-        #if connect_to_port is not None:
+        # if connect_to_port is not None:
         #    port = int(connect_to_port)
         #    timeout = 1500
         #    self.server = None
-        #else:
-        #port = utils.find_free_port()
+        # else:
+        # port = utils.find_free_port()
         self.server = KoreServer(
             kompiled_dir=definition_dir,
             module_name=main_module_name,
             command=list((KORE_RPC_COMMAND,)) + list(kore_rpc_args),
-            #port=port,
+            # port=port,
         )
         timeout = None
         self.client = KoreClient("localhost", port=self.server.port, timeout=timeout)
@@ -65,16 +65,16 @@ class ReachabilitySystem:
     def __init__(
         self,
         kdw: KompiledDefinitionWrapper,
-        #kore_rpc_args: T.Iterable[str] = (),
-        #connect_to_port: T.Optional[str] = None,
+        # kore_rpc_args: T.Iterable[str] = (),
+        # connect_to_port: T.Optional[str] = None,
     ):
         self.kdw = kdw
         self.kprint = KPrint(kdw.definition_dir)
         self.kcs = KoreClientServer(
             definition_dir=kdw.definition_dir,
             main_module_name=self.kdw.main_module_name,
-            #kore_rpc_args=kore_rpc_args,
-            #connect_to_port=connect_to_port,
+            # kore_rpc_args=kore_rpc_args,
+            # connect_to_port=connect_to_port,
         )
 
     @property

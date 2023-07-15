@@ -1,5 +1,5 @@
-import typing as T
 import logging
+import typing as T
 from pathlib import Path
 
 import pyk.kore.prelude as KorePrelude
@@ -13,10 +13,10 @@ from pyk.testing._kompiler import KompiledTest
 import kaipy.rs_utils as RSUtils
 from kaipy.HeatPreAnalysis import ContextAlias, ContextAliases, pre_analyze
 from kaipy.ReachabilitySystem import ReachabilitySystem
-
 from kaipy.testing.testingbase import RSTestBase
 
 _LOGGER: T.Final = logging.getLogger(__name__)
+
 
 class MyTest(RSTestBase):
     MYTEST_CONTEXT_ALIAS_BEFORE: T.ClassVar[Path]
@@ -66,7 +66,7 @@ class TestImp(MyTest):
         rests = pre_analyze(reachability_system, context_aliases, input_pattern)
         assert len(rests) == 17
         print("Rests:")
-        for i,a_rest in enumerate(rests):
+        for i, a_rest in enumerate(rests):
             print(f"{i}: {reachability_system.kprint.kore_to_pretty(a_rest)}")
 
     # def test_execute_var(self, reachability_system: ReachabilitySystem):

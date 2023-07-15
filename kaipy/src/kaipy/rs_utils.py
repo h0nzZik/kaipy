@@ -56,7 +56,7 @@ def match_ca(
         compute_renaming0(vars_to_avoid=vars_to_avoid, vars_to_rename=vars_to_rename),
         ca,
     )
-    #print(f"ca_renamed: {rs.kprint.kore_to_pretty(ca_renamed)}")
+    # print(f"ca_renamed: {rs.kprint.kore_to_pretty(ca_renamed)}")
     eca = existentially_quantify_free_variables(rs.top_sort, ca_renamed)
     ir: KoreRpc.ImpliesResult = rs.kcs.client.implies(data, eca)
     if not ir.satisfiable:
