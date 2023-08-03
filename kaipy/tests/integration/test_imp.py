@@ -1,6 +1,7 @@
 import logging
 import typing as T
 from pathlib import Path
+from immutabledict import immutabledict
 
 import pyk.kore.prelude as KorePrelude
 import pyk.kore.rpc as KoreRpc
@@ -14,6 +15,7 @@ import kaipy.rs_utils as RSUtils
 from kaipy.HeatPreAnalysis import ContextAlias, ContextAliases, pre_analyze
 from kaipy.ReachabilitySystem import ReachabilitySystem
 from kaipy.testing.testingbase import RSTestBase
+import kaipy.analyzer
 
 _LOGGER: T.Final = logging.getLogger(__name__)
 
@@ -68,6 +70,24 @@ class TestImp(MyTest):
         print("Rests:")
         for i, a_rest in enumerate(rests):
             print(f"{i}: {reachability_system.kprint.kore_to_pretty(a_rest)}")
+
+    def test_cartesian_dict(self):
+        # { x |-> {phi1, phi2}, y |-> {phi3, phi4} }
+        # into
+        # { {x |-> phi1, y |-> phi3}, {x |-> phi1, y |-> phi4}, {x |-> phi2, y |-> phi3}, {x |-> phi2, y |-> phi4}  }
+        actual = kaipy.analyzer.cartesian_dict(immutabledict({"x" : {1,2}, "y" : {3, 4}}))
+        expected = { immutabledict({"x" : 1, "y" : 3}), immutabledict({"x" : 1, "y" : 4}), immutabledict({"x" : 2, "y" : 3}), immutabledict({"x" : 2, "y" : 4}) }
+        assert expected == actual
+
+    def test_analyze(
+        self, reachability_system: ReachabilitySystem
+    ):
+        input_pattern: Kore.Pattern = reachability_system.kdw.get_input_kore(
+            RSTestBase.LANGUAGES / "imp/sum.imp"
+        )
+
+        rv = kaipy.analyzer.analyze(reachability_system, input_pattern)
+        assert(False) # To print stuff
 
     # def test_execute_var(self, reachability_system: ReachabilitySystem):
     #     #x = Kore.EVar("VARX", KorePrelude.SORT_K_ITEM)
