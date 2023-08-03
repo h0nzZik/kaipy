@@ -8,16 +8,16 @@ jobs:
       - name: 'Check out code'
         uses: actions/checkout@v3
       - name: 'Install Nix/Cachix'
-        uses: cachix/install-nix-action@v19
+        uses: cachix/install-nix-action@v22
         with:
-          install_url: https://releases.nixos.org/nix/nix-2.13.3/install
+          install_url: https://releases.nixos.org/nix/nix-2.16.1/install
           extra_nix_config: |
             access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
       - uses: cachix/cachix-action@v12
         with:
           name: k-framework
       - name: 'MyPy kaipy'
-        run: GC_DONT_GC=1 nix develop --print-build-logs '.#kaipy' --command mypy ./kaipy
+        run: GC_DONT_GC=1 nix develop --print-build-logs '.#kaipy' --command mypy ./kaipy/src
       - name: 'Build kaipy'
         run: GC_DONT_GC=1 nix build --print-build-logs '.#kaipy'
       - name: 'Test kaipy'

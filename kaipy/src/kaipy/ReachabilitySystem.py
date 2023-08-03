@@ -1,18 +1,18 @@
-import typing as T
 import functools as F
-
+import typing as T
 from pathlib import Path
 
+import pyk.kore.syntax as Kore
 from pyk.kast.outer import KDefinition
 from pyk.kore.parser import KoreParser
 from pyk.kore.rpc import KoreClient, KoreServer
-import pyk.kore.syntax as Kore
 from pyk.ktool.kprint import KPrint
 
 from .kcommands import KORE_RPC_COMMAND
 from .KompiledDefinitionWrapper import KompiledDefinitionWrapper
 from .kore_utils import (
     axiom_label,
+    existentially_quantify_free_variables,
     free_evars_of_pattern,
     get_symbol_sort,
     get_top_cell_initializer,
@@ -29,23 +29,23 @@ class KoreClientServer:
         self,
         definition_dir: Path,
         main_module_name: str,
-        kore_rpc_args: T.Iterable[str] = (),
-        connect_to_port: T.Optional[str] = None,
+        kore_rpc_args: T.Iterable[str] = ["--enable-log-timestamps"],
+        # connect_to_port: T.Optional[str] = None,
     ):
-        if connect_to_port is not None:
-            port = int(connect_to_port)
-            timeout = 1500
-            self.server = None
-        else:
-            port = 3000
-            self.server = KoreServer(
-                kompiled_dir=definition_dir,
-                module_name=main_module_name,
-                command=(KORE_RPC_COMMAND,) + tuple(kore_rpc_args),
-                port=port,
-            )
-            timeout = None
-        self.client = KoreClient("localhost", port=port, timeout=timeout)
+        # if connect_to_port is not None:
+        #    port = int(connect_to_port)
+        #    timeout = 1500
+        #    self.server = None
+        # else:
+        # port = utils.find_free_port()
+        self.server = KoreServer(
+            kompiled_dir=definition_dir,
+            module_name=main_module_name,
+            command=list((KORE_RPC_COMMAND,)) + list(kore_rpc_args),
+            # port=port,
+        )
+        timeout = None
+        self.client = KoreClient("localhost", port=self.server.port, timeout=timeout)
 
     def __enter__(self) -> "KoreClientServer":
         return self
@@ -60,33 +60,26 @@ class KoreClientServer:
 class ReachabilitySystem:
     kcs: KoreClientServer
     kdw: KompiledDefinitionWrapper
-    #definition: Definition
-    main_module_name: str
     kprint: KPrint
-    definition_dir: Path
 
     def __init__(
         self,
-        definition_dir: Path,
-        kore_rpc_args: T.Iterable[str] = (),
-        connect_to_port: T.Optional[str] = None,
+        kdw: KompiledDefinitionWrapper,
+        # kore_rpc_args: T.Iterable[str] = (),
+        # connect_to_port: T.Optional[str] = None,
     ):
-        self.definition_dir = definition_dir
-        with open(definition_dir / "mainModule.txt", "r") as mm:
-            self.main_module_name = mm.read()
-        with open(definition_dir / "definition.kore", "r") as dc:
-            d = dc.read()
-        #kparser = KoreParser(d)
-
-        #definition = kparser.definition()
-        self.kdw = KompiledDefinitionWrapper(definition_dir)
-        self.kprint = KPrint(definition_dir)
+        self.kdw = kdw
+        self.kprint = KPrint(kdw.definition_dir)
         self.kcs = KoreClientServer(
-            definition_dir=definition_dir,
-            main_module_name=self.main_module_name,
-            kore_rpc_args=kore_rpc_args,
-            connect_to_port=connect_to_port,
+            definition_dir=kdw.definition_dir,
+            main_module_name=self.kdw.main_module_name,
+            # kore_rpc_args=kore_rpc_args,
+            # connect_to_port=connect_to_port,
         )
+
+    @property
+    def definition_dir(self) -> Path:
+        return self.kdw.definition_dir
 
     def __enter__(self) -> "ReachabilitySystem":
         return self
@@ -95,7 +88,7 @@ class ReachabilitySystem:
         self.kcs.__exit__()
 
     def get_symbol_sort(self, symbol: str) -> Kore.Sort:
-        return get_symbol_sort(self.definition, self.main_module_name, symbol)
+        return get_symbol_sort(self.definition, self.kdw.main_module_name, symbol)
 
     @F.cached_property
     def definition(self) -> Kore.Definition:
@@ -109,23 +102,15 @@ class ReachabilitySystem:
     def kast_definition(self) -> KDefinition:
         return self.kprint.definition
 
-
     def rule_by_id(self, ruleid: str) -> Kore.Axiom:
         for axiom in self.kdw.rewrite_rules:
             if axiom_label(axiom) == ruleid:
                 return axiom
         raise ValueError(f"Axiom with id {ruleid} not found.")
 
-    @F.cached_property
-    def rules_variables(self) -> T.Set[Kore.EVar]:
-        evars: T.Set[Kore.EVar] = set()
-        for axiom in self.kdw.rewrite_rules:
-            evars = evars.union(free_evars_of_pattern(axiom.pattern))
-        return evars
-
     def is_nonhooked_constructor(self, name: str) -> bool:
         return is_nonhooked_constructor_symbol(
-            self.definition, self.main_module_name, name
+            self.definition, self.kdw.main_module_name, name
         )
 
     def simplify(self, pattern: Kore.Pattern) -> Kore.Pattern:

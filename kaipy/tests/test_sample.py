@@ -1,8 +1,8 @@
+import typing as T
 from pathlib import Path
 
 from pyk.testing._kompiler import KompiledTest
 
-import typing as T
 
 def func(x):
     return x + 1
