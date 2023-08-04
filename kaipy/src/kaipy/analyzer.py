@@ -58,15 +58,7 @@ class FinitePatternDomain(IAbstractPatternDomain):
         for i,p in enumerate(self.pl):
             if sortof(self.rs, p) != csort:
                 continue
-            p_renamed: Kore.Pattern = KoreUtils.rename_vars(
-                KoreUtils.compute_renaming0(
-                    vars_to_avoid=list(KoreUtils.free_evars_of_pattern(c)),
-                    vars_to_rename=list(KoreUtils.free_evars_of_pattern(p))
-                ),
-                p,
-            )
-            ir: KoreRpc.ImpliesResult = self.rs.implies(c, p_renamed)
-            if ir.satisfiable:
+            if self.rs.subsumes(c, p):
                 return FinitePattern(i, csort)
         return FinitePattern(-1, csort)
     

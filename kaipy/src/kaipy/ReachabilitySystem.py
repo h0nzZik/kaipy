@@ -10,15 +10,7 @@ from pyk.ktool.kprint import KPrint
 
 from .kcommands import KORE_RPC_COMMAND
 from .KompiledDefinitionWrapper import KompiledDefinitionWrapper
-from .kore_utils import (
-    axiom_label,
-    existentially_quantify_free_variables,
-    free_evars_of_pattern,
-    get_symbol_sort,
-    get_top_cell_initializer,
-    is_nonhooked_constructor_symbol,
-    rewrite_axioms,
-)
+import kaipy.kore_utils as KoreUtils
 
 
 class KoreClientServer:
@@ -88,7 +80,7 @@ class ReachabilitySystem:
         self.kcs.__exit__()
 
     def get_symbol_sort(self, symbol: str) -> Kore.Sort:
-        return get_symbol_sort(self.definition, self.kdw.main_module_name, symbol)
+        return KoreUtils.get_symbol_sort(self.definition, self.kdw.main_module_name, symbol)
 
     @F.cached_property
     def definition(self) -> Kore.Definition:
@@ -96,7 +88,7 @@ class ReachabilitySystem:
 
     @F.cached_property
     def top_sort(self) -> Kore.Sort:
-        return self.get_symbol_sort(get_top_cell_initializer(self.definition))
+        return self.get_symbol_sort(KoreUtils.get_top_cell_initializer(self.definition))
 
     @F.cached_property
     def kast_definition(self) -> KDefinition:
@@ -104,12 +96,12 @@ class ReachabilitySystem:
 
     def rule_by_id(self, ruleid: str) -> Kore.Axiom:
         for axiom in self.kdw.rewrite_rules:
-            if axiom_label(axiom) == ruleid:
+            if KoreUtils.axiom_label(axiom) == ruleid:
                 return axiom
         raise ValueError(f"Axiom with id {ruleid} not found.")
 
     def is_nonhooked_constructor(self, name: str) -> bool:
-        return is_nonhooked_constructor_symbol(
+        return KoreUtils.is_nonhooked_constructor_symbol(
             self.definition, self.kdw.main_module_name, name
         )
 
@@ -128,3 +120,15 @@ class ReachabilitySystem:
             print(f"ant: {self.kprint.kore_to_pretty(ant)}")
             print(f"con: {self.kprint.kore_to_pretty(con)}")
             raise
+    
+    def subsumes(self, ant: Kore.Pattern, con: Kore.Pattern) -> bool:
+        con_renamed: Kore.Pattern = KoreUtils.rename_vars(
+            KoreUtils.compute_renaming0(
+                vars_to_avoid=list(KoreUtils.free_evars_of_pattern(ant)),
+                vars_to_rename=list(KoreUtils.free_evars_of_pattern(con))
+            ),
+            con,
+        )
+        con_eqa = KoreUtils.existentially_quantify_free_variables(self.top_sort, con_renamed)
+        ir = self.implies(ant, con_eqa)
+        return ir.satisfiable
