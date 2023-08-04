@@ -126,8 +126,7 @@ class ReachabilitySystem:
             case Kore.App(sym, _, _):
                 return self.get_symbol_sort(sym)
 
-        assert type(p) is Kore.WithSort
-        return p.sort
+        return p.sort # type: ignore
 
 
     def subsumes(self, ant: Kore.Pattern, con: Kore.Pattern) -> bool:

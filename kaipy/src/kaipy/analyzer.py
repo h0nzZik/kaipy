@@ -27,6 +27,10 @@ class IAbstractPatternDomain(abc.ABC):
         ...
 
     @abc.abstractmethod
+    def is_top(self, a: IAbstractPattern) -> bool:
+        ...
+
+    @abc.abstractmethod
     def concretize(self, a: IAbstractPattern) -> Kore.Pattern:
         ...
     
@@ -48,19 +52,29 @@ class FinitePatternDomain(IAbstractPatternDomain):
     def __init__(self, pl: T.List[Kore.Pattern], rs: ReachabilitySystem):
         self.pl = pl
         self.rs = rs
+
+        #print("Finite domain:")
+        #for i, a_rest in enumerate(pl):
+        #    print(f"{i}: {rs.kprint.kore_to_pretty(a_rest)}")
     
     def abstract(self, c: Kore.Pattern) -> FinitePattern:
+        print(f'abstracting {c.text}')
         csort = self.rs.sortof(c)
         for i,p in enumerate(self.pl):
             if self.rs.sortof(p) != csort:
                 continue
             if self.rs.subsumes(c, p):
                 return FinitePattern(i, csort)
+        print(f'(no nice pattern found)')
         return FinitePattern(-1, csort)
     
+    def is_top(self, a: IAbstractPattern) -> bool:
+        assert type(a) is FinitePattern
+        return a.idx == -1
+
     def concretize(self, a: IAbstractPattern) -> Kore.Pattern:
         assert type(a) is FinitePattern
-        if a.idx == -1:
+        if self.is_top(a):
             return Kore.Top(a.sort)
         return self.pl[a.idx]
     
@@ -132,21 +146,30 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
     def concretize(self, a: IAbstractSubstitution) -> T.Set[Substitution]:
         assert type(a) is CartesianAbstractSubstitution
 
+        # If `v` is top, we do not want to concretize it,
+        # because the resulting constraint would be something like
+        # `X = Top()`. But such substitution is useless.
         concretes: T.Dict[Kore.EVar, Kore.Pattern] = {
             k : self.pattern_domain.concretize(v)
             for k,v in a.mapping.items()
+            if not self.pattern_domain.is_top(v)
         }
         return {Substitution(immutabledict(concretes))}
     
     def subsumes(self, a1: IAbstractSubstitution, a2: IAbstractSubstitution) -> bool:
         assert type(a1) is CartesianAbstractSubstitution
         assert type(a2) is CartesianAbstractSubstitution
-        if a1.mapping.keys() != a2.mapping.keys():
-            return False;
+        # If there is some key `k` in `a2` which is not in `a1`,
+        # it means that `a2` restricts the state more than `a1`;
+        # in that case, `a1` is not subsumed by `a2`.
+        if not set(a1.mapping.keys()).issuperset(a2.mapping.keys()):
+            return False
+        # `a1` contains more keys; these are not restricted by `a2`.
+        # It is enough to check for the keys of `a2`
         return all(
             [
                 self.pattern_domain.subsumes(a1.mapping[k], a2.mapping[k])
-                for k in a1.mapping.keys()
+                for k in a2.mapping.keys()
             ]
         )
 
@@ -219,17 +242,19 @@ def for_each_match(
             conj_simplified = rs.kcs.client.simplify(conj)[0]
             if KoreUtils.is_bottom(conj_simplified):
                 continue
+            #print(f'Not bottom: {rs.kprint.kore_to_pretty(conj_simplified)}')
+            #print(f'(rule lhs: {info.description})')
+            #print(f'(st: {rs.kprint.kore_to_pretty(st)})')
             eqls: T.Dict[Kore.EVar, Kore.Pattern] = KoreUtils.extract_equalities_from_witness(
                 {ev.name for ev in KoreUtils.free_evars_of_pattern(st)},
                 conj_simplified
             )
             new_subst = Substitution(immutabledict(eqls))
             abstract_subst: IAbstractSubstitution = subst_domain.abstract(new_subst)
-            print(abstract_subst)
             is_new: bool = info.insert(subst_domain, abstract_subst)
             if is_new:
                 for concretized_subst in subst_domain.concretize(abstract_subst):
-                    new_ps.append(conj_with_subst(rs, st, concretized_subst))
+                    new_ps.append(rs.simplify(conj_with_subst(rs, st, concretized_subst)))
     return new_ps
             
 
@@ -238,9 +263,12 @@ def analyze(
     rests: T.List[Kore.Pattern],
     initial_configuration: Kore.Pattern,
 ) -> None:
-    pattern_domain: IAbstractPatternDomain = FinitePatternDomain(rests, rs)
+    initial_configuration = rs.simplify(initial_configuration)
+    finite_set_of_patterns = rests + list(KoreUtils.some_subpatterns_of(initial_configuration).keys())
+    pattern_domain: IAbstractPatternDomain = FinitePatternDomain(finite_set_of_patterns, rs)
     subst_domain: IAbstractSubstitutionDomain = CartesianAbstractSubstitutionDomain(pattern_domain)
     states: States = build_states(rs, KoreUtils.free_evars_of_pattern(initial_configuration))
+    print(f'initial: {rs.kprint.kore_to_pretty(initial_configuration)}')
     cfgs = [initial_configuration]
     new_ps = for_each_match(rs, states, cfgs, subst_domain)
     for np in new_ps:
