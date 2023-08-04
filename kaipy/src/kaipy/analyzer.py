@@ -17,6 +17,7 @@ from .ReachabilitySystem import ReachabilitySystem
 from .KompiledDefinitionWrapper import KompiledDefinitionWrapper
 from .Substitution import Substitution
 
+_LOGGER: T.Final = logging.getLogger(__name__)
 
 class IAbstractPattern(abc.ABC):
     ...
@@ -44,6 +45,7 @@ class FinitePattern(IAbstractPattern):
     # -1 means Top
     idx: int
     sort: Kore.Sort
+    renaming: T.Dict[str,str] | None
 
 class FinitePatternDomain(IAbstractPatternDomain):
     pl : T.List[Kore.Pattern]
@@ -58,15 +60,17 @@ class FinitePatternDomain(IAbstractPatternDomain):
         #    print(f"{i}: {rs.kprint.kore_to_pretty(a_rest)}")
     
     def abstract(self, c: Kore.Pattern) -> FinitePattern:
-        print(f'abstracting {c.text}')
+        #print(f'abstracting {c.text}')
         csort = self.rs.sortof(c)
         for i,p in enumerate(self.pl):
             if self.rs.sortof(p) != csort:
                 continue
-            if self.rs.subsumes(c, p):
-                return FinitePattern(i, csort)
-        print(f'(no nice pattern found)')
-        return FinitePattern(-1, csort)
+            sr = self.rs.subsumes(c, p)
+            if sr[0] == True:
+                renaming = { v:k for k,v in (sr[1] or dict()).items() }
+                return FinitePattern(i, csort, renaming)
+        #print(f'(no nice pattern found)')
+        return FinitePattern(-1, csort, None)
     
     def is_top(self, a: IAbstractPattern) -> bool:
         assert type(a) is FinitePattern
@@ -76,17 +80,21 @@ class FinitePatternDomain(IAbstractPatternDomain):
         assert type(a) is FinitePattern
         if self.is_top(a):
             return Kore.Top(a.sort)
-        return self.pl[a.idx]
+        return KoreUtils.rename_vars(a.renaming or dict(), self.pl[a.idx])
     
     def subsumes(self, a1: IAbstractPattern, a2: IAbstractPattern) -> bool:
         assert type(a1) is FinitePattern
         assert type(a2) is FinitePattern
-        # These two branches are only optimizations
+
+        if a1.sort != a2.sort:
+            return False
+
         if a2.idx == -1:
             return True
-        if a1.idx == a2.idx:
-            return True
-        return self.rs.subsumes(self.concretize(a1), self.concretize(a2))
+        ## I am not sure if this is a valid optimization. It would be nice
+        # if a1.idx == a2.idx:
+        #     return True
+        return self.rs.subsumes(self.concretize(a1), self.concretize(a2))[0]
 
 
 class IAbstractSubstitution(abc.ABC):
@@ -223,9 +231,15 @@ def build_states(rs: ReachabilitySystem, vars_to_avoid: T.Set[Kore.EVar]) -> Sta
                 #print(f'renamed LHS (new state): {rs.kprint.kore_to_pretty(pattern_renamed)}')
     return States(d)
 
+
 def conj_with_subst(rs: ReachabilitySystem, p: Kore.Pattern, s: Substitution) -> Kore.Pattern:
     sort = rs.sortof(p)
-    s_p = s.kore(sort)
+    renaming = KoreUtils.compute_renaming0(
+        vars_to_avoid=list(KoreUtils.free_evars_of_pattern(p)),
+        vars_to_rename=list(itertools.chain(*[list(KoreUtils.free_evars_of_pattern(v)) for k,v in s.mapping.items()]))
+    )
+    s2 = Substitution({k : KoreUtils.rename_vars(renaming, v) for k,v in s.mapping.items()})
+    s_p = s2.kore(sort)
     return Kore.And(sort, p, s_p)
 
 def for_each_match(
@@ -238,15 +252,24 @@ def for_each_match(
     for cfg in cfgs:
         for st,info in states.states.items():
             # project configuration `cfg` to state `st`
-            conj = Kore.And(rs.top_sort, cfg, st)
-            conj_simplified = rs.kcs.client.simplify(conj)[0]
+            renaming = KoreUtils.compute_renaming0(
+                vars_to_avoid=list(KoreUtils.free_evars_of_pattern(cfg)),
+                vars_to_rename=list(KoreUtils.free_evars_of_pattern(st))
+            )
+            st_renamed = KoreUtils.rename_vars(
+                renaming,
+                st
+            )
+            conj = Kore.And(rs.top_sort, cfg, st_renamed)
+            conj_simplified = rs.simplify(conj)
             if KoreUtils.is_bottom(conj_simplified):
                 continue
             #print(f'Not bottom: {rs.kprint.kore_to_pretty(conj_simplified)}')
             #print(f'(rule lhs: {info.description})')
             #print(f'(st: {rs.kprint.kore_to_pretty(st)})')
+            fvs: T.Set[Kore.EVar] = KoreUtils.free_evars_of_pattern(st_renamed)
             eqls: T.Dict[Kore.EVar, Kore.Pattern] = KoreUtils.extract_equalities_from_witness(
-                {ev.name for ev in KoreUtils.free_evars_of_pattern(st)},
+                {ev.name for ev in fvs},
                 conj_simplified
             )
             new_subst = Substitution(immutabledict(eqls))
@@ -254,7 +277,12 @@ def for_each_match(
             is_new: bool = info.insert(subst_domain, abstract_subst)
             if is_new:
                 for concretized_subst in subst_domain.concretize(abstract_subst):
-                    new_ps.append(rs.simplify(conj_with_subst(rs, st, concretized_subst)))
+                    #concretized_renamed_subst = KoreUtils.rename_vars(renaming, phi)
+                    print(f'st vars: {KoreUtils.free_evars_of_pattern(st_renamed)}')
+                    print(f'concretized subst vars: {set(concretized_subst.mapping.keys())}')
+                    p = rs.simplify(conj_with_subst(rs, st_renamed, concretized_subst))
+                    p2 = rs.simplify(RSUtils.cleanup_pattern(rs, p))
+                    new_ps.append(p2)
     return new_ps
             
 
@@ -268,10 +296,21 @@ def analyze(
     pattern_domain: IAbstractPatternDomain = FinitePatternDomain(finite_set_of_patterns, rs)
     subst_domain: IAbstractSubstitutionDomain = CartesianAbstractSubstitutionDomain(pattern_domain)
     states: States = build_states(rs, KoreUtils.free_evars_of_pattern(initial_configuration))
-    print(f'initial: {rs.kprint.kore_to_pretty(initial_configuration)}')
+    #print(f'initial: {rs.kprint.kore_to_pretty(initial_configuration)}')
     cfgs = [initial_configuration]
-    new_ps = for_each_match(rs, states, cfgs, subst_domain)
-    for np in new_ps:
-        print(f'new: {rs.kprint.kore_to_pretty(np)}')
+    current_ps = for_each_match(rs, states, cfgs, subst_domain)
+    while len(current_ps) > 0:
+        cfg = current_ps.pop()
+        print(f'cfg {rs.kprint.kore_to_pretty(cfg)}')
+        exec_result: KoreRpc.ExecuteResult = rs.kcs.client.execute(cfg)
+        if exec_result.next_states is not None:
+            successors = [s.kore for s in exec_result.next_states]
+        else:
+            successors = [exec_result.state.kore]
+        print(f'Has {len(successors)} successors')
+        new_ps: T.List[Kore.Pattern] = for_each_match(rs, states, successors, subst_domain)
+        print(f'After processing: {len(new_ps)} states')
+        current_ps.extend(new_ps)
+
 
     return None

@@ -1,4 +1,5 @@
 import functools as F
+import logging
 import typing as T
 from pathlib import Path
 
@@ -12,6 +13,7 @@ from .kcommands import KORE_RPC_COMMAND
 from .KompiledDefinitionWrapper import KompiledDefinitionWrapper
 import kaipy.kore_utils as KoreUtils
 
+_LOGGER: T.Final = logging.getLogger(__name__)
 
 class KoreClientServer:
     server: T.Optional[KoreRpc.KoreServer]
@@ -108,35 +110,44 @@ class ReachabilitySystem:
     def simplify(self, pattern: Kore.Pattern) -> Kore.Pattern:
         try:
             return self.kcs.client.simplify(pattern)[0]
-        except:
-            print(f"Error when simplifying: {self.kprint.kore_to_pretty(pattern)}")
+        except KoreRpc.KoreClientError as e:
+            _LOGGER.warning(f"Error when simplifying: {self.kprint.kore_to_pretty(pattern)}")
+            _LOGGER.warning(f"exception: {str(e)}")
+            _LOGGER.warning(f"data: {str(e.data)}")
             raise
 
     def implies(self, ant: Kore.Pattern, con: Kore.Pattern) -> KoreRpc.ImpliesResult:
         try:
             return self.kcs.client.implies(ant, con)
-        except:
-            print(f"Error during implication check.")
-            print(f"ant: {self.kprint.kore_to_pretty(ant)}")
-            print(f"con: {self.kprint.kore_to_pretty(con)}")
+        except KoreRpc.KoreClientError as e:
+            _LOGGER.warning(f"Error during implication check.")
+            _LOGGER.warning(f"ant: {ant.text}")
+            _LOGGER.warning(f"con: {con.text}")
+            _LOGGER.warning(f"ant(pretty): {self.kprint.kore_to_pretty(ant)}")
+            _LOGGER.warning(f"con(pretty): {self.kprint.kore_to_pretty(con)}")
+            _LOGGER.warning(f"exception: {str(e)}")
+            _LOGGER.warning(f"data: {str(e.data)}")
             raise
     
     def sortof(self, p: Kore.Pattern) -> Kore.Sort:
         match p:
+            case Kore.App('inj', (srcsort,dstsort), _):
+                return dstsort
             case Kore.App(sym, _, _):
                 return self.get_symbol_sort(sym)
 
         return p.sort # type: ignore
 
 
-    def subsumes(self, ant: Kore.Pattern, con: Kore.Pattern) -> bool:
+    def subsumes(self, ant: Kore.Pattern, con: Kore.Pattern) -> T.Tuple[bool, T.Dict[str,str] | None]:
+        renaming = KoreUtils.compute_renaming0(
+            vars_to_avoid=list(KoreUtils.free_evars_of_pattern(ant)),
+            vars_to_rename=list(KoreUtils.free_evars_of_pattern(con))
+        )
         con_renamed: Kore.Pattern = KoreUtils.rename_vars(
-            KoreUtils.compute_renaming0(
-                vars_to_avoid=list(KoreUtils.free_evars_of_pattern(ant)),
-                vars_to_rename=list(KoreUtils.free_evars_of_pattern(con))
-            ),
+            renaming,
             con,
         )
         con_eqa = KoreUtils.existentially_quantify_free_variables(self.sortof(con_renamed), con_renamed)
         ir = self.implies(ant, con_eqa)
-        return ir.satisfiable
+        return ir.satisfiable,(renaming if ir.satisfiable else None)
