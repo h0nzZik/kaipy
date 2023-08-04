@@ -31,14 +31,6 @@ class IAbstractPatternDomain(abc.ABC):
         ...
 
 
-def sortof(rs: ReachabilitySystem, p: Kore.Pattern) -> Kore.Sort:
-    match p:
-        case Kore.App(sym, _, _):
-            return rs.get_symbol_sort(sym)
-
-    assert type(p) is Kore.WithSort
-    return p.sort
-
 @dataclasses.dataclass
 class FinitePattern(IAbstractPattern):
     # -1 means Top
@@ -54,9 +46,9 @@ class FinitePatternDomain(IAbstractPatternDomain):
         self.rs = rs
     
     def abstract(self, c: Kore.Pattern) -> FinitePattern:
-        csort = sortof(self.rs, c)
+        csort = self.rs.sortof(c)
         for i,p in enumerate(self.pl):
-            if sortof(self.rs, p) != csort:
+            if self.rs.sortof(p) != csort:
                 continue
             if self.rs.subsumes(c, p):
                 return FinitePattern(i, csort)
@@ -163,7 +155,7 @@ def build_states(rs: ReachabilitySystem, vars_to_avoid: T.Set[Kore.EVar]) -> Sta
                     pattern,
                 )
                 d[pattern_renamed] = StateInfo(original_rule_label, [])
-                print(f'renamed LHS (new state): {rs.kprint.kore_to_pretty(pattern_renamed)}')
+                #print(f'renamed LHS (new state): {rs.kprint.kore_to_pretty(pattern_renamed)}')
     return States(d)
 
 

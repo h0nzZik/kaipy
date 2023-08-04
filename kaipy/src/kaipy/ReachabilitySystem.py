@@ -121,6 +121,15 @@ class ReachabilitySystem:
             print(f"con: {self.kprint.kore_to_pretty(con)}")
             raise
     
+    def sortof(self, p: Kore.Pattern) -> Kore.Sort:
+        match p:
+            case Kore.App(sym, _, _):
+                return self.get_symbol_sort(sym)
+
+        assert type(p) is Kore.WithSort
+        return p.sort
+
+
     def subsumes(self, ant: Kore.Pattern, con: Kore.Pattern) -> bool:
         con_renamed: Kore.Pattern = KoreUtils.rename_vars(
             KoreUtils.compute_renaming0(
@@ -129,6 +138,6 @@ class ReachabilitySystem:
             ),
             con,
         )
-        con_eqa = KoreUtils.existentially_quantify_free_variables(self.top_sort, con_renamed)
+        con_eqa = KoreUtils.existentially_quantify_free_variables(self.sortof(con_renamed), con_renamed)
         ir = self.implies(ant, con_eqa)
         return ir.satisfiable
