@@ -29,6 +29,49 @@ class IAbstractPatternDomain(abc.ABC):
     def concretize(self, a: IAbstractPattern) -> T.Set[Kore.Pattern]:
         ...
 
+
+def sortof(p: Kore.Pattern) -> Kore.Sort:
+    assert type(p) is Kore.WithSort
+    return p.sort
+
+@dataclasses.dataclass
+class FinitePattern(IAbstractPattern):
+    # -1 means Top
+    idx: int
+    sort: Kore.Sort
+
+class FinitePatternDomain(IAbstractPatternDomain):
+    pl : T.List[Kore.Pattern]
+    rs : ReachabilitySystem
+
+    def __init__(self, pl: T.List[Kore.Pattern], rs: ReachabilitySystem):
+        self.pl = pl
+        self.rs = rs
+    
+    def abstract(self, c: Kore.Pattern) -> FinitePattern:
+        csort = sortof(c)
+        for i,p in enumerate(self.pl):
+            if sortof(p) != csort:
+                continue
+            p_renamed: Kore.Pattern = KoreUtils.rename_vars(
+                KoreUtils.compute_renaming0(
+                    vars_to_avoid=list(KoreUtils.free_evars_of_pattern(c)),
+                    vars_to_rename=list(KoreUtils.free_evars_of_pattern(p))
+                ),
+                p,
+            )
+            ir: KoreRpc.ImpliesResult = self.rs.kcs.client.implies(c, p_renamed)
+            if ir.satisfiable:
+                return FinitePattern(i, csort)
+        return FinitePattern(-1, csort)
+    
+    def concretize(self, a: IAbstractPattern) -> T.Set[Kore.Pattern]:
+        assert type(a) is FinitePattern
+        if a.idx == -1:
+            return {Kore.Top(a.sort)}
+        return {self.pl[a.idx]}
+
+
 class IAbstractSubstitution(abc.ABC):
     ...
 
@@ -45,14 +88,14 @@ class IAbstractSubstitutionDomain(abc.ABC):
 # { x |-> {phi1, phi2}, y |-> {phi3, phi4} }
 # into
 # { {x |-> phi1, y |-> phi3}, {x |-> phi1, y |-> phi4}, {x |-> phi2, y |-> phi3}, {x |-> phi2, y |-> phi4}  }
-def cartesian_dict(d: T.Dict[T.Any, T.Any]) -> T.Set[T.Dict[T.Any, T.Any]]:
+def cartesian_dict(d: T.Mapping[T.Any, T.Any]) -> T.Set[T.Mapping[T.Any, T.Any]]:
     if len(list(d.keys())) == 0:
         return {immutabledict()}
     k = list(d.keys())[0]
     xs = d[k]
-    d1 = immutabledict({k1:v1 for k1,v1 in d.items() if not k1 == k})
+    d1: immutabledict[T.Any,T.Any] = immutabledict({k1:v1 for k1,v1 in d.items() if not k1 == k})
     cd = cartesian_dict(d1)
-    result = set()
+    result: T.Set[T.Any] = set()
     for di in cd:
         for x in xs:
             d2 = { k0:v0 for k0,v0 in di.items() }
