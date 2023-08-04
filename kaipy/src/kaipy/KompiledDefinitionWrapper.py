@@ -90,7 +90,7 @@ class KompiledDefinitionWrapper:
             n = n + 1
 
         args_name = "VarARGS" + str(n)
-        print(f"args_name: {args_name}")
+        #print(f"args_name: {args_name}")
 
         result = krun._krun(
             command=(kcommands.KRUN_COMMAND),

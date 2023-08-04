@@ -27,7 +27,11 @@ class IAbstractPatternDomain(abc.ABC):
         ...
 
     @abc.abstractmethod
-    def concretize(self, a: IAbstractPattern) -> T.Set[Kore.Pattern]:
+    def concretize(self, a: IAbstractPattern) -> Kore.Pattern:
+        ...
+    
+    @abc.abstractmethod
+    def subsumes(self, a1: IAbstractPattern, a2: IAbstractPattern) -> bool:
         ...
 
 
@@ -54,11 +58,21 @@ class FinitePatternDomain(IAbstractPatternDomain):
                 return FinitePattern(i, csort)
         return FinitePattern(-1, csort)
     
-    def concretize(self, a: IAbstractPattern) -> T.Set[Kore.Pattern]:
+    def concretize(self, a: IAbstractPattern) -> Kore.Pattern:
         assert type(a) is FinitePattern
         if a.idx == -1:
-            return {Kore.Top(a.sort)}
-        return {self.pl[a.idx]}
+            return Kore.Top(a.sort)
+        return self.pl[a.idx]
+    
+    def subsumes(self, a1: IAbstractPattern, a2: IAbstractPattern) -> bool:
+        assert type(a1) is FinitePattern
+        assert type(a2) is FinitePattern
+        # These two branches are only optimizations
+        if a2.idx == -1:
+            return True
+        if a1.idx == a2.idx:
+            return True
+        return self.rs.subsumes(self.concretize(a1), self.concretize(a2))
 
 
 class IAbstractSubstitution(abc.ABC):
@@ -71,6 +85,11 @@ class IAbstractSubstitutionDomain(abc.ABC):
     
     @abc.abstractmethod
     def abstract(self, subst: Substitution) -> IAbstractSubstitution:
+        ...
+
+
+    @abc.abstractmethod
+    def subsumes(self, a1: IAbstractSubstitution, a2: IAbstractSubstitution) -> bool:
         ...
 
 # Turns
@@ -113,18 +132,41 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
     def concretize(self, a: IAbstractSubstitution) -> T.Set[Substitution]:
         assert type(a) is CartesianAbstractSubstitution
 
-        concretes: T.Dict[Kore.EVar, T.Set[Kore.Pattern]] = {
+        concretes: T.Dict[Kore.EVar, Kore.Pattern] = {
             k : self.pattern_domain.concretize(v)
             for k,v in a.mapping.items()
         }
-        cd = cartesian_dict(concretes)
-        return {Substitution(immutabledict(d)) for d in cd}
+        return {Substitution(immutabledict(concretes))}
+    
+    def subsumes(self, a1: IAbstractSubstitution, a2: IAbstractSubstitution) -> bool:
+        assert type(a1) is CartesianAbstractSubstitution
+        assert type(a2) is CartesianAbstractSubstitution
+        if a1.mapping.keys() != a2.mapping.keys():
+            return False;
+        return all(
+            [
+                self.pattern_domain.subsumes(a1.mapping[k], a2.mapping[k])
+                for k in a1.mapping.keys()
+            ]
+        )
 
 
 @dataclasses.dataclass
 class StateInfo:
     description: str
     substitutions: T.List[IAbstractSubstitution]
+    
+    def insert(
+        self,
+        abstract_domain: IAbstractSubstitutionDomain,
+        abstract_subst: IAbstractSubstitution,
+    ) -> bool:
+        for sub in self.substitutions:
+            if abstract_domain.subsumes(abstract_subst, sub):
+                return False
+
+        self.substitutions.append(abstract_subst)        
+        return True
 
 
 @dataclasses.dataclass
@@ -158,15 +200,20 @@ def build_states(rs: ReachabilitySystem, vars_to_avoid: T.Set[Kore.EVar]) -> Sta
                 #print(f'renamed LHS (new state): {rs.kprint.kore_to_pretty(pattern_renamed)}')
     return States(d)
 
+def conj_with_subst(rs: ReachabilitySystem, p: Kore.Pattern, s: Substitution) -> Kore.Pattern:
+    sort = rs.sortof(p)
+    s_p = s.kore(sort)
+    return Kore.And(sort, p, s_p)
 
 def for_each_match(
     rs: ReachabilitySystem,
     states: States,
     cfgs: T.List[Kore.Pattern],
     subst_domain: IAbstractSubstitutionDomain,
-):
+) -> T.List[Kore.Pattern]:
+    new_ps : T.List[Kore.Pattern] = list()
     for cfg in cfgs:
-        for st in states.states:
+        for st,info in states.states.items():
             # project configuration `cfg` to state `st`
             conj = Kore.And(rs.top_sort, cfg, st)
             conj_simplified = rs.kcs.client.simplify(conj)[0]
@@ -179,6 +226,11 @@ def for_each_match(
             new_subst = Substitution(immutabledict(eqls))
             abstract_subst: IAbstractSubstitution = subst_domain.abstract(new_subst)
             print(abstract_subst)
+            is_new: bool = info.insert(subst_domain, abstract_subst)
+            if is_new:
+                for concretized_subst in subst_domain.concretize(abstract_subst):
+                    new_ps.append(conj_with_subst(rs, st, concretized_subst))
+    return new_ps
             
 
 def analyze(
@@ -190,6 +242,8 @@ def analyze(
     subst_domain: IAbstractSubstitutionDomain = CartesianAbstractSubstitutionDomain(pattern_domain)
     states: States = build_states(rs, KoreUtils.free_evars_of_pattern(initial_configuration))
     cfgs = [initial_configuration]
-    for_each_match(rs, states, cfgs, subst_domain)
+    new_ps = for_each_match(rs, states, cfgs, subst_domain)
+    for np in new_ps:
+        print(f'new: {rs.kprint.kore_to_pretty(np)}')
 
     return None
