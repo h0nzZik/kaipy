@@ -249,6 +249,29 @@ def conj_with_subst(rs: ReachabilitySystem, p: Kore.Pattern, s: Substitution) ->
     s_p = s2.kore(sort)
     return Kore.And(sort, p, s_p)
 
+def get_abstract_subst_of_state(
+    rs: ReachabilitySystem,
+    subst_domain: IAbstractSubstitutionDomain,
+    cfg: Kore.Pattern,
+    st_renamed: Kore.Pattern,
+) -> IAbstractSubstitution | None:
+    # project configuration `cfg` to state `st`
+    conj = Kore.And(rs.top_sort, cfg, st_renamed)
+    conj_simplified = rs.simplify(conj)
+    if KoreUtils.is_bottom(conj_simplified):
+        return None
+    #print(f'Not bottom: {rs.kprint.kore_to_pretty(conj_simplified)}')
+    #print(f'(rule lhs: {info.description})')
+    #print(f'(st: {rs.kprint.kore_to_pretty(st)})')
+    fvs: T.Set[Kore.EVar] = KoreUtils.free_evars_of_pattern(st_renamed)
+    eqls: T.Dict[Kore.EVar, Kore.Pattern] = KoreUtils.extract_equalities_from_witness(
+        {ev.name for ev in fvs},
+        conj_simplified
+    )
+    new_subst = Substitution(immutabledict(eqls))
+    abstract_subst: IAbstractSubstitution = subst_domain.abstract(new_subst)
+    return abstract_subst
+
 def for_each_match(
     rs: ReachabilitySystem,
     states: States,
@@ -258,7 +281,6 @@ def for_each_match(
     new_ps : T.List[Kore.Pattern] = list()
     for cfg in cfgs:
         for st,info in states.states.items():
-            # project configuration `cfg` to state `st`
             renaming = KoreUtils.compute_renaming0(
                 vars_to_avoid=list(KoreUtils.free_evars_of_pattern(cfg)),
                 vars_to_rename=list(KoreUtils.free_evars_of_pattern(st))
@@ -267,20 +289,12 @@ def for_each_match(
                 renaming,
                 st
             )
-            conj = Kore.And(rs.top_sort, cfg, st_renamed)
-            conj_simplified = rs.simplify(conj)
-            if KoreUtils.is_bottom(conj_simplified):
-                continue
-            #print(f'Not bottom: {rs.kprint.kore_to_pretty(conj_simplified)}')
-            #print(f'(rule lhs: {info.description})')
-            #print(f'(st: {rs.kprint.kore_to_pretty(st)})')
-            fvs: T.Set[Kore.EVar] = KoreUtils.free_evars_of_pattern(st_renamed)
-            eqls: T.Dict[Kore.EVar, Kore.Pattern] = KoreUtils.extract_equalities_from_witness(
-                {ev.name for ev in fvs},
-                conj_simplified
+
+            abstract_subst: IAbstractSubstitution | None = get_abstract_subst_of_state(
+                rs=rs, subst_domain=subst_domain, cfg=cfg, st_renamed=st_renamed
             )
-            new_subst = Substitution(immutabledict(eqls))
-            abstract_subst: IAbstractSubstitution = subst_domain.abstract(new_subst)
+            if abstract_subst is None:
+                continue
             is_new: bool = info.insert(subst_domain, abstract_subst)
             if is_new:
                 for concretized_subst in subst_domain.concretize(abstract_subst):
