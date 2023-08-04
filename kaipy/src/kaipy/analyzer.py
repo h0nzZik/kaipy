@@ -94,6 +94,13 @@ class FinitePatternDomain(IAbstractPatternDomain):
         ## I am not sure if this is a valid optimization. It would be nice
         # if a1.idx == a2.idx:
         #     return True
+
+        if self.is_top(a2):
+            return True
+        
+        if self.is_top(a1):
+            return False
+        
         return self.rs.subsumes(self.concretize(a1), self.concretize(a2))[0]
 
 
@@ -300,16 +307,17 @@ def analyze(
     cfgs = [initial_configuration]
     current_ps = for_each_match(rs, states, cfgs, subst_domain)
     while len(current_ps) > 0:
+        _LOGGER.warning(f'remaining {len(current_ps)} states')
         cfg = current_ps.pop()
-        print(f'cfg {rs.kprint.kore_to_pretty(cfg)}')
-        exec_result: KoreRpc.ExecuteResult = rs.kcs.client.execute(cfg)
+        _LOGGER.warning(f'cfg {rs.kprint.kore_to_pretty(cfg)}')
+        exec_result: KoreRpc.ExecuteResult = rs.kcs.client.execute(cfg, max_depth=1)
         if exec_result.next_states is not None:
             successors = [s.kore for s in exec_result.next_states]
         else:
             successors = [exec_result.state.kore]
-        print(f'Has {len(successors)} successors')
+        _LOGGER.warning(f'Has {len(successors)} successors')
         new_ps: T.List[Kore.Pattern] = for_each_match(rs, states, successors, subst_domain)
-        print(f'After processing: {len(new_ps)} states')
+        _LOGGER.warning(f'After processing: {len(new_ps)} states')
         current_ps.extend(new_ps)
 
 
