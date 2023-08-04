@@ -65,7 +65,7 @@ class FinitePatternDomain(IAbstractPatternDomain):
                 ),
                 p,
             )
-            ir: KoreRpc.ImpliesResult = self.rs.kcs.client.implies(c, p_renamed)
+            ir: KoreRpc.ImpliesResult = self.rs.implies(c, p_renamed)
             if ir.satisfiable:
                 return FinitePattern(i, csort)
         return FinitePattern(-1, csort)

@@ -5,7 +5,7 @@ from pathlib import Path
 import pyk.kore.syntax as Kore
 from pyk.kast.outer import KDefinition
 from pyk.kore.parser import KoreParser
-from pyk.kore.rpc import KoreClient, KoreServer
+import pyk.kore.rpc as KoreRpc
 from pyk.ktool.kprint import KPrint
 
 from .kcommands import KORE_RPC_COMMAND
@@ -22,8 +22,8 @@ from .kore_utils import (
 
 
 class KoreClientServer:
-    server: T.Optional[KoreServer]
-    client: KoreClient
+    server: T.Optional[KoreRpc.KoreServer]
+    client: KoreRpc.KoreClient
 
     def __init__(
         self,
@@ -38,14 +38,14 @@ class KoreClientServer:
         #    self.server = None
         # else:
         # port = utils.find_free_port()
-        self.server = KoreServer(
+        self.server = KoreRpc.KoreServer(
             kompiled_dir=definition_dir,
             module_name=main_module_name,
             command=list((KORE_RPC_COMMAND,)) + list(kore_rpc_args),
             # port=port,
         )
         timeout = None
-        self.client = KoreClient("localhost", port=self.server.port, timeout=timeout)
+        self.client = KoreRpc.KoreClient("localhost", port=self.server.port, timeout=timeout)
 
     def __enter__(self) -> "KoreClientServer":
         return self
@@ -118,4 +118,13 @@ class ReachabilitySystem:
             return self.kcs.client.simplify(pattern)[0]
         except:
             print(f"Error when simplifying: {self.kprint.kore_to_pretty(pattern)}")
+            raise
+
+    def implies(self, ant: Kore.Pattern, con: Kore.Pattern) -> KoreRpc.ImpliesResult:
+        try:
+            return self.kcs.client.implies(ant, con)
+        except:
+            print(f"Error during implication check.")
+            print(f"ant: {self.kprint.kore_to_pretty(ant)}")
+            print(f"con: {self.kprint.kore_to_pretty(con)}")
             raise
