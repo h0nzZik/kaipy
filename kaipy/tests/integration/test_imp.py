@@ -80,13 +80,18 @@ class TestImp(MyTest):
         assert expected == actual
 
     def test_analyze(
-        self, reachability_system: ReachabilitySystem
+        self, reachability_system: ReachabilitySystem, context_aliases: ContextAliases
     ):
         input_pattern: Kore.Pattern = reachability_system.kdw.get_input_kore(
             RSTestBase.LANGUAGES / "imp/sum.imp"
         )
 
-        rv = kaipy.analyzer.analyze(reachability_system, input_pattern)
+        rests = pre_analyze(reachability_system, context_aliases, input_pattern)
+        rv = kaipy.analyzer.analyze(
+            reachability_system,
+            rests=rests,
+            initial_configuration=input_pattern,
+        )
         assert(False) # To print stuff
 
     # def test_execute_var(self, reachability_system: ReachabilitySystem):

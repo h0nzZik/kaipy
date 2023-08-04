@@ -14,6 +14,7 @@ import kaipy.rs_utils as RSUtils
 import kaipy.kore_utils as KoreUtils
 
 from .ReachabilitySystem import ReachabilitySystem
+from .KompiledDefinitionWrapper import KompiledDefinitionWrapper
 from .Substitution import Substitution
 
 
@@ -30,7 +31,11 @@ class IAbstractPatternDomain(abc.ABC):
         ...
 
 
-def sortof(p: Kore.Pattern) -> Kore.Sort:
+def sortof(rs: ReachabilitySystem, p: Kore.Pattern) -> Kore.Sort:
+    match p:
+        case Kore.App(sym, _, _):
+            return rs.get_symbol_sort(sym)
+
     assert type(p) is Kore.WithSort
     return p.sort
 
@@ -49,9 +54,9 @@ class FinitePatternDomain(IAbstractPatternDomain):
         self.rs = rs
     
     def abstract(self, c: Kore.Pattern) -> FinitePattern:
-        csort = sortof(c)
+        csort = sortof(self.rs, c)
         for i,p in enumerate(self.pl):
-            if sortof(p) != csort:
+            if sortof(self.rs, p) != csort:
                 continue
             p_renamed: Kore.Pattern = KoreUtils.rename_vars(
                 KoreUtils.compute_renaming0(
@@ -135,7 +140,7 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
 @dataclasses.dataclass
 class StateInfo:
     description: str
-    substitutions: T.List[Substitution]
+    substitutions: T.List[IAbstractSubstitution]
 
 
 @dataclasses.dataclass
@@ -170,7 +175,12 @@ def build_states(rs: ReachabilitySystem, vars_to_avoid: T.Set[Kore.EVar]) -> Sta
     return States(d)
 
 
-def for_each_match(rs: ReachabilitySystem, states: States, cfgs: T.List[Kore.Pattern]):
+def for_each_match(
+    rs: ReachabilitySystem,
+    states: States,
+    cfgs: T.List[Kore.Pattern],
+    subst_domain: IAbstractSubstitutionDomain,
+):
     for cfg in cfgs:
         for st in states.states:
             # project configuration `cfg` to state `st`
@@ -183,9 +193,19 @@ def for_each_match(rs: ReachabilitySystem, states: States, cfgs: T.List[Kore.Pat
                 conj_simplified
             )
             new_subst = Substitution(immutabledict(eqls))
+            abstract_subst: IAbstractSubstitution = subst_domain.abstract(new_subst)
+            print(abstract_subst)
             
 
-def analyze(rs: ReachabilitySystem, initial_configuration: Kore.Pattern) -> None:
+def analyze(
+    rs: ReachabilitySystem,
+    rests: T.List[Kore.Pattern],
+    initial_configuration: Kore.Pattern,
+) -> None:
+    pattern_domain: IAbstractPatternDomain = FinitePatternDomain(rests, rs)
+    subst_domain: IAbstractSubstitutionDomain = CartesianAbstractSubstitutionDomain(pattern_domain)
     states: States = build_states(rs, KoreUtils.free_evars_of_pattern(initial_configuration))
+    cfgs = [initial_configuration]
+    for_each_match(rs, states, cfgs, subst_domain)
 
     return None
