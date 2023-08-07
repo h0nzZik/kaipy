@@ -216,10 +216,11 @@ class StateInfo:
     ) -> bool:
         for sub in self.substitutions:
             if abstract_domain.subsumes(abstract_subst, sub):
+                _LOGGER.error(f'********Substitution subsumed by an existing one')
                 return False
 
-        _LOGGER.warning(f'State {self.description}: new substitution (not subsumed):')
-        _LOGGER.warning(f'{abstract_domain.print(abstract_subst)}')
+        #_LOGGER.warning(f'State {self.description}: new substitution (not subsumed):')
+        #_LOGGER.warning(f'{abstract_domain.print(abstract_subst)}')
         self.substitutions.append(abstract_subst)        
         return True
 
@@ -324,6 +325,11 @@ def for_each_match(
     return new_ps
             
 
+def normalize_pattern(cfg: Kore.Pattern) -> Kore.Pattern:
+    vs = KoreUtils.free_occs_det(cfg)
+    renaming = { v.name : ("VAR"+str(i)) for i,v in enumerate(vs)}
+    return KoreUtils.rename_vars(renaming, cfg)
+
 def analyze(
     rs: ReachabilitySystem,
     rests: T.List[Kore.Pattern],
@@ -340,6 +346,7 @@ def analyze(
     while len(current_ps) > 0:
         _LOGGER.warning(f'remaining {len(current_ps)} states')
         cfg = current_ps.pop()
+        cfg = normalize_pattern(cfg)
         _LOGGER.warning(f'cfg {rs.kprint.kore_to_pretty(cfg)}')
         exec_result: KoreRpc.ExecuteResult = rs.kcs.client.execute(cfg, max_depth=1)
         if exec_result.next_states is not None:
