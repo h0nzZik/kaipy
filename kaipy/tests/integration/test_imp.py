@@ -82,7 +82,7 @@ class TestImp(MyTest):
     def test_analyze(
         self, reachability_system: ReachabilitySystem, context_aliases: ContextAliases
     ):
-        rs.stats.reset()
+        reachability_system.stats.reset()
         input_pattern: Kore.Pattern = reachability_system.kdw.get_input_kore(
             RSTestBase.LANGUAGES / "imp/sum.imp"
         )
@@ -93,7 +93,7 @@ class TestImp(MyTest):
             rests=rests,
             initial_configuration=input_pattern,
         )
-        print(rs.stats.dict)
+        print(reachability_system.stats.dict)
         assert(False) # To print stuff
 
     # def test_execute_var(self, reachability_system: ReachabilitySystem):

@@ -344,7 +344,7 @@ def analyze(
         _LOGGER.warning(f'remaining {len(current_ps)} states')
         cfg = current_ps.pop()
         cfg = normalize_pattern(cfg)
-        _LOGGER.warning(f'cfg {rs.kprint.kore_to_pretty(cfg)}')
+        #_LOGGER.warning(f'cfg {rs.kprint.kore_to_pretty(cfg)}')
         exec_result: KoreRpc.ExecuteResult = rs.execute_step(cfg)
         if exec_result.next_states is not None:
             successors = [s.kore for s in exec_result.next_states]
