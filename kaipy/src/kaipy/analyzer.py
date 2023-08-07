@@ -38,6 +38,10 @@ class IAbstractPatternDomain(abc.ABC):
     @abc.abstractmethod
     def subsumes(self, a1: IAbstractPattern, a2: IAbstractPattern) -> bool:
         ...
+    
+    @abc.abstractmethod
+    def print(self, a: IAbstractPattern) -> str:
+        ...
 
 
 @dataclasses.dataclass
@@ -103,6 +107,9 @@ class FinitePatternDomain(IAbstractPatternDomain):
         
         return self.rs.subsumes(self.concretize(a1), self.concretize(a2))[0]
 
+    def print(self, a: IAbstractPattern) -> str:
+        return self.rs.kprint.kore_to_pretty(self.concretize(a))
+
 
 class IAbstractSubstitution(abc.ABC):
     ...
@@ -119,6 +126,10 @@ class IAbstractSubstitutionDomain(abc.ABC):
 
     @abc.abstractmethod
     def subsumes(self, a1: IAbstractSubstitution, a2: IAbstractSubstitution) -> bool:
+        ...
+    
+    @abc.abstractmethod
+    def print(self, a: IAbstractSubstitution) -> str:
         ...
 
 # Turns
@@ -188,6 +199,10 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
             ]
         )
 
+    def print(self, a: IAbstractSubstitution) -> str:
+        assert type(a) is CartesianAbstractSubstitution
+        return str({ k: self.pattern_domain.print(v) for k,v in a.mapping.items() })
+
 
 @dataclasses.dataclass
 class StateInfo:
@@ -203,6 +218,8 @@ class StateInfo:
             if abstract_domain.subsumes(abstract_subst, sub):
                 return False
 
+        _LOGGER.warning(f'State {self.description}: new substitution (not subsumed):')
+        _LOGGER.warning(f'{abstract_domain.print(abstract_subst)}')
         self.substitutions.append(abstract_subst)        
         return True
 
