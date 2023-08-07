@@ -1,6 +1,7 @@
 import functools as F
 import logging
 import typing as T
+import time
 from pathlib import Path
 
 import pyk.kore.syntax as Kore
@@ -9,6 +10,7 @@ from pyk.kore.parser import KoreParser
 import pyk.kore.rpc as KoreRpc
 from pyk.ktool.kprint import KPrint
 
+from .PerfCounter import PerfCounter
 from .kcommands import KORE_RPC_COMMAND
 from .KompiledDefinitionWrapper import KompiledDefinitionWrapper
 import kaipy.kore_utils as KoreUtils
@@ -51,10 +53,33 @@ class KoreClientServer:
             self.server = None
 
 
+class RSStats:
+    implies: PerfCounter
+    execute_step: PerfCounter
+    simplify: PerfCounter
+
+    def __init__(self):
+        self.reset()
+    
+    def reset(self) -> None:
+        self.implies = PerfCounter()
+        self.execute_step = PerfCounter()
+        self.simplify = PerfCounter()
+
+    @property
+    def dict(self) -> T.Dict[str, T.Any]:
+        return {
+            'implies' : self.implies.dict,
+            'execute_step' : self.execute_step.dict,
+            'simplify' : self.simplify.dict,
+        }   
+
+
 class ReachabilitySystem:
     kcs: KoreClientServer
     kdw: KompiledDefinitionWrapper
     kprint: KPrint
+    stats: RSStats
 
     def __init__(
         self,
@@ -70,6 +95,7 @@ class ReachabilitySystem:
             # kore_rpc_args=kore_rpc_args,
             # connect_to_port=connect_to_port,
         )
+        self.stats = RSStats()
 
     @property
     def definition_dir(self) -> Path:
@@ -107,9 +133,20 @@ class ReachabilitySystem:
             self.definition, self.kdw.main_module_name, name
         )
 
+    def execute_step(self, cfg: Kore.Pattern) -> KoreRpc.ExecuteResult:
+        old = time.perf_counter()
+        rv = self.kcs.client.execute(cfg, max_depth=1)
+        new = time.perf_counter()
+        self.stats.execute_step.add(new - old)
+        return rv
+
     def simplify(self, pattern: Kore.Pattern) -> Kore.Pattern:
         try:
-            return self.kcs.client.simplify(pattern)[0]
+            old = time.perf_counter()
+            rv = self.kcs.client.simplify(pattern)[0]
+            new = time.perf_counter()
+            self.stats.simplify.add(new - old)
+            return rv
         except KoreRpc.KoreClientError as e:
             _LOGGER.warning(f"Error when simplifying: {self.kprint.kore_to_pretty(pattern)}")
             _LOGGER.warning(f"exception: {str(e)}")
@@ -118,7 +155,11 @@ class ReachabilitySystem:
 
     def implies(self, ant: Kore.Pattern, con: Kore.Pattern) -> KoreRpc.ImpliesResult:
         try:
-            return self.kcs.client.implies(ant, con)
+            old = time.perf_counter()
+            rv = self.kcs.client.implies(ant, con)
+            new = time.perf_counter()
+            self.stats.implies.add(new - old)
+            return rv
         except KoreRpc.KoreClientError as e:
             _LOGGER.warning(f"Error during implication check.")
             _LOGGER.warning(f"ant: {ant.text}")
