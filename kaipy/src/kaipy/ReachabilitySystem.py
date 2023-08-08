@@ -2,9 +2,9 @@ import functools as F
 import logging
 import typing as T
 import time
-#import multiprocessing as mp
-import multiprocess as mp # type: ignore
-import multiprocess.pool as mpPool # type: ignore
+import traceback
+import multiprocessing as mp
+import multiprocessing.pool as mpPool
 from pathlib import Path
 
 import pyk.kore.syntax as Kore
@@ -69,6 +69,7 @@ class RSStats:
         self.implies = PerfCounter()
         self.execute_step = PerfCounter()
         self.simplify = PerfCounter()
+        self.map_simplify = PerfCounter()
 
     @property
     def dict(self) -> T.Dict[str, T.Any]:
@@ -86,6 +87,16 @@ def set_global_kcs(kcs: KoreClientServer):
     global global_kcs
     global_kcs = kcs
 
+def my_cleanup(args):
+    global global_kcs
+    assert global_kcs is not None
+    global_kcs.__exit__(*args)
+    global_kcs = None
+
+def my_simp(p: Kore.Pattern) -> Kore.Pattern:
+    global global_kcs
+    assert global_kcs is not None
+    return global_kcs.client.simplify(p)[0]
 
 class KcsPool:
     pool: mpPool.Pool
@@ -95,17 +106,30 @@ class KcsPool:
         main_module_name: str,
         kore_rpc_args: T.Iterable[str] = ["--enable-log-timestamps"],
     ):
+        _LOGGER.warning("< KcsPool.__init__()>")
         self.pool = mp.Pool(
             processes=mp.cpu_count(),
             initializer=lambda: set_global_kcs(KoreClientServer(definition_dir, main_module_name, kore_rpc_args))
         )
-    
-    def map_simplify(self, ps: T.List[Kore.Pattern]) -> T.List[Kore.Pattern]:
-        def f(p):
-            assert global_kcs is not None
-            return global_kcs.client.simplify(p)[0]
+        _LOGGER.warning("</KcsPool.__init__()>")
 
-        return self.pool.map(f, ps)
+    def __enter__(self) -> "KcsPool":
+        _LOGGER.warning("< KcsPool.__enter__()>")
+        _LOGGER.warning("</KcsPool.__enter__()>")
+        return self
+
+    def __exit__(self, *args: T.Any) -> None:
+        _LOGGER.warning("< KcsPool.__exit__()>")
+        traceback.print_stack()
+        self.pool.map(my_cleanup, [args for _ in range(mp.cpu_count())])
+        self.pool.__exit__(*args)
+        _LOGGER.warning("</KcsPool.__exit__()>")
+
+    def map_simplify(self, ps: T.List[Kore.Pattern]) -> T.List[Kore.Pattern]:
+        _LOGGER.warning(f"< KcsPool.map_simplify({len(ps)})>")
+        rv = self.pool.map(my_simp, ps)
+        _LOGGER.warning("</KcsPool.map_simplify()>")
+        return rv
 
 class ReachabilitySystem:
     kcs: KoreClientServer
@@ -138,7 +162,8 @@ class ReachabilitySystem:
         return self
 
     def __exit__(self, *args: T.Any) -> None:
-        self.kcs.__exit__()
+        self.kcs.__exit__(*args)
+        self.kcspool.__exit__(*args)
 
     def get_symbol_sort(self, symbol: str) -> Kore.Sort:
         return KoreUtils.get_symbol_sort(self.definition, self.kdw.main_module_name, symbol)

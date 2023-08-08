@@ -27,7 +27,6 @@
                 python.pkgs.networkx
                 python.pkgs.immutabledict
                 python.pkgs.pytest
-                python.pkgs.multiprocess
               ];
               postInstall = ''
                 substituteInPlace $out/lib/*/site-packages/kaipy/kcommands.py \

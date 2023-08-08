@@ -298,7 +298,7 @@ def for_each_match(
     cfgs: T.List[Kore.Pattern],
     subst_domain: IAbstractSubstitutionDomain,
 ) -> T.List[Kore.Pattern]:
-    conjinfos: T.List[T.Tuple[Kore.Pattern, StateInfo, T.Set[Kore.EVar]]]
+    conjinfos: T.List[T.Tuple[Kore.Pattern, StateInfo, T.Set[Kore.EVar]]] = list()
     for cfg in cfgs:
         for st,info in states.states.items():
             renaming = KoreUtils.compute_renaming0(
@@ -322,7 +322,7 @@ def for_each_match(
     _LOGGER.warning(f'Simplifying {len(conjs)} items at once')
     conjs_simplified = rs.map_simplify(conjs)
 
-    new_ps : T.List[Kore.Pattern] = list()
+    new_ps_raw : T.List[Kore.Pattern] = list()
     for simplified,info,evars in zip(conjs_simplified, infos, evarss):
             abstract_subst: IAbstractSubstitution | None = get_abstract_subst_of_state(
                 rs=rs,
@@ -338,9 +338,19 @@ def for_each_match(
                     #concretized_renamed_subst = KoreUtils.rename_vars(renaming, phi)
                     print(f'st vars: {KoreUtils.free_evars_of_pattern(st_renamed)}')
                     print(f'concretized subst vars: {set(concretized_subst.mapping.keys())}')
-                    p = rs.simplify(conj_with_subst(rs, st_renamed, concretized_subst))
-                    p2 = rs.simplify(RSUtils.cleanup_pattern(rs, p)) # TODO the outer simplify is probably not needed
-                    new_ps.append(p2)
+                    p0 = conj_with_subst(rs, st_renamed, concretized_subst)
+                    new_ps_raw.append(p0)
+
+    _LOGGER.warning(f'Simplifying {len(new_ps_raw)} items at once (second)')
+    for pr in new_ps_raw:
+        _LOGGER.warning(f'Item: {rs.kprint.kore_to_pretty(pr)}')
+    new_ps_0 = rs.map_simplify(new_ps_raw)
+    _LOGGER.warning(f'(done)')
+    new_ps: T.List[Kore.Pattern] = list()
+    for p in new_ps_0:
+        print(f'Cleaning up')
+        p2 = RSUtils.cleanup_pattern(rs, p)
+        new_ps.append(p2)
     return new_ps
             
 
