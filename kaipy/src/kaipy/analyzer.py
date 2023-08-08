@@ -343,8 +343,8 @@ def for_each_match(
                     new_ps_raw.append(p0)
 
     _LOGGER.warning(f'Simplifying {len(new_ps_raw)} items at once (second)')
-    for pr in new_ps_raw:
-        _LOGGER.warning(f'Item: {rs.kprint.kore_to_pretty(pr)}')
+    #for pr in new_ps_raw:
+    #    _LOGGER.warning(f'Item: {rs.kprint.kore_to_pretty(pr)}')
     new_ps_0 = rs.map_simplify(new_ps_raw)
     _LOGGER.warning(f'(done)')
     new_ps: T.List[Kore.Pattern] = list()
@@ -360,15 +360,22 @@ def normalize_pattern(cfg: Kore.Pattern) -> Kore.Pattern:
     renaming = { v.name : ("VAR"+str(i)) for i,v in enumerate(vs)}
     return KoreUtils.rename_vars(renaming, cfg)
 
-def analyze(
+def build_abstract_substitution_domain(
     rs: ReachabilitySystem,
     rests: T.List[Kore.Pattern],
-    initial_configuration: Kore.Pattern,
-) -> States:
+    initial_configuration: Kore.Pattern
+) -> IAbstractSubstitutionDomain:
     initial_configuration = rs.simplify(initial_configuration)
     finite_set_of_patterns = rests + list(KoreUtils.some_subpatterns_of(initial_configuration).keys())
     pattern_domain: IAbstractPatternDomain = FinitePatternDomain(finite_set_of_patterns, rs)
     subst_domain: IAbstractSubstitutionDomain = CartesianAbstractSubstitutionDomain(pattern_domain)
+    return subst_domain
+
+def analyze(
+    rs: ReachabilitySystem,
+    subst_domain: IAbstractSubstitutionDomain,
+    initial_configuration: Kore.Pattern,
+) -> States:
     states: States = build_states(rs, KoreUtils.free_evars_of_pattern(initial_configuration))
     #print(f'initial: {rs.kprint.kore_to_pretty(initial_configuration)}')
     cfgs = [normalize_pattern(initial_configuration)]

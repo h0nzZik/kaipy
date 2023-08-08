@@ -88,13 +88,22 @@ class TestImp(MyTest):
         )
 
         rests = pre_analyze(reachability_system, context_aliases, input_pattern)
-        rv = kaipy.analyzer.analyze(
+        subst_domain: IAbstractSubstitutionDomain = kaipy.analyzer.build_abstract_substitution_domain(
             reachability_system,
-            rests=rests,
+            rests,
+            input_pattern
+        )
+        states = kaipy.analyzer.analyze(
+            reachability_system,
+            subst_domain=subst_domain,
             initial_configuration=input_pattern,
         )
         print(reachability_system.stats.dict)
-        kaipy.analyzer.print_states(rv)
+        kaipy.analyzer.print_states(
+            states,
+            rs=reachability_system,
+            subst_domain=subst_domain
+        )
         assert(False) # To print stuff
 
     # def test_execute_var(self, reachability_system: ReachabilitySystem):
