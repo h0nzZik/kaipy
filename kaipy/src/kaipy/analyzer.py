@@ -279,18 +279,11 @@ def conj_with_subst(rs: ReachabilitySystem, p: Kore.Pattern, s: Substitution) ->
 def get_abstract_subst_of_state(
     rs: ReachabilitySystem,
     subst_domain: IAbstractSubstitutionDomain,
-    cfg: Kore.Pattern,
-    st_renamed: Kore.Pattern,
+    conj_simplified : Kore.Pattern,
+    fvs: T.Set[Kore.EVar],
 ) -> IAbstractSubstitution | None:
-    # project configuration `cfg` to state `st`
-    conj = Kore.And(rs.top_sort, cfg, st_renamed)
-    conj_simplified = rs.simplify(conj)
     if KoreUtils.is_bottom(conj_simplified):
         return None
-    #print(f'Not bottom: {rs.kprint.kore_to_pretty(conj_simplified)}')
-    #print(f'(rule lhs: {info.description})')
-    #print(f'(st: {rs.kprint.kore_to_pretty(st)})')
-    fvs: T.Set[Kore.EVar] = KoreUtils.free_evars_of_pattern(st_renamed)
     eqls: T.Dict[Kore.EVar, Kore.Pattern] = KoreUtils.extract_equalities_from_witness(
         {ev.name for ev in fvs},
         conj_simplified
@@ -305,7 +298,7 @@ def for_each_match(
     cfgs: T.List[Kore.Pattern],
     subst_domain: IAbstractSubstitutionDomain,
 ) -> T.List[Kore.Pattern]:
-    new_ps : T.List[Kore.Pattern] = list()
+    conjinfos: T.List[T.Tuple[Kore.Pattern, StateInfo, T.Set[Kore.EVar]]]
     for cfg in cfgs:
         for st,info in states.states.items():
             renaming = KoreUtils.compute_renaming0(
@@ -316,9 +309,26 @@ def for_each_match(
                 renaming,
                 st
             )
+            conj = Kore.And(rs.top_sort, cfg, st_renamed)
+            conjinfos.append((
+                conj,
+                info,
+                KoreUtils.free_evars_of_pattern(st_renamed)
+            ))
+    
+    conjs: T.List[Kore.Pattern] = [ci[0] for ci in conjinfos]
+    infos: T.List[StateInfo] = [ci[1] for ci in conjinfos]
+    evarss: T.List[T.Set[Kore.EVar]] = [ci[2] for ci in conjinfos]
+    _LOGGER.warning(f'Simplifying {len(conjs)} items at once')
+    conjs_simplified = rs.map_simplify(conjs)
 
+    new_ps : T.List[Kore.Pattern] = list()
+    for simplified,info,evars in zip(conjs_simplified, infos, evarss):
             abstract_subst: IAbstractSubstitution | None = get_abstract_subst_of_state(
-                rs=rs, subst_domain=subst_domain, cfg=cfg, st_renamed=st_renamed
+                rs=rs,
+                subst_domain=subst_domain,
+                conj_simplified=simplified,
+                fvs=evars,
             )
             if abstract_subst is None:
                 continue

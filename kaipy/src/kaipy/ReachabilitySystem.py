@@ -2,7 +2,9 @@ import functools as F
 import logging
 import typing as T
 import time
-import multiprocessing as mp
+#import multiprocessing as mp
+import multiprocess as mp # type: ignore
+import multiprocess.pool as mpPool # type: ignore
 from pathlib import Path
 
 import pyk.kore.syntax as Kore
@@ -86,7 +88,7 @@ def set_global_kcs(kcs: KoreClientServer):
 
 
 class KcsPool:
-    pool: mp.pool.Pool
+    pool: mpPool.Pool
     def __init__(
         self,
         definition_dir: Path,
