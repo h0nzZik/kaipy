@@ -298,7 +298,7 @@ def for_each_match(
     cfgs: T.List[Kore.Pattern],
     subst_domain: IAbstractSubstitutionDomain,
 ) -> T.List[Kore.Pattern]:
-    conjinfos: T.List[T.Tuple[Kore.Pattern, StateInfo, T.Set[Kore.EVar]]] = list()
+    conjinfos: T.List[T.Tuple[Kore.Pattern, StateInfo, Kore.Pattern]] = list()
     for cfg in cfgs:
         for st,info in states.states.items():
             renaming = KoreUtils.compute_renaming0(
@@ -313,17 +313,18 @@ def for_each_match(
             conjinfos.append((
                 conj,
                 info,
-                KoreUtils.free_evars_of_pattern(st_renamed)
+                st_renamed,
             ))
     
     conjs: T.List[Kore.Pattern] = [ci[0] for ci in conjinfos]
     infos: T.List[StateInfo] = [ci[1] for ci in conjinfos]
-    evarss: T.List[T.Set[Kore.EVar]] = [ci[2] for ci in conjinfos]
+    strenameds: T.List[Kore.Pattern] = [ci[2] for ci in conjinfos]
     _LOGGER.warning(f'Simplifying {len(conjs)} items at once')
     conjs_simplified = rs.map_simplify(conjs)
 
     new_ps_raw : T.List[Kore.Pattern] = list()
-    for simplified,info,evars in zip(conjs_simplified, infos, evarss):
+    for simplified,info,st_renamed in zip(conjs_simplified, infos, strenameds):
+            evars = KoreUtils.free_evars_of_pattern(st_renamed)
             abstract_subst: IAbstractSubstitution | None = get_abstract_subst_of_state(
                 rs=rs,
                 subst_domain=subst_domain,
@@ -370,7 +371,7 @@ def analyze(
     subst_domain: IAbstractSubstitutionDomain = CartesianAbstractSubstitutionDomain(pattern_domain)
     states: States = build_states(rs, KoreUtils.free_evars_of_pattern(initial_configuration))
     #print(f'initial: {rs.kprint.kore_to_pretty(initial_configuration)}')
-    cfgs = [initial_configuration]
+    cfgs = [normalize_pattern(initial_configuration)]
     current_ps = for_each_match(rs, states, cfgs, subst_domain)
     while len(current_ps) > 0:
         _LOGGER.warning(f'remaining {len(current_ps)} states')

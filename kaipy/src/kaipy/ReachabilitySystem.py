@@ -3,6 +3,8 @@ import logging
 import typing as T
 import time
 import traceback
+import os
+import sys
 import multiprocessing as mp
 import multiprocessing.pool as mpPool
 from pathlib import Path
@@ -73,10 +75,13 @@ class RSStats:
         }   
 
 
+def start_kcs(definition_dir, main_module_name, kore_rpc_args) -> KoreClientServer:
+    return KoreClientServer(definition_dir, main_module_name, kore_rpc_args)
 
 global_kcs: KoreClientServer|None = None
 def set_global_kcs(kcs: KoreClientServer):
     global global_kcs
+    #_LOGGER.warning(f'Setting global KCS (pid: {os.getpid()})')
     global_kcs = kcs
 
 def my_cleanup(args):
@@ -85,43 +90,57 @@ def my_cleanup(args):
     global_kcs.__exit__(*args)
     global_kcs = None
 
-def my_simp(p: Kore.Pattern) -> Kore.Pattern:
+def my_simp(p: Kore.Pattern) -> Kore.Pattern|None:
     global global_kcs
     assert global_kcs is not None
-    return global_kcs.client.simplify(p)[0]
+    print(f"my_simp: pid={os.getpid()}")
+    try:
+        return global_kcs.client.simplify(p)[0]
+    except KoreRpc.KoreClientError as e:
+        _LOGGER.warning(f"Error when simplifying: {p.text}")
+        _LOGGER.warning(f"exception: {str(e)}")
+        _LOGGER.warning(f"data: {str(e.data)}")
+        return None
 
 class KcsPool:
     pool: mpPool.Pool
+    kcss: T.List[KoreClientServer]
     def __init__(
         self,
         definition_dir: Path,
         main_module_name: str,
         kore_rpc_args: T.Iterable[str] = ["--enable-log-timestamps"],
     ):
-        _LOGGER.warning("< KcsPool.__init__()>")
+        #_LOGGER.warning(f"< KcsPool.__init__(): pid={os.getpid()}>")
         self.pool = mp.Pool(
             processes=mp.cpu_count(),
-            initializer=lambda: set_global_kcs(KoreClientServer(definition_dir, main_module_name, kore_rpc_args))
+            initializer=lambda: set_global_kcs(start_kcs(definition_dir, main_module_name, kore_rpc_args))
         )
-        _LOGGER.warning("</KcsPool.__init__()>")
+        #_LOGGER.warning(f'pool: {self.pool}')
+        #_LOGGER.warning(f"</KcsPool.__init__(): pid={os.getpid()}>")
 
     def __enter__(self) -> "KcsPool":
-        _LOGGER.warning("< KcsPool.__enter__()>")
-        _LOGGER.warning("</KcsPool.__enter__()>")
+        #_LOGGER.warning("< KcsPool.__enter__()>")
+        #_LOGGER.warning("</KcsPool.__enter__()>")
         return self
 
     def __exit__(self, *args: T.Any) -> None:
-        _LOGGER.warning("< KcsPool.__exit__()>")
-        traceback.print_stack()
-        self.pool.map(my_cleanup, [args for _ in range(mp.cpu_count())])
-        self.pool.__exit__(*args)
-        _LOGGER.warning("</KcsPool.__exit__()>")
+        #_LOGGER.warning(f"< KcsPool.__exit__(): pid={os.getpid()}>")
+        #traceback.print_stack()
+        #self.pool.map(my_cleanup, [args for _ in range(mp.cpu_count())])
+        self.pool.close()
+        self.pool.join()
+        #self.pool.__exit__(*args)
+        #_LOGGER.warning("</KcsPool.__exit__()>")
 
     def map_simplify(self, ps: T.List[Kore.Pattern]) -> T.List[Kore.Pattern]:
-        _LOGGER.warning(f"< KcsPool.map_simplify({len(ps)})>")
+        #_LOGGER.warning(f"< KcsPool.map_simplify({len(ps)})>")
+        #_LOGGER.warning(f'pool: {self.pool}')
         rv = self.pool.map(my_simp, ps)
-        _LOGGER.warning("</KcsPool.map_simplify()>")
-        return rv
+        if any(p is None for p in rv):
+            raise RuntimeError("An exception occurred in a child process")
+        #_LOGGER.warning("</KcsPool.map_simplify()>")
+        return rv # type: ignore
 
 class ReachabilitySystem:
     kcs: KoreClientServer
