@@ -14,7 +14,7 @@ import pyk.kore.rpc as KoreRpc
 from pyk.ktool.kprint import KPrint
 
 from .PerfCounter import PerfCounter
-from .kcommands import KORE_RPC_COMMAND
+#from .kcommands import KORE_RPC_COMMAND
 from .KompiledDefinitionWrapper import KompiledDefinitionWrapper
 import kaipy.kore_utils as KoreUtils
 
@@ -29,19 +29,11 @@ class KoreClientServer:
         definition_dir: Path,
         main_module_name: str,
         kore_rpc_args: T.Iterable[str] = ["--enable-log-timestamps"],
-        # connect_to_port: T.Optional[str] = None,
     ):
-        # if connect_to_port is not None:
-        #    port = int(connect_to_port)
-        #    timeout = 1500
-        #    self.server = None
-        # else:
-        # port = utils.find_free_port()
         self.server = KoreRpc.KoreServer(
             kompiled_dir=definition_dir,
             module_name=main_module_name,
-            command=list((KORE_RPC_COMMAND,)) + list(kore_rpc_args),
-            # port=port,
+            command=list(('kore-rpc',)) + list(kore_rpc_args),
         )
         timeout = None
         self.client = KoreRpc.KoreClient("localhost", port=self.server.port, timeout=timeout)

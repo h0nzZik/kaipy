@@ -8,7 +8,7 @@ from pyk.kore.kompiled import KompiledKore
 from pyk.kore.parser import KoreParser
 from pyk.ktool import krun
 
-import kaipy.kcommands as kcommands
+#import kaipy.kcommands as kcommands
 
 from .HeatonlyDefinition import heat_cool_only_definition
 from .IManagedKompiledKore import IManagedKompiledKore
@@ -93,7 +93,7 @@ class KompiledDefinitionWrapper:
         #print(f"args_name: {args_name}")
 
         result = krun._krun(
-            command=(kcommands.KRUN_COMMAND),
+            #command=(kcommands.KRUN_COMMAND),
             input_file=Path(program),
             definition_dir=self.definition_dir,
             output=krun.KRunOutput.KORE,

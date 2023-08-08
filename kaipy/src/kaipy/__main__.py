@@ -28,7 +28,7 @@ from immutabledict import immutabledict
 from pyk.kore.kompiled import KompiledKore
 from pyk.kore.parser import KoreParser
 
-from .kcommands import KRUN_COMMAND
+#from .kcommands import KRUN_COMMAND
 from .kore_utils import (
     axiom_label,
     axiom_uuid,
