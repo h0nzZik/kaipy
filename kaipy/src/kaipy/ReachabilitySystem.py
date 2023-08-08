@@ -2,6 +2,7 @@ import functools as F
 import logging
 import typing as T
 import time
+import multiprocessing as mp
 from pathlib import Path
 
 import pyk.kore.syntax as Kore
@@ -57,6 +58,7 @@ class RSStats:
     implies: PerfCounter
     execute_step: PerfCounter
     simplify: PerfCounter
+    map_simplify: PerfCounter
 
     def __init__(self):
         self.reset()
@@ -72,11 +74,40 @@ class RSStats:
             'implies' : self.implies.dict,
             'execute_step' : self.execute_step.dict,
             'simplify' : self.simplify.dict,
+            'map_simplify' : self.map_simplify.dict,
         }   
 
 
+
+global_kcs: KoreClientServer|None = None
+def set_global_kcs(kcs: KoreClientServer):
+    global global_kcs
+    global_kcs = kcs
+
+
+class KcsPool:
+    pool: mp.pool.Pool
+    def __init__(
+        self,
+        definition_dir: Path,
+        main_module_name: str,
+        kore_rpc_args: T.Iterable[str] = ["--enable-log-timestamps"],
+    ):
+        self.pool = mp.Pool(
+            processes=mp.cpu_count(),
+            initializer=lambda: set_global_kcs(KoreClientServer(definition_dir, main_module_name, kore_rpc_args))
+        )
+    
+    def map_simplify(self, ps: T.List[Kore.Pattern]) -> T.List[Kore.Pattern]:
+        def f(p):
+            assert global_kcs is not None
+            return global_kcs.client.simplify(p)[0]
+
+        return self.pool.map(f, ps)
+
 class ReachabilitySystem:
     kcs: KoreClientServer
+    kcspool: KcsPool
     kdw: KompiledDefinitionWrapper
     kprint: KPrint
     stats: RSStats
@@ -84,16 +115,16 @@ class ReachabilitySystem:
     def __init__(
         self,
         kdw: KompiledDefinitionWrapper,
-        # kore_rpc_args: T.Iterable[str] = (),
-        # connect_to_port: T.Optional[str] = None,
     ):
         self.kdw = kdw
         self.kprint = KPrint(kdw.definition_dir)
         self.kcs = KoreClientServer(
             definition_dir=kdw.definition_dir,
             main_module_name=self.kdw.main_module_name,
-            # kore_rpc_args=kore_rpc_args,
-            # connect_to_port=connect_to_port,
+        )
+        self.kcspool = KcsPool(
+            definition_dir=kdw.definition_dir,
+            main_module_name=self.kdw.main_module_name,
         )
         self.stats = RSStats()
 
@@ -149,6 +180,19 @@ class ReachabilitySystem:
             return rv
         except KoreRpc.KoreClientError as e:
             _LOGGER.warning(f"Error when simplifying: {self.kprint.kore_to_pretty(pattern)}")
+            _LOGGER.warning(f"exception: {str(e)}")
+            _LOGGER.warning(f"data: {str(e.data)}")
+            raise
+    
+    def map_simplify(self, ps: T.List[Kore.Pattern]) -> T.List[Kore.Pattern]:
+        try:
+            old = time.perf_counter()
+            rv = self.kcspool.map_simplify(ps)
+            new = time.perf_counter()
+            self.stats.map_simplify.add(new - old, count=len(ps))
+            return rv
+        except KoreRpc.KoreClientError as e:
+            _LOGGER.warning(f"Error when simplifying (multiple patterns)")
             _LOGGER.warning(f"exception: {str(e)}")
             _LOGGER.warning(f"data: {str(e.data)}")
             raise

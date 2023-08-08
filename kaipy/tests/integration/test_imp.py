@@ -94,6 +94,7 @@ class TestImp(MyTest):
             initial_configuration=input_pattern,
         )
         print(reachability_system.stats.dict)
+        kaipy.analyzer.print_states(rv)
         assert(False) # To print stuff
 
     # def test_execute_var(self, reachability_system: ReachabilitySystem):

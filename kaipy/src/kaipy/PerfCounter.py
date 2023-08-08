@@ -13,6 +13,6 @@ class PerfCounter:
             'total_time' : self.total_time
         }   
 
-    def add(self, time_diff : float) -> None:
-        self.total_count = self.total_count + 1
+    def add(self, time_diff : float, count=1) -> None:
+        self.total_count = self.total_count + count
         self.total_time = self.total_time + time_diff

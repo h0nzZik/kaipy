@@ -226,6 +226,18 @@ class StateInfo:
 class States:
     states: T.Dict[Kore.Pattern, StateInfo]
 
+def print_states(
+    states: States,
+    rs: ReachabilitySystem,
+    subst_domain: IAbstractSubstitutionDomain
+) -> None:
+    print("****STATES****")
+    for i,st in enumerate(states.states):
+        print(f'state: {rs.kprint.kore_to_pretty(st)}')
+        print(f'info:')
+        for subst in states.states[st].substitutions:
+            print(f'{subst_domain.print(subst)}')
+
 
 def build_states(rs: ReachabilitySystem, vars_to_avoid: T.Set[Kore.EVar]) -> States:
     d : T.Dict[Kore.Pattern, StateInfo] = dict()
@@ -317,7 +329,7 @@ def for_each_match(
                     print(f'st vars: {KoreUtils.free_evars_of_pattern(st_renamed)}')
                     print(f'concretized subst vars: {set(concretized_subst.mapping.keys())}')
                     p = rs.simplify(conj_with_subst(rs, st_renamed, concretized_subst))
-                    p2 = rs.simplify(RSUtils.cleanup_pattern(rs, p))
+                    p2 = rs.simplify(RSUtils.cleanup_pattern(rs, p)) # TODO the outer simplify is probably not needed
                     new_ps.append(p2)
     return new_ps
             
@@ -331,7 +343,7 @@ def analyze(
     rs: ReachabilitySystem,
     rests: T.List[Kore.Pattern],
     initial_configuration: Kore.Pattern,
-) -> None:
+) -> States:
     initial_configuration = rs.simplify(initial_configuration)
     finite_set_of_patterns = rests + list(KoreUtils.some_subpatterns_of(initial_configuration).keys())
     pattern_domain: IAbstractPatternDomain = FinitePatternDomain(finite_set_of_patterns, rs)
@@ -356,4 +368,4 @@ def analyze(
         current_ps.extend(new_ps)
 
 
-    return None
+    return states
