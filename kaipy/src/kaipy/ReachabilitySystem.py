@@ -84,6 +84,11 @@ def set_global_kcs(kcs: KoreClientServer):
     #_LOGGER.warning(f'Setting global KCS (pid: {os.getpid()})')
     global_kcs = kcs
 
+def get_global_kcs() -> KoreClientServer:
+    global global_kcs
+    assert global_kcs is not None
+    return global_kcs
+
 def my_cleanup(args):
     global global_kcs
     assert global_kcs is not None
@@ -253,13 +258,7 @@ class ReachabilitySystem:
             raise
     
     def sortof(self, p: Kore.Pattern) -> Kore.Sort:
-        match p:
-            case Kore.App('inj', (srcsort,dstsort), _):
-                return dstsort
-            case Kore.App(sym, _, _):
-                return self.get_symbol_sort(sym)
-
-        return p.sort # type: ignore
+        return self.kdw.sortof(p)
 
 
     def subsumes(self, ant: Kore.Pattern, con: Kore.Pattern) -> T.Tuple[bool, T.Dict[str,str] | None]:

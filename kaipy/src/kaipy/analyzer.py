@@ -1,6 +1,7 @@
 import abc
 import dataclasses
 import itertools
+import functools
 import logging
 import typing as T
 
@@ -13,7 +14,7 @@ import pyk.kore.syntax as Kore
 import kaipy.rs_utils as RSUtils
 import kaipy.kore_utils as KoreUtils
 
-from .ReachabilitySystem import ReachabilitySystem
+from .ReachabilitySystem import ReachabilitySystem, KoreClientServer, get_global_kcs
 from .KompiledDefinitionWrapper import KompiledDefinitionWrapper
 from .Substitution import Substitution
 
@@ -51,6 +52,43 @@ class FinitePattern(IAbstractPattern):
     sort: Kore.Sort
     renaming: T.Dict[str,str] | None
 
+class Subsumer:
+    c: Kore.Pattern
+    kdw: KompiledDefinitionWrapper
+
+    def __init__(self, c: Kore.Pattern, kdw: KompiledDefinitionWrapper):
+        self.c = c
+        self.kdw = kdw
+    
+    @functools.cached_property
+    def c_sort(self) -> Kore.Sort:
+        return self.kdw.sortof(self.c)
+
+    # Assumes it has been called in a worker process,
+    # not in the main one
+    def __call__(self, p: Kore.Pattern) -> T.Tuple[bool, T.Dict[str,str] | None]:
+        kcs: KoreClientServer = get_global_kcs()
+        p_sort = self.kdw.sortof(p)
+        if self.c_sort != p_sort:
+            return False,{}
+        
+        ant: Kore.Pattern = self.c
+        con: Kore.Pattern = p
+
+        renaming = KoreUtils.compute_renaming0(
+            vars_to_avoid=list(KoreUtils.free_evars_of_pattern(ant)),
+            vars_to_rename=list(KoreUtils.free_evars_of_pattern(con))
+        )
+        con_renamed: Kore.Pattern = KoreUtils.rename_vars(
+            renaming,
+            con,
+        )
+        con_eqa = KoreUtils.existentially_quantify_free_variables(self.c_sort, con_renamed)
+        ir = kcs.client.implies(ant, con_eqa)
+        return ir.satisfiable, (renaming if ir.satisfiable else None)
+
+
+
 class FinitePatternDomain(IAbstractPatternDomain):
     pl : T.List[Kore.Pattern]
     rs : ReachabilitySystem
@@ -64,16 +102,23 @@ class FinitePatternDomain(IAbstractPatternDomain):
         #    print(f"{i}: {rs.kprint.kore_to_pretty(a_rest)}")
     
     def abstract(self, c: Kore.Pattern) -> FinitePattern:
-        #print(f'abstracting {c.text}')
         csort = self.rs.sortof(c)
-        for i,p in enumerate(self.pl):
-            if self.rs.sortof(p) != csort:
+        # Optimization
+        match c:
+            case Kore.EVar(_, _):
+                return FinitePattern(-1, csort, None)
+        _LOGGER.warning(f'abstracting {c.text}')
+        #pls: T.List[T.Tuple[int, Kore.Pattern]] = list(enumerate(self.pl))
+        subsumer: T.Callable[[Kore.Pattern], T.Tuple[bool, T.Dict[str,str] | None]] = Subsumer(c=c, kdw=self.rs.kdw)
+        #holds: T.List[T.Tuple[bool, T.Dict[str,str] | None]] = [(False, {})]
+        holds: T.List[T.Tuple[bool, T.Dict[str,str] | None]] = self.rs.kcspool.pool.map(subsumer, self.pl)
+        for i,(h,renaming) in enumerate(holds):
+            if not h:
                 continue
-            sr = self.rs.subsumes(c, p)
-            if sr[0] == True:
-                renaming = { v:k for k,v in (sr[1] or dict()).items() }
-                return FinitePattern(i, csort, renaming)
-        #print(f'(no nice pattern found)')
+            reversed_renaming = { v:k for k,v in (renaming or dict()).items() }
+            _LOGGER.warning(f'(found something)')
+            return FinitePattern(i, csort, reversed_renaming)
+        _LOGGER.warning(f'(no nice pattern found)')
         return FinitePattern(-1, csort, None)
     
     def is_top(self, a: IAbstractPattern) -> bool:
