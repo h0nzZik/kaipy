@@ -97,7 +97,7 @@ def my_cleanup(args):
 def my_simp(p: Kore.Pattern) -> Kore.Pattern|None:
     global global_kcs
     assert global_kcs is not None
-    print(f"my_simp: pid={os.getpid()}")
+    #print(f"my_simp: pid={os.getpid()}")
     try:
         return global_kcs.client.simplify(p)[0]
     except KoreRpc.KoreClientError as e:
