@@ -15,6 +15,7 @@ import kaipy.rs_utils as RSUtils
 import kaipy.kore_utils as KoreUtils
 
 from kaipy.IAbstractPatternDomain import IAbstractPattern, IAbstractPatternDomain
+from kaipy.IAbstractSubstitutionDomain import IAbstractSubstitution, IAbstractSubstitutionDomain
 from kaipy.FinitePatternDomain import FinitePattern, FinitePatternDomain
 
 from .ReachabilitySystem import ReachabilitySystem, KoreClientServer, get_global_kcs
@@ -24,28 +25,6 @@ from .Substitution import Substitution
 _LOGGER: T.Final = logging.getLogger(__name__)
 
 
-
-
-class IAbstractSubstitution(abc.ABC):
-    ...
-
-class IAbstractSubstitutionDomain(abc.ABC):
-    @abc.abstractmethod
-    def concretize(self, a: IAbstractSubstitution) -> T.Set[Substitution]:
-        ...
-    
-    @abc.abstractmethod
-    def abstract(self, subst: Substitution) -> IAbstractSubstitution:
-        ...
-
-
-    @abc.abstractmethod
-    def subsumes(self, a1: IAbstractSubstitution, a2: IAbstractSubstitution) -> bool:
-        ...
-    
-    @abc.abstractmethod
-    def print(self, a: IAbstractSubstitution) -> str:
-        ...
 
 # Turns
 # { x |-> {phi1, phi2}, y |-> {phi3, phi4} }
