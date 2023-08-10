@@ -10,6 +10,7 @@ from immutabledict import immutabledict
 import pyk.kore.prelude as KorePrelude
 import pyk.kore.rpc as KoreRpc
 import pyk.kore.syntax as Kore
+from pyk.ktool.kprint import KPrint
 
 import kaipy.rs_utils as RSUtils
 import kaipy.kore_utils as KoreUtils
@@ -47,6 +48,7 @@ def cartesian_dict(d: T.Mapping[T.Any, T.Any]) -> T.Set[T.Mapping[T.Any, T.Any]]
 
 @dataclasses.dataclass
 class StateInfo:
+    pattern: Kore.Pattern
     description: str
     substitutions: T.List[IAbstractSubstitution]
     
@@ -63,25 +65,38 @@ class StateInfo:
         return True
 
 
+    def print(self, kprint: KPrint, subst_domain: IAbstractSubstitutionDomain):
+        print(f'state {self.description}')
+        print(f'{kprint.kore_to_pretty(self.pattern)}')
+        print(f'info:')
+        for subst in self.substitutions:
+            print(f'{subst_domain.print(subst)}')
+
+
 @dataclasses.dataclass
 class States:
-    states: T.Dict[Kore.Pattern, StateInfo]
+    states_by_pattern: T.Dict[Kore.Pattern, StateInfo]
+    states_by_id: T.Dict[str, StateInfo]
 
-def print_states(
-    states: States,
-    rs: ReachabilitySystem,
-    subst_domain: IAbstractSubstitutionDomain
-) -> None:
-    print("****STATES****")
-    for i,st in enumerate(states.states):
-        print(f'state: {rs.kprint.kore_to_pretty(st)}')
-        print(f'info:')
-        for subst in states.states[st].substitutions:
-            print(f'{subst_domain.print(subst)}')
+    def info_by_id(self, id: str) -> StateInfo:
+        return self.states_by_id[id]
+    
+    def info_by_pattern(self, pattern: Kore.Pattern):
+        return self.states_by_pattern[pattern]
+
+    def print_states(
+        self,
+        kprint: KPrint,
+        subst_domain: IAbstractSubstitutionDomain
+    ) -> None:
+        print("****STATES****")
+        for st in self.states_by_pattern:
+            self.states_by_pattern[st].print(kprint, subst_domain)
 
 
 def build_states(rs: ReachabilitySystem, vars_to_avoid: T.Set[Kore.EVar]) -> States:
     d : T.Dict[Kore.Pattern, StateInfo] = dict()
+    d2: T.Dict[str, StateInfo] = dict()
 
     for axiom in rs.kdw.rewrite_rules:
         match axiom:
@@ -102,9 +117,11 @@ def build_states(rs: ReachabilitySystem, vars_to_avoid: T.Set[Kore.EVar]) -> Sta
                     ),
                     pattern,
                 )
-                d[pattern_renamed] = StateInfo(original_rule_label, [])
+                info = StateInfo(pattern=pattern_renamed, description=original_rule_label, substitutions=[])
+                d[pattern_renamed] = info
+                d2[original_rule_label] = info
                 #print(f'renamed LHS (new state): {rs.kprint.kore_to_pretty(pattern_renamed)}')
-    return States(d)
+    return States(states_by_pattern=d, states_by_id=d2)
 
 
 def get_abstract_subst_of_state(
@@ -177,7 +194,7 @@ def compute_list_of_raw_pattern_projections(
 ) -> T.List[RawPatternProjection]:
     conjinfos: T.List[RawPatternProjection] = list()
     for cfg in cfgs:
-        for st,info in states.states.items():
+        for st,info in states.states_by_pattern.items():
             conjinfos.append(
                 compute_raw_pattern_projection(
                     rs,
