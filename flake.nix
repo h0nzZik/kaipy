@@ -3,10 +3,8 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.05";
     flake-utils.url = "github:numtide/flake-utils";
-    pyk.url = "github:runtimeverification/pyk/v0.1.397";
-    k-framework.url = "github:runtimeverification/k/v6.0.42";
-    k-framework.inputs.nixpkgs.follows = "nixpkgs";
-    pyk.inputs.nixpkgs.follows = "nixpkgs";
+    pyk.url = "github:runtimeverification/pyk/v0.1.404";
+    k-framework.url = "github:runtimeverification/k/v6.0.46";
   };
 
   outputs = { self,flake-utils, nixpkgs, pyk, k-framework, ...}:
@@ -14,31 +12,23 @@
       overlay = final: prev:
         let
           #python = prev.python311;
-          python = prev.pyk-python311.python;
+          #python = prev.pyk-python311.python;
           k = k-framework.packages.${prev.system}.k;
+          pyk-py = pyk.packages.${prev.system}.pyk-python311;
+          python = pyk-py.python;
           kaipy = python.pkgs.buildPythonApplication {
               name = "kaipy";
               src = ./kaipy;
               format = "pyproject";
               propagatedBuildInputs = [
                 k
-                prev.pyk-python311
+                #prev.pyk-python311
+                pyk-py
                 python.pkgs.setuptools
                 python.pkgs.networkx
                 python.pkgs.immutabledict
                 python.pkgs.pytest
               ];
-              postInstall = ''
-                substituteInPlace $out/lib/*/site-packages/kaipy/kcommands.py \
-                  --replace "\"kompile\"" "\"${k}/bin/kompile\""
-                substituteInPlace $out/lib/*/site-packages/kaipy/kcommands.py \
-                  --replace "\"kprove\"" "\"${k}/bin/kprove\""
-                substituteInPlace $out/lib/*/site-packages/kaipy/kcommands.py \
-                  --replace "\"krun\"" "\"${k}/bin/krun\""
-                substituteInPlace $out/lib/*/site-packages/kaipy/kcommands.py \
-                  --replace "\"kore-rpc\"" "\"${k}/bin/kore-rpc\""
-              '';
-
           };
         in {
           kaipy = kaipy;
@@ -49,7 +39,7 @@
             pkgs = import nixpkgs {
               inherit system;
               overlays = [
-                pyk.overlay
+                #pyk.overlay
                 self.overlay
               ];
             };

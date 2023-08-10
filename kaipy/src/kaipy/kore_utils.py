@@ -212,6 +212,20 @@ def rename_vars(renaming: T.Dict[str, str], phi: Kore.Pattern) -> Kore.Pattern:
     raise NotImplementedError()
 
 
+def free_occs_det(pattern: Kore.Pattern) -> list[Kore.EVar]:
+    occurrences: list[Kore.EVar] = []
+
+    def collect(pattern: Kore.Pattern) -> None:
+        if type(pattern) is Kore.EVar:
+            if pattern not in occurrences:
+                occurrences.append(pattern)
+        else:
+            for sub_pattern in pattern.patterns:
+                collect(sub_pattern)
+
+    collect(pattern)
+    return occurrences
+
 def free_evars_of_pattern(p: Kore.Pattern) -> T.Set[Kore.EVar]:
     return set(chain.from_iterable(free_occs(p).values()))
 

@@ -8,8 +8,9 @@ from pyk.kore.kompiled import KompiledKore
 from pyk.kore.parser import KoreParser
 from pyk.ktool import krun
 
-import kaipy.kcommands as kcommands
+#import kaipy.kcommands as kcommands
 
+import kaipy.kore_utils as KoreUtils
 from .HeatonlyDefinition import heat_cool_only_definition
 from .IManagedKompiledKore import IManagedKompiledKore
 from .kore_utils import (  # axiom_label,; get_symbol_sort,; get_top_cell_initializer,; is_nonhooked_constructor_symbol,
@@ -90,10 +91,10 @@ class KompiledDefinitionWrapper:
             n = n + 1
 
         args_name = "VarARGS" + str(n)
-        print(f"args_name: {args_name}")
+        #print(f"args_name: {args_name}")
 
         result = krun._krun(
-            command=(kcommands.KRUN_COMMAND),
+            #command=(kcommands.KRUN_COMMAND),
             input_file=Path(program),
             definition_dir=self.definition_dir,
             output=krun.KRunOutput.KORE,
@@ -119,3 +120,12 @@ class KompiledDefinitionWrapper:
             main_module_name=self.main_module_name,
             definition_dir=tmp_kompiled_kore.definition_dir,
         )
+
+    def sortof(self, p: Kore.Pattern) -> Kore.Sort:
+        match p:
+            case Kore.App('inj', (srcsort,dstsort), _):
+                return dstsort
+            case Kore.App(sym, _, _):
+                return KoreUtils.get_symbol_sort(self.kompiled_kore.definition, self.main_module_name, sym)
+
+        return p.sort # type: ignore

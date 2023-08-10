@@ -28,7 +28,7 @@ from immutabledict import immutabledict
 from pyk.kore.kompiled import KompiledKore
 from pyk.kore.parser import KoreParser
 
-from .kcommands import KRUN_COMMAND
+#from .kcommands import KRUN_COMMAND
 from .kore_utils import (
     axiom_label,
     axiom_uuid,
@@ -54,6 +54,7 @@ from .kore_utils import (
 from .ReachabilitySystem import ReachabilitySystem
 from .rs_utils import cleanup_eqs, cleanup_pattern, make_conjunction
 from .TriviallyManagedKompiledKore import TriviallyManagedKompiledKore
+from .Substitution import Substitution, subst_to_pattern
 
 
 def compute_conjunction(
@@ -149,19 +150,6 @@ def compute_semantics_pregraph(rs: ReachabilitySystem) -> SemanticsPreGraph:
     return SemanticsPreGraph(nodes)
 
 
-@dataclass(frozen=True)
-class Substitution:
-    mapping: Mapping[Kore.EVar, Kore.Pattern]
-
-    def free_evars(self) -> Set[Kore.EVar]:
-        fe: Set[Kore.EVar] = set()
-        for _, p in self.mapping.items():
-            fe = fe.union(free_evars_of_pattern(p))
-        return fe
-
-
-def subst_to_pattern(sort: Kore.Sort, subst: Substitution) -> Kore.Pattern:
-    return mapping_to_pattern(sort, subst.mapping)
 
 
 def substitution_subsumed_by(
