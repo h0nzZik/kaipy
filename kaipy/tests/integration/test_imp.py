@@ -15,6 +15,8 @@ import kaipy.rs_utils as RSUtils
 from kaipy.HeatPreAnalysis import ContextAlias, ContextAliases, pre_analyze
 from kaipy.ReachabilitySystem import ReachabilitySystem
 from kaipy.testing.testingbase import RSTestBase
+
+import kaipy.DefaultSubstitutionDomain
 import kaipy.analyzer
 
 _LOGGER: T.Final = logging.getLogger(__name__)
@@ -88,7 +90,7 @@ class TestImp(MyTest):
         )
 
         rests = pre_analyze(reachability_system, context_aliases, input_pattern)
-        subst_domain: IAbstractSubstitutionDomain = kaipy.analyzer.build_abstract_substitution_domain(
+        subst_domain: IAbstractSubstitutionDomain = kaipy.DefaultSubstitutionDomain.build_abstract_substitution_domain(
             reachability_system,
             rests,
             input_pattern
