@@ -84,9 +84,8 @@ def set_global_kcs(kcs: KoreClientServer):
     #_LOGGER.warning(f'Setting global KCS (pid: {os.getpid()})')
     global_kcs = kcs
 
-def get_global_kcs() -> KoreClientServer:
+def get_global_kcs() -> KoreClientServer|None:
     global global_kcs
-    assert global_kcs is not None
     return global_kcs
 
 def my_cleanup(args):

@@ -54,21 +54,24 @@ class FinitePattern(IAbstractPattern):
 
 class Subsumer:
     c: Kore.Pattern
-    kdw: KompiledDefinitionWrapper
+    rs: ReachabilitySystem
 
-    def __init__(self, c: Kore.Pattern, kdw: KompiledDefinitionWrapper):
+    def __init__(self, c: Kore.Pattern, rs: ReachabilitySystem):
         self.c = c
-        self.kdw = kdw
+        self.rs = rs
     
     @functools.cached_property
     def c_sort(self) -> Kore.Sort:
-        return self.kdw.sortof(self.c)
+        return self.rs.kdw.sortof(self.c)
 
-    # Assumes it has been called in a worker process,
-    # not in the main one
     def __call__(self, p: Kore.Pattern) -> T.Tuple[bool, T.Dict[str,str] | None]:
-        kcs: KoreClientServer = get_global_kcs()
-        p_sort = self.kdw.sortof(p)
+        kcs: KoreClientServer|None = get_global_kcs()
+        # This means we are not running in a worker process
+        # but in the main one.
+        if kcs is None:
+            kcs = self.rs.kcs
+
+        p_sort = self.rs.kdw.sortof(p)
         if self.c_sort != p_sort:
             return False,{}
         
@@ -92,32 +95,60 @@ class Subsumer:
 class FinitePatternDomain(IAbstractPatternDomain):
     pl : T.List[Kore.Pattern]
     rs : ReachabilitySystem
+    closed_patterns: T.List[T.Tuple[Kore.Pattern, int]]
+    open_patterns: T.List[T.Tuple[Kore.Pattern, int]]
 
     def __init__(self, pl: T.List[Kore.Pattern], rs: ReachabilitySystem):
         self.pl = pl
         self.rs = rs
 
+        self.closed_patterns = []
+        self.open_patterns = []
+        for i,p in enumerate(self.pl):
+            if len(KoreUtils.free_evars_of_pattern(p)) == 0:
+                self.closed_patterns.append((p, i))
+            else:
+                self.open_patterns.append((p, i))
+        _LOGGER.warning(f'Finite domain: {len(self.closed_patterns)} closed, {len(self.open_patterns)} open')
         #print("Finite domain:")
         #for i, a_rest in enumerate(pl):
         #    print(f"{i}: {rs.kprint.kore_to_pretty(a_rest)}")
     
     def abstract(self, c: Kore.Pattern) -> FinitePattern:
         csort = self.rs.sortof(c)
+        _LOGGER.warning(f'abstracting {c.text}')
         # Optimization
         match c:
             case Kore.EVar(_, _):
+                # TODO generalize this to `inj(EVar)``
+                _LOGGER.warning(f'Fast -1')
                 return FinitePattern(-1, csort, None)
-        _LOGGER.warning(f'abstracting {c.text}')
+        
+        # another optimization: for terms without free variables
+        # it is enough to check for an equality with patterns without free variables.
+        # This assumes functionality of both patterns.
+        # For terms with free variables it is necessary to check for subsumtion/implication
+        # but it is enough to consider patterns *with* free variables.
+        if len(KoreUtils.free_evars_of_pattern(c)) == 0:
+            for p,i in self.closed_patterns:
+                if p == c:
+                    _LOGGER.warning(f'Fast no-vars')
+                    return FinitePattern(i, csort, {})
+            return FinitePattern(-1, csort, None)
+
+        
         #pls: T.List[T.Tuple[int, Kore.Pattern]] = list(enumerate(self.pl))
-        subsumer: T.Callable[[Kore.Pattern], T.Tuple[bool, T.Dict[str,str] | None]] = Subsumer(c=c, kdw=self.rs.kdw)
+        subsumer: T.Callable[[Kore.Pattern], T.Tuple[bool, T.Dict[str,str] | None]] = Subsumer(c=c, rs=self.rs)
         #holds: T.List[T.Tuple[bool, T.Dict[str,str] | None]] = [(False, {})]
-        holds: T.List[T.Tuple[bool, T.Dict[str,str] | None]] = self.rs.kcspool.pool.map(subsumer, self.pl)
+        #holds = self.rs.kcspool.pool.map(subsumer, [p for p,i in self.open_patterns])
+        # Lazy map, not parallel
+        holds = map(subsumer, [p for p,i in self.open_patterns])
         for i,(h,renaming) in enumerate(holds):
             if not h:
                 continue
             reversed_renaming = { v:k for k,v in (renaming or dict()).items() }
             _LOGGER.warning(f'(found something)')
-            return FinitePattern(i, csort, reversed_renaming)
+            return FinitePattern(self.open_patterns[i][1], csort, reversed_renaming)
         _LOGGER.warning(f'(no nice pattern found)')
         return FinitePattern(-1, csort, None)
     
@@ -311,15 +342,32 @@ def build_states(rs: ReachabilitySystem, vars_to_avoid: T.Set[Kore.EVar]) -> Sta
     return States(d)
 
 
-def conj_with_subst(rs: ReachabilitySystem, p: Kore.Pattern, s: Substitution) -> Kore.Pattern:
+def conj_with_subst(
+    rs: ReachabilitySystem,
+    p: Kore.Pattern,
+    renaming: T.Dict[str, str],
+    s: Substitution
+) -> Kore.Pattern:
     sort = rs.sortof(p)
-    renaming = KoreUtils.compute_renaming0(
-        vars_to_avoid=list(KoreUtils.free_evars_of_pattern(p)),
-        vars_to_rename=list(itertools.chain(*[list(KoreUtils.free_evars_of_pattern(v)) for k,v in s.mapping.items()]))
-    )
-    s2 = Substitution({k : KoreUtils.rename_vars(renaming, v) for k,v in s.mapping.items()})
-    s_p = s2.kore(sort)
-    return Kore.And(sort, p, s_p)
+    p_renamed_back = KoreUtils.rename_vars(reverse_renaming(renaming), p)
+    # Safety check: all variables of the substitution have to be in the main body
+    evs = KoreUtils.free_evars_of_pattern(p_renamed_back)
+    for ev in s.mapping.keys():
+        if ev not in evs:
+            _LOGGER.error(f'Variable {ev} of substitution is not in renamed-back pattern')
+            _LOGGER.error(f'Subst: {s}')
+            _LOGGER.error(f'pattern: {rs.kprint.kore_to_pretty(p_renamed_back)}')
+            assert(False)
+
+    return Kore.And(sort, p_renamed_back, s.kore(sort))
+    
+    #renaming = KoreUtils.compute_renaming0(
+    #    vars_to_avoid=list(KoreUtils.free_evars_of_pattern(p)),
+    #    vars_to_rename=list(itertools.chain(*[list(KoreUtils.free_evars_of_pattern(v)) for k,v in s.mapping.items()]))
+    #)
+    #s2 = Substitution({k : KoreUtils.rename_vars(renaming, v) for k,v in s.mapping.items()})
+    #s_p = s2.kore(sort)
+    #return Kore.And(sort, p, s_p)
 
 def get_abstract_subst_of_state(
     rs: ReachabilitySystem,
@@ -337,55 +385,115 @@ def get_abstract_subst_of_state(
     abstract_subst: IAbstractSubstitution = subst_domain.abstract(new_subst)
     return abstract_subst
 
+def rename_to_avoid(
+    pattern_to_rename: Kore.Pattern,
+    pattern_to_avoid: Kore.Pattern
+) -> T.Tuple[Kore.Pattern, T.Dict[str, str]]:
+    renaming = KoreUtils.compute_renaming0(
+        vars_to_avoid=list(KoreUtils.free_evars_of_pattern(pattern_to_avoid)),
+        vars_to_rename=list(KoreUtils.free_evars_of_pattern(pattern_to_rename))
+    )
+    st_renamed = KoreUtils.rename_vars(
+        renaming,
+        pattern_to_rename
+    )
+    return st_renamed,renaming
+
+def reverse_renaming(renaming: T.Dict[str, str]) -> T.Dict[str, str]:
+    return {v:k for k,v in renaming.items()}
+
+@dataclasses.dataclass(frozen=True)
+class RawPatternProjection:
+    conj: Kore.Pattern
+    info: StateInfo
+    st_renamed: Kore.Pattern
+    renaming: T.Dict[str, str]
+
+    def with_conj(self, new_conj: Kore.Pattern) -> "RawPatternProjection":
+        return RawPatternProjection(
+            conj=new_conj,
+            info=self.info,
+            st_renamed=self.st_renamed,
+            renaming=self.renaming
+        )
+
+def compute_raw_pattern_projection(
+    rs: ReachabilitySystem,
+    what: Kore.Pattern,
+    to: Kore.Pattern,
+    info: StateInfo
+) -> RawPatternProjection:
+    to_renamed,renaming = rename_to_avoid(to, what)
+    conj = Kore.And(rs.top_sort, what, to_renamed)
+    return RawPatternProjection(
+        conj=conj,
+        info=info,
+        st_renamed=to_renamed,
+        renaming=renaming,
+    )
+
+def compute_list_of_raw_pattern_projections(
+    rs: ReachabilitySystem,
+    states: States,
+    cfgs: T.List[Kore.Pattern],
+) -> T.List[RawPatternProjection]:
+    conjinfos: T.List[RawPatternProjection] = list()
+    for cfg in cfgs:
+        for st,info in states.states.items():
+            conjinfos.append(
+                compute_raw_pattern_projection(
+                    rs,
+                    cfg,
+                    st,
+                    info
+                )
+            )
+    return conjinfos
+
+def compute_raw_concretizations(
+    rs: ReachabilitySystem,
+    subst_domain: IAbstractSubstitutionDomain,
+    conjinfos2: T.List[RawPatternProjection]
+) -> T.List[Kore.Pattern]:
+    new_ps_raw : T.List[Kore.Pattern] = list()
+    for ci2 in conjinfos2:
+            evars = KoreUtils.free_evars_of_pattern(ci2.st_renamed)
+            abstract_subst: IAbstractSubstitution | None = get_abstract_subst_of_state(
+                rs=rs,
+                subst_domain=subst_domain,
+                conj_simplified=ci2.conj,
+                fvs=evars,
+            )
+            if abstract_subst is None:
+                continue
+            is_new: bool = ci2.info.insert(subst_domain, abstract_subst)
+            if is_new:
+                for concretized_subst in subst_domain.concretize(abstract_subst):
+                    #print(f'st vars: {KoreUtils.free_evars_of_pattern(ci2.st_renamed)}')
+                    #print(f'concretized subst vars: {set(concretized_subst.mapping.keys())}')
+                    p0 = conj_with_subst(
+                        rs,
+                        ci2.st_renamed,
+                        ci2.renaming,
+                        concretized_subst
+                    )
+                    _LOGGER.warning(f'New concretized projection: {rs.kprint.kore_to_pretty(p0)}')
+                    new_ps_raw.append(p0)
+    return new_ps_raw
+
 def for_each_match(
     rs: ReachabilitySystem,
     states: States,
     cfgs: T.List[Kore.Pattern],
     subst_domain: IAbstractSubstitutionDomain,
 ) -> T.List[Kore.Pattern]:
-    conjinfos: T.List[T.Tuple[Kore.Pattern, StateInfo, Kore.Pattern]] = list()
-    for cfg in cfgs:
-        for st,info in states.states.items():
-            renaming = KoreUtils.compute_renaming0(
-                vars_to_avoid=list(KoreUtils.free_evars_of_pattern(cfg)),
-                vars_to_rename=list(KoreUtils.free_evars_of_pattern(st))
-            )
-            st_renamed = KoreUtils.rename_vars(
-                renaming,
-                st
-            )
-            conj = Kore.And(rs.top_sort, cfg, st_renamed)
-            conjinfos.append((
-                conj,
-                info,
-                st_renamed,
-            ))
-    
-    conjs: T.List[Kore.Pattern] = [ci[0] for ci in conjinfos]
-    infos: T.List[StateInfo] = [ci[1] for ci in conjinfos]
-    strenameds: T.List[Kore.Pattern] = [ci[2] for ci in conjinfos]
-    _LOGGER.warning(f'Simplifying {len(conjs)} items at once')
-    conjs_simplified = rs.map_simplify(conjs)
+    conjinfos: T.List[RawPatternProjection] = compute_list_of_raw_pattern_projections(rs, states, cfgs)
+    _LOGGER.warning(f'Simplifying {len(conjinfos)} items at once')
+    conjs_simplified = rs.map_simplify([ci.conj for ci in conjinfos])
+    _LOGGER.warning(f'done.')
+    conjinfos2: T.List[RawPatternProjection] = [ci.with_conj(conj2) for ci,conj2 in zip(conjinfos, conjs_simplified)]
 
-    new_ps_raw : T.List[Kore.Pattern] = list()
-    for simplified,info,st_renamed in zip(conjs_simplified, infos, strenameds):
-            evars = KoreUtils.free_evars_of_pattern(st_renamed)
-            abstract_subst: IAbstractSubstitution | None = get_abstract_subst_of_state(
-                rs=rs,
-                subst_domain=subst_domain,
-                conj_simplified=simplified,
-                fvs=evars,
-            )
-            if abstract_subst is None:
-                continue
-            is_new: bool = info.insert(subst_domain, abstract_subst)
-            if is_new:
-                for concretized_subst in subst_domain.concretize(abstract_subst):
-                    #concretized_renamed_subst = KoreUtils.rename_vars(renaming, phi)
-                    print(f'st vars: {KoreUtils.free_evars_of_pattern(st_renamed)}')
-                    print(f'concretized subst vars: {set(concretized_subst.mapping.keys())}')
-                    p0 = conj_with_subst(rs, st_renamed, concretized_subst)
-                    new_ps_raw.append(p0)
+    new_ps_raw : T.List[Kore.Pattern] = compute_raw_concretizations(rs, subst_domain, conjinfos2)
 
     _LOGGER.warning(f'Simplifying {len(new_ps_raw)} items at once (second)')
     #for pr in new_ps_raw:
@@ -394,7 +502,7 @@ def for_each_match(
     _LOGGER.warning(f'(done)')
     new_ps: T.List[Kore.Pattern] = list()
     for p in new_ps_0:
-        print(f'Cleaning up')
+        #print(f'Cleaning up')
         p2 = RSUtils.cleanup_pattern(rs, p)
         new_ps.append(p2)
     return new_ps
@@ -416,6 +524,14 @@ def build_abstract_substitution_domain(
     subst_domain: IAbstractSubstitutionDomain = CartesianAbstractSubstitutionDomain(pattern_domain)
     return subst_domain
 
+def get_successors(rs: ReachabilitySystem, cfg: Kore.Pattern) -> T.List[Kore.Pattern]:
+    exec_result: KoreRpc.ExecuteResult = rs.execute_step(cfg)
+    if exec_result.next_states is not None:
+        successors = [s.kore for s in exec_result.next_states]
+    else:
+        successors = [exec_result.state.kore]
+    return successors
+
 def analyze(
     rs: ReachabilitySystem,
     subst_domain: IAbstractSubstitutionDomain,
@@ -428,13 +544,9 @@ def analyze(
     while len(current_ps) > 0:
         _LOGGER.warning(f'remaining {len(current_ps)} states')
         cfg = current_ps.pop()
-        cfg = normalize_pattern(cfg)
+        #cfg = normalize_pattern(cfg)
         #_LOGGER.warning(f'cfg {rs.kprint.kore_to_pretty(cfg)}')
-        exec_result: KoreRpc.ExecuteResult = rs.execute_step(cfg)
-        if exec_result.next_states is not None:
-            successors = [s.kore for s in exec_result.next_states]
-        else:
-            successors = [exec_result.state.kore]
+        successors = [normalize_pattern(s) for s in get_successors(rs, cfg)]
         _LOGGER.warning(f'Has {len(successors)} successors')
         new_ps: T.List[Kore.Pattern] = for_each_match(rs, states, successors, subst_domain)
         _LOGGER.warning(f'After processing: {len(new_ps)} states')
