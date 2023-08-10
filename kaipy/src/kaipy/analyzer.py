@@ -352,12 +352,14 @@ def conj_with_subst(
     p_renamed_back = KoreUtils.rename_vars(reverse_renaming(renaming), p)
     # Safety check: all variables of the substitution have to be in the main body
     evs = KoreUtils.free_evars_of_pattern(p_renamed_back)
-    for ev in s.mapping.keys():
-        if ev not in evs:
-            _LOGGER.error(f'Variable {ev} of substitution is not in renamed-back pattern')
-            _LOGGER.error(f'Subst: {s}')
-            _LOGGER.error(f'pattern: {rs.kprint.kore_to_pretty(p_renamed_back)}')
-            assert(False)
+    #for ev in s.mapping.keys():
+    #    if ev not in evs:
+    #        _LOGGER.error(f'Variable {ev} of substitution is not in renamed-back pattern')
+    #        _LOGGER.error(f'Subst: {s}')
+    #        for ev0 in s.mapping.keys():
+    #            _LOGGER.error(f'{ev0} ===> {rs.kprint.kore_to_pretty(s.mapping[ev0])}')
+    #        _LOGGER.error(f'pattern: {rs.kprint.kore_to_pretty(p_renamed_back)}')
+    #        assert(False)
 
     return Kore.And(sort, p_renamed_back, s.kore(sort))
     
@@ -457,6 +459,8 @@ def compute_raw_concretizations(
 ) -> T.List[Kore.Pattern]:
     new_ps_raw : T.List[Kore.Pattern] = list()
     for ci2 in conjinfos2:
+            #_LOGGER.warning(f'crawcon: st_renamed = {rs.kprint.kore_to_pretty(ci2.st_renamed)}')
+            _LOGGER.warning(f'crawcon: renaming = {ci2.renaming}')
             evars = KoreUtils.free_evars_of_pattern(ci2.st_renamed)
             abstract_subst: IAbstractSubstitution | None = get_abstract_subst_of_state(
                 rs=rs,
@@ -466,19 +470,17 @@ def compute_raw_concretizations(
             )
             if abstract_subst is None:
                 continue
+            _LOGGER.warning(f'Abstract subst: {abstract_subst}')
             is_new: bool = ci2.info.insert(subst_domain, abstract_subst)
             if is_new:
                 for concretized_subst in subst_domain.concretize(abstract_subst):
                     #print(f'st vars: {KoreUtils.free_evars_of_pattern(ci2.st_renamed)}')
                     #print(f'concretized subst vars: {set(concretized_subst.mapping.keys())}')
-                    p0 = conj_with_subst(
-                        rs,
-                        ci2.st_renamed,
-                        ci2.renaming,
-                        concretized_subst
-                    )
-                    _LOGGER.warning(f'New concretized projection: {rs.kprint.kore_to_pretty(p0)}')
-                    new_ps_raw.append(p0)
+                    sort = rs.kdw.sortof(ci2.st_renamed)
+                    p0 = Kore.And(sort, ci2.st_renamed, concretized_subst.kore(sort))
+                    p1 = KoreUtils.rename_vars(ci2.renaming, p0)
+                    #_LOGGER.warning(f'New concretized projection: {rs.kprint.kore_to_pretty(p1)}')
+                    new_ps_raw.append(p1)
     return new_ps_raw
 
 def for_each_match(
@@ -491,7 +493,8 @@ def for_each_match(
     _LOGGER.warning(f'Simplifying {len(conjinfos)} items at once')
     conjs_simplified = rs.map_simplify([ci.conj for ci in conjinfos])
     _LOGGER.warning(f'done.')
-    conjinfos2: T.List[RawPatternProjection] = [ci.with_conj(conj2) for ci,conj2 in zip(conjinfos, conjs_simplified)]
+    conjinfos2: T.List[RawPatternProjection] = [ci.with_conj(conj2) for ci,conj2 in zip(conjinfos, conjs_simplified) if not KoreUtils.is_bottom(conj2)]
+    _LOGGER.warning(f'Non-bottoms: {len(conjinfos2)}')
 
     new_ps_raw : T.List[Kore.Pattern] = compute_raw_concretizations(rs, subst_domain, conjinfos2)
 
@@ -538,8 +541,8 @@ def analyze(
     initial_configuration: Kore.Pattern,
 ) -> States:
     states: States = build_states(rs, KoreUtils.free_evars_of_pattern(initial_configuration))
-    #print(f'initial: {rs.kprint.kore_to_pretty(initial_configuration)}')
-    cfgs = [normalize_pattern(initial_configuration)]
+    cfgs = [normalize_pattern(rs.simplify(initial_configuration))]
+    #_LOGGER.warning(f'initial: {rs.kprint.kore_to_pretty(cfgs[0])}')
     current_ps = for_each_match(rs, states, cfgs, subst_domain)
     while len(current_ps) > 0:
         _LOGGER.warning(f'remaining {len(current_ps)} states')
@@ -548,6 +551,8 @@ def analyze(
         #_LOGGER.warning(f'cfg {rs.kprint.kore_to_pretty(cfg)}')
         successors = [normalize_pattern(s) for s in get_successors(rs, cfg)]
         _LOGGER.warning(f'Has {len(successors)} successors')
+        #for succ in successors:
+        #    _LOGGER.warning(f'succ: {rs.kprint.kore_to_pretty(succ)}')
         new_ps: T.List[Kore.Pattern] = for_each_match(rs, states, successors, subst_domain)
         _LOGGER.warning(f'After processing: {len(new_ps)} states')
         current_ps.extend(new_ps)
