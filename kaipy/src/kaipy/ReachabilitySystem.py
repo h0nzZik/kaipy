@@ -259,6 +259,8 @@ class ReachabilitySystem:
         return self.kdw.sortof(p)
 
 
+    # TODO simplify, return only the boolean component
+    # (the generality is not used)
     def subsumes(self, ant: Kore.Pattern, con: Kore.Pattern) -> T.Tuple[bool, T.Dict[str,str] | None]:
         renaming = KoreUtils.compute_renaming0(
             vars_to_avoid=list(KoreUtils.free_evars_of_pattern(ant)),
