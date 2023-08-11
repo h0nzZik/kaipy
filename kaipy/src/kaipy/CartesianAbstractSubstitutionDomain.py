@@ -1,6 +1,7 @@
 import dataclasses
 import typing as T
 import pprint
+import itertools
 
 from immutabledict import immutabledict
 
@@ -44,7 +45,32 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
         for k in concretes:
             assert not KoreUtils.is_top(concretes[k])
 
-        return {Substitution(immutabledict(concretes))}
+        # It might happen that there are two evars, e1 and e2,
+        # that are mapped to patterns p1 and p2, respectively,
+        # such that p1 and p2 share some variable `v`.
+        # This is unfortunate, because `v` in `p1` is unrelated
+        # to `v` in `p2`, but the underlying pattern substitution
+        # can not do anything about it. So we handle the case here.
+        
+        # Rename all the variables
+        vars_to_rename = list(itertools.chain(*[
+                    list(KoreUtils.free_evars_of_pattern(p))
+                    for p in concretes.values()
+                ]))
+        vars_to_avoid: T.Set[Kore.EVar] = set()
+        concretes_renamed: T.Dict[Kore.EVar, Kore.Pattern] = dict()
+        for k,v in concretes.items():
+            # But compute a separate renaming for each component
+            renaming = KoreUtils.compute_renaming0(
+                vars_to_avoid=list(vars_to_avoid),
+                vars_to_rename=vars_to_rename
+            )
+            v_renamed = KoreUtils.rename_vars(renaming, v)
+            concretes_renamed[k] = v_renamed
+            vars_to_avoid = vars_to_avoid.union(
+                KoreUtils.free_evars_of_pattern(v_renamed)
+            )
+        return {Substitution(immutabledict(concretes_renamed))}
     
     def subsumes(self, a1: IAbstractSubstitution, a2: IAbstractSubstitution) -> bool:
         assert type(a1) is CartesianAbstractSubstitution
