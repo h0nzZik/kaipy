@@ -124,8 +124,9 @@ def build_states(rs: ReachabilitySystem, vars_to_avoid: T.Set[Kore.EVar]) -> Sta
                     ),
                     pattern,
                 )
-                info = StateInfo(pattern=pattern_renamed, description=original_rule_label, substitutions=[])
-                d[pattern_renamed] = info
+                pattern_clean = RSUtils.cleanup_pattern(rs, rs.simplify(pattern_renamed))
+                info = StateInfo(pattern=pattern_clean, description=original_rule_label, substitutions=[])
+                d[pattern_clean] = info
                 d2[original_rule_label] = info
                 #print(f'renamed LHS (new state): {rs.kprint.kore_to_pretty(pattern_renamed)}')
     return States(states_by_pattern=d, states_by_id=d2)
