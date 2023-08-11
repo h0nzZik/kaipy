@@ -100,7 +100,7 @@ class FinitePatternDomain(IAbstractPatternDomain):
             for p,i in self.closed_patterns:
                 if p == c:
                     #_LOGGER.warning(f'Fast no-vars')
-                    return FinitePattern(self.closed_patterns[i][1], csort, {})
+                    return FinitePattern(i, csort, {})
 
             # We should NOT abstract `c` as Top yet,
             # because there might be some open pattern that matches it
@@ -122,7 +122,8 @@ class FinitePatternDomain(IAbstractPatternDomain):
                 continue
             reversed_renaming = { v:k for k,v in (renaming or dict()).items() }
             #_LOGGER.warning(f'(found something)')
-            return FinitePattern(self.open_patterns[i][1], csort, reversed_renaming)
+            #return FinitePattern(self.open_patterns[i][1], csort, reversed_renaming)
+            return FinitePattern(self.open_patterns[i][1], csort, dict())
         #_LOGGER.warning(f'(no nice pattern found)')
         return FinitePattern(-1, csort, None)
     
