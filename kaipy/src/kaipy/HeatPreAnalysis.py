@@ -219,10 +219,10 @@ def collect_rests(
         new_rest: Kore.Pattern = mapping[
             Kore.EVar(name="VARREST", sort=Kore.SortApp(name="SortK"))
         ]
-        # _LOGGER.info(f"new term: {rs.kprint.kore_to_pretty(new_term)}")
-        # _LOGGER.info(f"new rest: {rs.kprint.kore_to_pretty(new_rest)}")
+        #_LOGGER.warning(f"new term: {rs.kprint.kore_to_pretty(new_term)}")
+        #_LOGGER.warning(f"new rest: {rs.kprint.kore_to_pretty(new_rest)}")
         if stage == "heating":
-            _LOGGER.info(f"adding new rest")
+            #_LOGGER.warning(f"adding new rest")
             collected.append(new_rest)
 
         term = new_term
