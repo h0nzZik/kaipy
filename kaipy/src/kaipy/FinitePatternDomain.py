@@ -71,6 +71,7 @@ class FinitePatternDomain(IAbstractPatternDomain):
         self.closed_patterns = []
         self.open_patterns = []
         for i,p in enumerate(self.pl):
+            _LOGGER.warning(f"FPD {i}: {self.rs.kprint.kore_to_pretty(p)}")
             if len(KoreUtils.free_evars_of_pattern(p)) == 0:
                 self.closed_patterns.append((p, i))
             else:
@@ -82,12 +83,12 @@ class FinitePatternDomain(IAbstractPatternDomain):
     
     def abstract(self, c: Kore.Pattern) -> FinitePattern:
         csort = self.rs.sortof(c)
-        _LOGGER.warning(f'abstracting {c.text}')
+        #_LOGGER.warning(f'abstracting {c.text}')
         # Optimization
         match c:
             case Kore.EVar(_, _):
                 # TODO generalize this to `inj(EVar)``
-                _LOGGER.warning(f'Fast -1')
+                #_LOGGER.warning(f'Fast -1')
                 return FinitePattern(-1, csort, None)
         
         # another optimization: for terms without free variables
@@ -98,8 +99,10 @@ class FinitePatternDomain(IAbstractPatternDomain):
         if len(KoreUtils.free_evars_of_pattern(c)) == 0:
             for p,i in self.closed_patterns:
                 if p == c:
-                    _LOGGER.warning(f'Fast no-vars')
+                    #_LOGGER.warning(f'Fast no-vars')
                     return FinitePattern(i, csort, {})
+
+            _LOGGER.warning(f"** Abstraction closed pattern {self.rs.kprint.kore_to_pretty(c)} as Top")
             return FinitePattern(-1, csort, None)
 
         
@@ -113,9 +116,9 @@ class FinitePatternDomain(IAbstractPatternDomain):
             if not h:
                 continue
             reversed_renaming = { v:k for k,v in (renaming or dict()).items() }
-            _LOGGER.warning(f'(found something)')
+            #_LOGGER.warning(f'(found something)')
             return FinitePattern(self.open_patterns[i][1], csort, reversed_renaming)
-        _LOGGER.warning(f'(no nice pattern found)')
+        #_LOGGER.warning(f'(no nice pattern found)')
         return FinitePattern(-1, csort, None)
     
     def is_top(self, a: IAbstractPattern) -> bool:
@@ -150,4 +153,6 @@ class FinitePatternDomain(IAbstractPatternDomain):
         return self.rs.subsumes(self.concretize(a1), self.concretize(a2))[0]
 
     def print(self, a: IAbstractPattern) -> str:
-        return self.rs.kprint.kore_to_pretty(self.concretize(a))
+        c = self.concretize(a)
+        assert not KoreUtils.is_top(c)
+        return self.rs.kprint.kore_to_pretty(c)

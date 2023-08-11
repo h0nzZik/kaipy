@@ -3,6 +3,7 @@ import dataclasses
 import itertools
 import functools
 import logging
+import pprint
 import typing as T
 
 from immutabledict import immutabledict
@@ -57,11 +58,17 @@ class StateInfo:
         abstract_domain: IAbstractSubstitutionDomain,
         abstract_subst: IAbstractSubstitution,
     ) -> bool:
+        if self.description == 'IMP.assignment':
+            _LOGGER.warning(f'inserting {pprint.pformat(abstract_domain.print(abstract_subst))}')
         for sub in self.substitutions:
             if abstract_domain.subsumes(abstract_subst, sub):
+                if self.description == 'IMP.assignment':
+                    _LOGGER.warning(f'(subsumed)')
                 return False
 
-        self.substitutions.append(abstract_subst)        
+        self.substitutions.append(abstract_subst)
+        if self.description == 'IMP.assignment':        
+            _LOGGER.warning(f'(new)')
         return True
 
 
@@ -84,7 +91,7 @@ class States:
     def info_by_pattern(self, pattern: Kore.Pattern):
         return self.states_by_pattern[pattern]
 
-    def print_states(
+    def print(
         self,
         kprint: KPrint,
         subst_domain: IAbstractSubstitutionDomain
@@ -129,16 +136,20 @@ def get_abstract_subst_of_state(
     subst_domain: IAbstractSubstitutionDomain,
     conj_simplified : Kore.Pattern,
     fvs: T.Set[Kore.EVar],
-) -> IAbstractSubstitution | None:
+    renaming: T.Dict[str,str]
+) -> T.Tuple[IAbstractSubstitution,Substitution] | None:
     if KoreUtils.is_bottom(conj_simplified):
         return None
     eqls: T.Dict[Kore.EVar, Kore.Pattern] = KoreUtils.extract_equalities_from_witness(
         {ev.name for ev in fvs},
         conj_simplified
     )
-    new_subst = Substitution(immutabledict(eqls))
+    eqls_filtered = {k:v for k,v in eqls.items() if not KoreUtils.is_top(v)}
+    renaming_back = reverse_renaming(renaming)
+    eqls_filtered_renamed = { Kore.EVar(name=renaming_back[k.name], sort=k.sort):v for k,v in eqls_filtered.items()}
+    new_subst = Substitution(immutabledict(eqls_filtered_renamed))
     abstract_subst: IAbstractSubstitution = subst_domain.abstract(new_subst)
-    return abstract_subst
+    return abstract_subst,new_subst
 
 def rename_to_avoid(
     pattern_to_rename: Kore.Pattern,
@@ -161,6 +172,7 @@ def reverse_renaming(renaming: T.Dict[str, str]) -> T.Dict[str, str]:
 class RawPatternProjection:
     conj: Kore.Pattern
     info: StateInfo
+    st: Kore.Pattern
     st_renamed: Kore.Pattern
     renaming: T.Dict[str, str]
 
@@ -168,6 +180,7 @@ class RawPatternProjection:
         return RawPatternProjection(
             conj=new_conj,
             info=self.info,
+            st=self.st,
             st_renamed=self.st_renamed,
             renaming=self.renaming
         )
@@ -183,6 +196,7 @@ def compute_raw_pattern_projection(
     return RawPatternProjection(
         conj=conj,
         info=info,
+        st=to,
         st_renamed=to_renamed,
         renaming=renaming,
     )
@@ -213,27 +227,37 @@ def compute_raw_concretizations(
     new_ps_raw : T.List[Kore.Pattern] = list()
     for ci2 in conjinfos2:
             #_LOGGER.warning(f'crawcon: st_renamed = {rs.kprint.kore_to_pretty(ci2.st_renamed)}')
-            _LOGGER.warning(f'crawcon: renaming = {ci2.renaming}')
+            #_LOGGER.warning(f'crawcon: renaming = {ci2.renaming}')
             evars = KoreUtils.free_evars_of_pattern(ci2.st_renamed)
-            abstract_subst: IAbstractSubstitution | None = get_abstract_subst_of_state(
+            ac_subst: T.Tuple[IAbstractSubstitution,Substitution] | None = get_abstract_subst_of_state(
                 rs=rs,
                 subst_domain=subst_domain,
                 conj_simplified=ci2.conj,
                 fvs=evars,
+                renaming=ci2.renaming,
             )
-            if abstract_subst is None:
+            if ac_subst is None:
                 continue
-            _LOGGER.warning(f'Abstract subst: {abstract_subst}')
+            abstract_subst,concrete_subst = ac_subst
+            if ci2.info.description == 'IMP.assignment':
+                _LOGGER.warning(f'Concrete subst: {concrete_subst}')
+                _LOGGER.warning(f'Abstract subst: {abstract_subst}')
+                
+            #_LOGGER.warning(f'Abstract subst: {abstract_subst}')
             is_new: bool = ci2.info.insert(subst_domain, abstract_subst)
             if is_new:
                 for concretized_subst in subst_domain.concretize(abstract_subst):
                     #print(f'st vars: {KoreUtils.free_evars_of_pattern(ci2.st_renamed)}')
                     #print(f'concretized subst vars: {set(concretized_subst.mapping.keys())}')
-                    sort = rs.kdw.sortof(ci2.st_renamed)
-                    p0 = Kore.And(sort, ci2.st_renamed, concretized_subst.kore(sort))
-                    p1 = KoreUtils.rename_vars(ci2.renaming, p0)
+                    #sort = rs.kdw.sortof(ci2.st_renamed)
+                    #p0 = Kore.And(sort, ci2.st_renamed, concretized_subst.kore(sort))
+                    #p1 = KoreUtils.rename_vars(ci2.renaming, p0)
                     #_LOGGER.warning(f'New concretized projection: {rs.kprint.kore_to_pretty(p1)}')
-                    new_ps_raw.append(p1)
+                    #new_ps_raw.append(p1)
+                    sort = rs.kdw.sortof(ci2.st)
+                    p0 = Kore.And(sort, ci2.st, concretized_subst.kore(sort))
+                    #_LOGGER.warning(f'New concretized projection: {rs.kprint.kore_to_pretty(p0)}')
+                    new_ps_raw.append(p0)
     return new_ps_raw
 
 def for_each_match(

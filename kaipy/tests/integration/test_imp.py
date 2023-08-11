@@ -101,12 +101,9 @@ class TestImp(MyTest):
             initial_configuration=input_pattern,
         )
         _LOGGER.info(reachability_system.stats.dict)
-        #kaipy.analyzer.print_states(
-        #    states,
-        #    rs=reachability_system,
-        #    subst_domain=subst_domain
-        #)
-        #assert(False) # To print stuff
+        states.states_by_id['IMP.assignment'].print(kprint=reachability_system.kprint, subst_domain=subst_domain)
+        #states.print(kprint=reachability_system.kprint, subst_domain=subst_domain)
+        assert(False) # To print stuff
 
     # def test_execute_var(self, reachability_system: ReachabilitySystem):
     #     #x = Kore.EVar("VARX", KorePrelude.SORT_K_ITEM)

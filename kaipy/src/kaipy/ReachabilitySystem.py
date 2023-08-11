@@ -16,7 +16,6 @@ import pyk.kore.rpc as KoreRpc
 from pyk.ktool.kprint import KPrint
 
 from .PerfCounter import PerfCounter
-#from .kcommands import KORE_RPC_COMMAND
 from .KompiledDefinitionWrapper import KompiledDefinitionWrapper
 import kaipy.kore_utils as KoreUtils
 

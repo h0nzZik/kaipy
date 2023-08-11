@@ -1,10 +1,12 @@
 import dataclasses
 import typing as T
+import pprint
 
 from immutabledict import immutabledict
 
 import pyk.kore.syntax as Kore
 
+import kaipy.kore_utils as KoreUtils
 from kaipy.Substitution import Substitution
 from kaipy.IAbstractPatternDomain import IAbstractPatternDomain, IAbstractPattern
 from kaipy.IAbstractSubstitutionDomain import IAbstractSubstitution, IAbstractSubstitutionDomain
@@ -21,12 +23,12 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
         self.pattern_domain = pattern_domain
     
     def abstract(self, subst: Substitution) -> IAbstractSubstitution:
-        return CartesianAbstractSubstitution(
-            {
+        m = {
                 v : self.pattern_domain.abstract(p)
                 for (v,p) in subst.mapping.items()
             }
-        )
+        m_filtered = {k:v for k,v in m.items() if not self.pattern_domain.is_top(v)}
+        return CartesianAbstractSubstitution(m_filtered)
 
     def concretize(self, a: IAbstractSubstitution) -> T.Set[Substitution]:
         assert type(a) is CartesianAbstractSubstitution
@@ -39,6 +41,9 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
             for k,v in a.mapping.items()
             if not self.pattern_domain.is_top(v)
         }
+        for k in concretes:
+            assert not KoreUtils.is_top(concretes[k])
+
         return {Substitution(immutabledict(concretes))}
     
     def subsumes(self, a1: IAbstractSubstitution, a2: IAbstractSubstitution) -> bool:
@@ -60,4 +65,4 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
 
     def print(self, a: IAbstractSubstitution) -> str:
         assert type(a) is CartesianAbstractSubstitution
-        return str({ k: self.pattern_domain.print(v) for k,v in a.mapping.items() })
+        return pprint.pformat({ k: self.pattern_domain.print(v) for k,v in a.mapping.items() })

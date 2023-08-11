@@ -189,7 +189,7 @@ def collect_rests(
             # There should be one subsequent state and one residual
             if len(execute_result.next_states) != 2:
                 _LOGGER.warning(
-                    f"Too much ({len(execute_result.next_states)}) next states; ending the analysis"
+                    f"Too many ({len(execute_result.next_states)}) next states; ending the analysis"
                 )
                 return HPAResult(collected, irreducibles)
                 for i, ns in enumerate(execute_result.next_states):
