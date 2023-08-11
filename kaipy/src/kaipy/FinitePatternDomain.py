@@ -145,9 +145,12 @@ class FinitePatternDomain(IAbstractPatternDomain):
 
         if a2.idx == -1:
             return True
-        ## I am not sure if this is a valid optimization. It would be nice
-        # if a1.idx == a2.idx:
-        #     return True
+
+        # In this case, self.concretize(a1) and self.concretize(a2)
+        # differe only in naming of variables, and therefore the subsumption
+        # holds.
+        if a1.idx == a2.idx:
+            return True
 
         if self.is_top(a2):
             return True
