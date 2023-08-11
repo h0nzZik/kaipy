@@ -63,6 +63,7 @@ class FinitePatternDomain(IAbstractPatternDomain):
     rs : ReachabilitySystem
     closed_patterns: T.List[T.Tuple[Kore.Pattern, int]]
     open_patterns: T.List[T.Tuple[Kore.Pattern, int]]
+    subsumption_matrix: T.Set[T.Tuple[int,int]]
 
     def __init__(self, pl: T.List[Kore.Pattern], rs: ReachabilitySystem):
         self.pl = pl
@@ -80,6 +81,19 @@ class FinitePatternDomain(IAbstractPatternDomain):
         #print("Finite domain:")
         #for i, a_rest in enumerate(pl):
         #    print(f"{i}: {rs.kprint.kore_to_pretty(a_rest)}")
+        self.subsumption_matrix = set()
+        for i,p in enumerate(pl):
+            for j,q in enumerate(pl):
+                # make it irreflexive
+                if i == j:
+                    continue
+                if self.rs.sortof(p) != self.rs.sortof(q):
+                    continue
+                if self.rs.subsumes(p, q)[0]:
+                    # `q` is more general
+                    self.subsumption_matrix.add((i,j))
+        _LOGGER.warning(f'Computed subsumption matrix (size {len(self.subsumption_matrix)})')
+        #_LOGGER.warning(f'{self.subsumption_matrix}')
     
     def abstract(self, c: Kore.Pattern) -> FinitePattern:
         csort = self.rs.sortof(c)
@@ -117,14 +131,33 @@ class FinitePatternDomain(IAbstractPatternDomain):
         #holds = self.rs.kcspool.pool.map(subsumer, [p for p,i in self.open_patterns])
         # Lazy map, not parallel
         holds = map(subsumer, [p for p,i in self.open_patterns])
+        fpl: T.List[FinitePattern] = list()
         for i,(h,renaming) in enumerate(holds):
             if not h:
                 continue
             reversed_renaming = { v:k for k,v in (renaming or dict()).items() }
             #_LOGGER.warning(f'(found something)')
-            return FinitePattern(self.open_patterns[i][1], csort, reversed_renaming)
-        #_LOGGER.warning(f'(no nice pattern found)')
-        return FinitePattern(-1, csort, None)
+            fp = FinitePattern(self.open_patterns[i][1], csort, reversed_renaming)
+            fpl.append(fp)
+        if len(fpl) == 0:
+            #_LOGGER.warning(f'no nice pattern found for {self.rs.kprint.kore_to_pretty(c)}')
+            return FinitePattern(-1, csort, None)
+        if len(fpl) == 1:
+            #_LOGGER.warning(f'unique nice pattern found')
+            return fpl[0]
+        _LOGGER.warning(f'NO unique nice pattern found - multiple found. Candidates:')
+        for fp in fpl:
+            _LOGGER.warning(f'  have {fp} as:')
+            _LOGGER.warning(f'  {self.rs.kprint.kore_to_pretty(self.concretize(fp))}')
+        
+
+        fp1 = fpl[0]
+        for fp2 in fpl[1:]:
+            if not (fp1.idx,fp2.idx) in self.subsumption_matrix:
+                _LOGGER.warning(f'Replacing with other (NOT more general)')
+                fp1 = fp2
+        _LOGGER.warning(f"Choosing {fp1.idx}")
+        return fp1
     
     def is_top(self, a: IAbstractPattern) -> bool:
         assert type(a) is FinitePattern
