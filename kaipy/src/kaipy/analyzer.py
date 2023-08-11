@@ -84,7 +84,7 @@ class StateInfo:
             print(f'  substitution {i}:')
             for k,v in concrete.mapping.items():
                 print(f'    {k}:')
-                print(f'    {kprint.kore_to_pretty(v)}:')
+                print(f'    {kprint.kore_to_pretty(v)}')
             #print(f'{subst_domain.print(subst)}')
 
 
@@ -278,21 +278,21 @@ def for_each_match(
     subst_domain: IAbstractSubstitutionDomain,
 ) -> T.List[Kore.Pattern]:
     conjinfos: T.List[RawPatternProjection] = compute_list_of_raw_pattern_projections(rs, states, cfgs)
-    _LOGGER.warning(f'Simplifying {len(conjinfos)} items at once')
+    #_LOGGER.warning(f'Simplifying {len(conjinfos)} items at once')
     conjs_simplified = rs.map_simplify([ci.conj for ci in conjinfos])
-    _LOGGER.warning(f'done.')
+    #_LOGGER.warning(f'done.')
     conjinfos2: T.List[RawPatternProjection] = [ci.with_conj(conj2) for ci,conj2 in zip(conjinfos, conjs_simplified) if not KoreUtils.is_bottom(conj2)]
-    _LOGGER.warning(f'Non-bottoms: {len(conjinfos2)}')
+    #_LOGGER.warning(f'Non-bottoms: {len(conjinfos2)}')
 
     new_ps_raw : T.List[Kore.Pattern] = compute_raw_concretizations(rs, subst_domain, conjinfos2)
 
     # We do not need to simplify anymore
-    _LOGGER.warning(f'Simplifying {len(new_ps_raw)} items at once (second)')
+    #_LOGGER.warning(f'Simplifying {len(new_ps_raw)} items at once (second)')
     #for pr in new_ps_raw:
     #    _LOGGER.warning(f'Item: {rs.kprint.kore_to_pretty(pr)}')
     #new_ps_0 = rs.map_simplify(new_ps_raw)
     new_ps_0 = new_ps_raw
-    _LOGGER.warning(f'(done)')
+    #_LOGGER.warning(f'(done)')
     new_ps: T.List[Kore.Pattern] = list()
     for p in new_ps_0:
         #print(f'Cleaning up')
@@ -328,11 +328,11 @@ def analyze(
         _LOGGER.warning(f'remaining {len(current_ps)} states')
         cfg = current_ps.pop()
         #cfg = normalize_pattern(cfg)
-        #_LOGGER.warning(f'cfg {rs.kprint.kore_to_pretty(cfg)}')
+        _LOGGER.warning(f'cfg {rs.kprint.kore_to_pretty(cfg)}')
         successors = [normalize_pattern(s) for s in get_successors(rs, cfg)]
         _LOGGER.warning(f'Has {len(successors)} successors')
-        #for succ in successors:
-        #    _LOGGER.warning(f'succ: {rs.kprint.kore_to_pretty(succ)}')
+        for succ in successors:
+            _LOGGER.warning(f'succ: {rs.kprint.kore_to_pretty(succ)}')
         new_ps: T.List[Kore.Pattern] = for_each_match(rs, states, successors, subst_domain)
         _LOGGER.warning(f'After processing: {len(new_ps)} states')
         current_ps.extend(new_ps)
