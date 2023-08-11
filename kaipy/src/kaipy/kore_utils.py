@@ -212,6 +212,75 @@ def rename_vars(renaming: T.Dict[str, str], phi: Kore.Pattern) -> Kore.Pattern:
     raise NotImplementedError()
 
 
+
+# This is very similar as as `rename_vars`
+def apply_subst(subst: T.Mapping[Kore.EVar, Kore.Pattern], phi: Kore.Pattern) -> Kore.Pattern:
+    match phi:
+        # The main case
+        case Kore.EVar(name, sort):
+            if Kore.EVar(name, sort) in subst:
+                return subst[Kore.EVar(name, sort)]
+            return Kore.EVar(name, sort)
+
+        # The recursive cases
+        case Kore.App(symbol_name, sorts, args):
+            return Kore.App(
+                symbol_name, sorts, tuple(map(lambda p: apply_subst(subst, p), args))
+            )
+        case Kore.Not(sort, pattern):
+            return Kore.Not(sort, apply_subst(subst, pattern))
+        case Kore.And(sort, left, right):
+            return Kore.And(
+                sort, apply_subst(subst, left), apply_subst(subst, right)
+            )
+        case Kore.Or(sort, left, right):
+            return Kore.Or(
+                sort, apply_subst(subst, left), apply_subst(subst, right)
+            )
+        case Kore.Implies(sort, left, right):
+            return Kore.Implies(
+                sort, apply_subst(subst, left), apply_subst(subst, right)
+            )
+        case Kore.Iff(sort, left, right):
+            return Kore.Iff(
+                sort, apply_subst(subst, left), apply_subst(subst, right)
+            )
+        case Kore.Exists(sort, var, pattern):
+            new_dict = dict(subst)
+            new_dict.update({var: var})
+            return Kore.Exists(sort, var, apply_subst(new_dict, pattern))
+        case Kore.Forall(sort, var, pattern):
+            new_dict = dict(subst)
+            new_dict.update({var: var})
+            return Kore.Forall(sort, var, apply_subst(new_dict, pattern))
+        # Base cases
+        case Kore.Equals(op_sort, sort, left, right):
+            return Kore.Equals(
+                op_sort, sort, apply_subst(subst, left), apply_subst(subst, right)
+            )
+        case Kore.In(op_sort, sort, left, right):
+            return Kore.In(
+                op_sort, sort, apply_subst(subst, left), apply_subst(subst, right)
+            )
+        case Kore.DV(_, _):
+            return phi
+        case Kore.SVar(_, _):
+            return phi
+        case Kore.String(_):
+            return phi
+        case Kore.Top(_):
+            return phi
+        case Kore.Bottom(_):
+            return phi
+        case Kore.Ceil(op_sort, sort, pattern):
+            return Kore.Ceil(op_sort, sort, apply_subst(subst, pattern))
+        case Kore.Floor(op_sort, sort, pattern):
+            return Kore.Floor(op_sort, sort, apply_subst(subst, pattern))
+        case _:
+            print(f"substitution not implemented for {phi}")
+            raise NotImplementedError()
+    raise NotImplementedError()
+
 def free_occs_det(pattern: Kore.Pattern) -> list[Kore.EVar]:
     occurrences: list[Kore.EVar] = []
 
