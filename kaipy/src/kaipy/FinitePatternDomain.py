@@ -71,7 +71,7 @@ class FinitePatternDomain(IAbstractPatternDomain):
         self.closed_patterns = []
         self.open_patterns = []
         for i,p in enumerate(self.pl):
-            _LOGGER.warning(f"FPD {i}: {self.rs.kprint.kore_to_pretty(p)}")
+            #_LOGGER.warning(f"FPD {i}: {self.rs.kprint.kore_to_pretty(p)}")
             if len(KoreUtils.free_evars_of_pattern(p)) == 0:
                 self.closed_patterns.append((p, i))
             else:
@@ -100,10 +100,15 @@ class FinitePatternDomain(IAbstractPatternDomain):
             for p,i in self.closed_patterns:
                 if p == c:
                     #_LOGGER.warning(f'Fast no-vars')
-                    return FinitePattern(i, csort, {})
+                    return FinitePattern(self.closed_patterns[i][1], csort, {})
 
-            _LOGGER.warning(f"** Abstraction closed pattern {self.rs.kprint.kore_to_pretty(c)} as Top")
-            return FinitePattern(-1, csort, None)
+            # We should NOT abstract `c` as Top yet,
+            # because there might be some open pattern that matches it
+            # e.g. if the pattern is `kseq(foo(), .K)`,
+            # then `kseq(foo(), kseq(Z, .K))` can match it with `Z=.K`
+            # because kseq(X, kseq(.K, .K)) = kseq(X, .K)  
+            #_LOGGER.warning(f"** Abstraction closed pattern {self.rs.kprint.kore_to_pretty(c)} as Top")
+            #return FinitePattern(-1, csort, None)
 
         
         #pls: T.List[T.Tuple[int, Kore.Pattern]] = list(enumerate(self.pl))
