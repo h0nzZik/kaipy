@@ -328,11 +328,11 @@ def analyze(
         _LOGGER.warning(f'remaining {len(current_ps)} states')
         cfg = current_ps.pop()
         #cfg = normalize_pattern(cfg)
-        _LOGGER.warning(f'cfg {rs.kprint.kore_to_pretty(cfg)}')
+        #_LOGGER.warning(f'cfg {rs.kprint.kore_to_pretty(cfg)}')
         successors = [normalize_pattern(s) for s in get_successors(rs, cfg)]
         _LOGGER.warning(f'Has {len(successors)} successors')
-        for succ in successors:
-            _LOGGER.warning(f'succ: {rs.kprint.kore_to_pretty(succ)}')
+        #for succ in successors:
+        #    _LOGGER.warning(f'succ: {rs.kprint.kore_to_pretty(succ)}')
         new_ps: T.List[Kore.Pattern] = for_each_match(rs, states, successors, subst_domain)
         _LOGGER.warning(f'After processing: {len(new_ps)} states')
         current_ps.extend(new_ps)
