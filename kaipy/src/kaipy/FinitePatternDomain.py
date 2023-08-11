@@ -122,8 +122,7 @@ class FinitePatternDomain(IAbstractPatternDomain):
                 continue
             reversed_renaming = { v:k for k,v in (renaming or dict()).items() }
             #_LOGGER.warning(f'(found something)')
-            #return FinitePattern(self.open_patterns[i][1], csort, reversed_renaming)
-            return FinitePattern(self.open_patterns[i][1], csort, dict())
+            return FinitePattern(self.open_patterns[i][1], csort, reversed_renaming)
         #_LOGGER.warning(f'(no nice pattern found)')
         return FinitePattern(-1, csort, None)
     
