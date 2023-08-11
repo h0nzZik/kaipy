@@ -59,7 +59,7 @@ class StateInfo:
         abstract_subst: IAbstractSubstitution,
     ) -> bool:
         if self.description == 'IMP.assignment':
-            _LOGGER.warning(f'inserting {pprint.pformat(abstract_domain.print(abstract_subst))}')
+            _LOGGER.warning(f'inserting {abstract_domain.print(abstract_subst)}')
         for sub in self.substitutions:
             if abstract_domain.subsumes(abstract_subst, sub):
                 if self.description == 'IMP.assignment':
@@ -240,24 +240,26 @@ def compute_raw_concretizations(
             if ac_subst is None:
                 continue
             abstract_subst,concrete_subst = ac_subst
-            if ci2.info.description == 'IMP.assignment':
-                _LOGGER.warning(f'Concrete subst: {concrete_subst}')
-                _LOGGER.warning(f'Abstract subst: {abstract_subst}')
                 
             #_LOGGER.warning(f'Abstract subst: {abstract_subst}')
             is_new: bool = ci2.info.insert(subst_domain, abstract_subst)
             if is_new:
                 for concretized_subst in subst_domain.concretize(abstract_subst):
-                    #print(f'st vars: {KoreUtils.free_evars_of_pattern(ci2.st_renamed)}')
-                    #print(f'concretized subst vars: {set(concretized_subst.mapping.keys())}')
-                    #sort = rs.kdw.sortof(ci2.st_renamed)
-                    #p0 = Kore.And(sort, ci2.st_renamed, concretized_subst.kore(sort))
-                    #p1 = KoreUtils.rename_vars(ci2.renaming, p0)
-                    #_LOGGER.warning(f'New concretized projection: {rs.kprint.kore_to_pretty(p1)}')
-                    #new_ps_raw.append(p1)
-                    sort = rs.kdw.sortof(ci2.st)
-                    p0 = Kore.And(sort, ci2.st, concretized_subst.kore(sort))
-                    #_LOGGER.warning(f'New concretized projection: {rs.kprint.kore_to_pretty(p0)}')
+                    assert concretized_subst.mapping.keys() <= concrete_subst.mapping.keys()
+                    # It might happen that some RHS of the substitution contains a free variable
+                    # that also occurs in ci2.st and is not simultaneously mapped to something else.
+                    # For example, we might have:
+                    #   `ci2.st = <k> X ~> Y ~> .K </k>`
+                    #   `subst = { X : foo(Y) }`
+                    # And that would be a problem.
+                    vars_to_avoid = list(KoreUtils.free_evars_of_pattern(ci2.st))
+                    vars_to_rename = list(itertools.chain(*[
+                        KoreUtils.free_evars_of_pattern(p)
+                        for p in concretized_subst.mapping.values()
+                    ]))
+                    renaming = KoreUtils.compute_renaming0(vars_to_avoid, vars_to_rename)
+                    ci2_st_renamed = KoreUtils.rename_vars(renaming, ci2.st)
+                    p0 = KoreUtils.apply_subst(concretized_subst.mapping, ci2_st_renamed)
                     new_ps_raw.append(p0)
     return new_ps_raw
 
@@ -276,10 +278,12 @@ def for_each_match(
 
     new_ps_raw : T.List[Kore.Pattern] = compute_raw_concretizations(rs, subst_domain, conjinfos2)
 
+    # We do not need to simplify anymore
     _LOGGER.warning(f'Simplifying {len(new_ps_raw)} items at once (second)')
     #for pr in new_ps_raw:
     #    _LOGGER.warning(f'Item: {rs.kprint.kore_to_pretty(pr)}')
-    new_ps_0 = rs.map_simplify(new_ps_raw)
+    #new_ps_0 = rs.map_simplify(new_ps_raw)
+    new_ps_0 = new_ps_raw
     _LOGGER.warning(f'(done)')
     new_ps: T.List[Kore.Pattern] = list()
     for p in new_ps_0:
