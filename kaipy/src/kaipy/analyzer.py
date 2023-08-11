@@ -66,6 +66,9 @@ class StateInfo:
                     _LOGGER.warning(f'(subsumed)')
                 return False
 
+        # TODO: We might also want to go through the all abstract substitutions
+        # that are subsumed by the new one, and remove them.
+        # I do not know yet whether we want that behavior.
         self.substitutions.append(abstract_subst)
         if self.description == 'IMP.assignment':        
             _LOGGER.warning(f'(new)')
@@ -76,8 +79,13 @@ class StateInfo:
         print(f'state {self.description}')
         print(f'{kprint.kore_to_pretty(self.pattern)}')
         print(f'info:')
-        for subst in self.substitutions:
-            print(f'{subst_domain.print(subst)}')
+        for i,subst in enumerate(self.substitutions):
+            concrete = subst_domain.concretize(subst)
+            print(f'  substitution {i}:')
+            for k,v in concrete.mapping.items():
+                print(f'    {k}:')
+                print(f'    {kprint.kore_to_pretty(v)}:')
+            #print(f'{subst_domain.print(subst)}')
 
 
 @dataclasses.dataclass
@@ -244,23 +252,23 @@ def compute_raw_concretizations(
             #_LOGGER.warning(f'Abstract subst: {abstract_subst}')
             is_new: bool = ci2.info.insert(subst_domain, abstract_subst)
             if is_new:
-                for concretized_subst in subst_domain.concretize(abstract_subst):
-                    assert concretized_subst.mapping.keys() <= concrete_subst.mapping.keys()
-                    # It might happen that some RHS of the substitution contains a free variable
-                    # that also occurs in ci2.st and is not simultaneously mapped to something else.
-                    # For example, we might have:
-                    #   `ci2.st = <k> X ~> Y ~> .K </k>`
-                    #   `subst = { X : foo(Y) }`
-                    # And that would be a problem.
-                    vars_to_avoid = list(KoreUtils.free_evars_of_pattern(ci2.st))
-                    vars_to_rename = list(itertools.chain(*[
-                        KoreUtils.free_evars_of_pattern(p)
-                        for p in concretized_subst.mapping.values()
-                    ]))
-                    renaming = KoreUtils.compute_renaming0(vars_to_avoid, vars_to_rename)
-                    ci2_st_renamed = KoreUtils.rename_vars(renaming, ci2.st)
-                    p0 = KoreUtils.apply_subst(concretized_subst.mapping, ci2_st_renamed)
-                    new_ps_raw.append(p0)
+                concretized_subst = subst_domain.concretize(abstract_subst)
+                assert concretized_subst.mapping.keys() <= concrete_subst.mapping.keys()
+                # It might happen that some RHS of the substitution contains a free variable
+                # that also occurs in ci2.st and is not simultaneously mapped to something else.
+                # For example, we might have:
+                #   `ci2.st = <k> X ~> Y ~> .K </k>`
+                #   `subst = { X : foo(Y) }`
+                # And that would be a problem.
+                vars_to_avoid = list(KoreUtils.free_evars_of_pattern(ci2.st))
+                vars_to_rename = list(itertools.chain(*[
+                    KoreUtils.free_evars_of_pattern(p)
+                    for p in concretized_subst.mapping.values()
+                ]))
+                renaming = KoreUtils.compute_renaming0(vars_to_avoid, vars_to_rename)
+                ci2_st_renamed = KoreUtils.rename_vars(renaming, ci2.st)
+                p0 = KoreUtils.apply_subst(concretized_subst.mapping, ci2_st_renamed)
+                new_ps_raw.append(p0)
     return new_ps_raw
 
 def for_each_match(
