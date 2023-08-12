@@ -68,10 +68,21 @@ class TestImp(MyTest):
         )
 
         rests = pre_analyze(reachability_system, context_aliases, input_pattern)
+
+        #print("Rests:")
+        #for i, a_rest in enumerate(rests):
+        #    _LOGGER.warning(f"{i}.text: {a_rest.text}")
+        #    _LOGGER.warning(f"{i}: {reachability_system.kprint.kore_to_pretty(a_rest)}")
+        
+        rests_pretty: T.List[str] = [reachability_system.kprint.kore_to_pretty(a_rest).strip() for a_rest in rests]
+        # 0
+        assert "#freezer___IMP-SYNTAX_Stmt_Stmt_Stmt0_ ( n = getArg ( 0 ) ; sum = 0 ; while ( ! n <= 0 ) { sum = sum + n ; n = n + - 1 ; } ~> . ) ~> VARREST2 ~> ." in rests_pretty
+        # 10
+        assert "#freezer_+__IMP-SYNTAX_AExp_AExp_AExp1_ ( HOLE:AExp ~> . ) ~> #freezer_=_;_IMP-SYNTAX_Stmt_Id_AExp1_ ( sum ~> . ) ~> #freezer___IMP-SYNTAX_Stmt_Stmt_Stmt0_ ( n = n + - 1 ; ~> . ) ~> VARREST2 ~> ." in rests_pretty
+        # 12
+        assert "#freezer_=_;_IMP-SYNTAX_Stmt_Id_AExp1_ ( n ~> . ) ~> #freezer___IMP-SYNTAX_Stmt_Stmt_Stmt1_ ( HOLE2:Stmt ~> . ) ~> VARREST2 ~> ." in rests_pretty
+
         assert len(rests) == 17
-        print("Rests:")
-        for i, a_rest in enumerate(rests):
-            print(f"{i}: {reachability_system.kprint.kore_to_pretty(a_rest)}")
 
     def test_cartesian_dict(self):
         # { x |-> {phi1, phi2}, y |-> {phi3, phi4} }
