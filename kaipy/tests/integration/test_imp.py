@@ -15,6 +15,7 @@ import kaipy.kore_utils as KoreUtils
 import kaipy.rs_utils as RSUtils
 from kaipy.HeatPreAnalysis import ContextAlias, ContextAliases, pre_analyze
 from kaipy.ReachabilitySystem import ReachabilitySystem
+from kaipy.BigsumPatternDomain import BigsumPattern, BigsumPatternDomain
 from kaipy.ExactPatternDomain import ExactPattern, ExactPatternDomain
 from kaipy.testing.testingbase import RSTestBase
 
@@ -94,7 +95,7 @@ class TestImp(MyTest):
         expected = { immutabledict({"x" : 1, "y" : 3}), immutabledict({"x" : 1, "y" : 4}), immutabledict({"x" : 2, "y" : 3}), immutabledict({"x" : 2, "y" : 4}) }
         assert expected == actual
 
-    def test_exact_pattern_domain(
+    def test_exact_and_bigsum_pattern_domain(
         self,
         reachability_system: ReachabilitySystem
     ):
@@ -106,6 +107,12 @@ class TestImp(MyTest):
         pd_p4 = ExactPatternDomain(rs=reachability_system, patterns=[p4])
         assert KoreUtils.is_top(pd_p4.concretize(pd_p4.abstract(p3)))
         assert p4 == pd_p4.concretize(pd_p4.abstract(p4))
+
+        pd_p2 = ExactPatternDomain(rs=reachability_system, patterns=[p2])
+        pd_bigsum = BigsumPatternDomain(rs=reachability_system, domains=[pd_p4, pd_p2])
+        assert KoreUtils.is_top(pd_bigsum.concretize(pd_bigsum.abstract(p3)))
+        assert p4 == pd_bigsum.concretize(pd_bigsum.abstract(p4))
+        assert p2 == pd_bigsum.concretize(pd_bigsum.abstract(p2))
 
     def test_analyze(
         self, reachability_system: ReachabilitySystem, context_aliases: ContextAliases
