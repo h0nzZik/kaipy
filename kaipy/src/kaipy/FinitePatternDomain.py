@@ -140,21 +140,21 @@ class FinitePatternDomain(IAbstractPatternDomain):
             fp = FinitePattern(self.open_patterns[i][1], csort, reversed_renaming)
             fpl.append(fp)
         if len(fpl) == 0:
-            #_LOGGER.warning(f'no nice pattern found for {self.rs.kprint.kore_to_pretty(c)}')
+            _LOGGER.warning(f'no nice pattern found for {self.rs.kprint.kore_to_pretty(c)}')
             return FinitePattern(-1, csort, None)
         if len(fpl) == 1:
             #_LOGGER.warning(f'unique nice pattern found')
             return fpl[0]
         _LOGGER.warning(f'NO unique nice pattern found - multiple found. Candidates:')
-        for fp in fpl:
-            _LOGGER.warning(f'  have {fp} as:')
-            _LOGGER.warning(f'  {self.rs.kprint.kore_to_pretty(self.concretize(fp))}')
+        #for fp in fpl:
+        #    _LOGGER.warning(f'  have {fp} as:')
+        #    _LOGGER.warning(f'  {self.rs.kprint.kore_to_pretty(self.concretize(fp))}')
         
 
         fp1 = fpl[0]
         for fp2 in fpl[1:]:
             if not (fp1.idx,fp2.idx) in self.subsumption_matrix:
-                _LOGGER.warning(f'Replacing with other (NOT more general)')
+                #_LOGGER.warning(f'Replacing with other (NOT more general)')
                 fp1 = fp2
         _LOGGER.warning(f"Choosing {fp1.idx}")
         return fp1

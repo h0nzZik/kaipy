@@ -149,10 +149,14 @@ def get_abstract_subst_of_state(
 ) -> T.Tuple[IAbstractSubstitution,Substitution] | None:
     if KoreUtils.is_bottom(conj_simplified):
         return None
-    eqls: T.Dict[Kore.EVar, Kore.Pattern] = KoreUtils.extract_equalities_from_witness(
+    eqls,raw_remainder = KoreUtils.extract_equalities_and_rest_from_witness(
         {ev.name for ev in fvs},
         conj_simplified
     )
+    remainders = KoreUtils.get_predicates(raw_remainder)
+    _LOGGER.warning(f"Remainder: {remainders}")
+    for r in remainders:
+        _LOGGER.warning(f'r: {rs.kprint.kore_to_pretty(r)}')
     eqls_filtered = {k:v for k,v in eqls.items() if not KoreUtils.is_top(v)}
     renaming_back = reverse_renaming(renaming)
     eqls_filtered_renamed = { Kore.EVar(name=renaming_back[k.name], sort=k.sort):v for k,v in eqls_filtered.items()}
