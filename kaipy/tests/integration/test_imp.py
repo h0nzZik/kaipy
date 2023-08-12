@@ -114,6 +114,29 @@ class TestImp(MyTest):
         assert p4 == pd_bigsum.concretize(pd_bigsum.abstract(p4))
         assert p2 == pd_bigsum.concretize(pd_bigsum.abstract(p2))
 
+    def test_analyze_simple(
+        self,
+        reachability_system: ReachabilitySystem,
+        context_aliases: ContextAliases
+    ):
+        input_pattern: Kore.Pattern = reachability_system.kdw.get_input_kore(
+            RSTestBase.LANGUAGES / "imp/simple.imp"
+        )
+
+        rests = pre_analyze(reachability_system, context_aliases, input_pattern)
+        subst_domain: IAbstractSubstitutionDomain = kaipy.DefaultSubstitutionDomain.build_abstract_substitution_domain(
+            reachability_system,
+            rests,
+            input_pattern
+        )
+        states = kaipy.analyzer.analyze(
+            reachability_system,
+            subst_domain=subst_domain,
+            initial_configuration=input_pattern,
+        )
+        states.states_by_id['IMP.assignment'].print(kprint=reachability_system.kprint, subst_domain=subst_domain)
+        assert False
+        
     def test_analyze(
         self, reachability_system: ReachabilitySystem, context_aliases: ContextAliases
     ):
