@@ -103,7 +103,7 @@ class TestImp(MyTest):
         _LOGGER.info(reachability_system.stats.dict)
         states.states_by_id['IMP.assignment'].print(kprint=reachability_system.kprint, subst_domain=subst_domain)
         #states.print(kprint=reachability_system.kprint, subst_domain=subst_domain)
-        assert(False) # To print stuff
+        #assert(False) # To print stuff
 
     # def test_execute_var(self, reachability_system: ReachabilitySystem):
     #     #x = Kore.EVar("VARX", KorePrelude.SORT_K_ITEM)
