@@ -154,9 +154,9 @@ def get_abstract_subst_of_state(
         conj_simplified
     )
     remainders = KoreUtils.get_predicates(raw_remainder) if raw_remainder is not None else []
-    _LOGGER.warning(f"Remainder: {remainders}")
-    for r in remainders:
-        _LOGGER.warning(f'r: {rs.kprint.kore_to_pretty(r)}')
+    #_LOGGER.warning(f"Remainder: {remainders}")
+    #for r in remainders:
+    #    _LOGGER.warning(f'r: {rs.kprint.kore_to_pretty(r)}')
     eqls_filtered = {k:v for k,v in eqls.items() if not KoreUtils.is_top(v)}
     renaming_back = reverse_renaming(renaming)
     eqls_filtered_renamed = { Kore.EVar(name=renaming_back[k.name], sort=k.sort):v for k,v in eqls_filtered.items()}
