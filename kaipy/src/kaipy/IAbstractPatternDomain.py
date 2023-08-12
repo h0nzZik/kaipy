@@ -22,6 +22,7 @@ class IAbstractPatternDomain(abc.ABC):
     def subsumes(self, a1: IAbstractPattern, a2: IAbstractPattern) -> bool:
         ...
     
+    # TODO rename to `to_str`
     @abc.abstractmethod
     def print(self, a: IAbstractPattern) -> str:
         ...

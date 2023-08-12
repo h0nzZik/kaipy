@@ -11,9 +11,11 @@ from pyk.kore.parser import KoreParser
 from pyk.ktool.kprint import KPrint
 from pyk.testing._kompiler import KompiledTest
 
+import kaipy.kore_utils as KoreUtils
 import kaipy.rs_utils as RSUtils
 from kaipy.HeatPreAnalysis import ContextAlias, ContextAliases, pre_analyze
 from kaipy.ReachabilitySystem import ReachabilitySystem
+from kaipy.ExactPatternDomain import ExactPattern, ExactPatternDomain
 from kaipy.testing.testingbase import RSTestBase
 
 import kaipy.DefaultSubstitutionDomain
@@ -92,9 +94,23 @@ class TestImp(MyTest):
         expected = { immutabledict({"x" : 1, "y" : 3}), immutabledict({"x" : 1, "y" : 4}), immutabledict({"x" : 2, "y" : 3}), immutabledict({"x" : 2, "y" : 4}) }
         assert expected == actual
 
+    def test_exact_pattern_domain(
+        self,
+        reachability_system: ReachabilitySystem
+    ):
+        p1: Pattern = Kore.App('dotk', sorts=(), args=())
+        p2: Pattern = Kore.DV(Kore.SortApp('SortInt', ()), "3")
+        p3: Pattern = KorePrelude.inj(Kore.SortApp('SortInt', ()), Kore.SortApp('SortKItem', ()), p2)
+        p4: Pattern = Kore.App('kseq', (), (p1,p3))
+        
+        pd_p4 = ExactPatternDomain(rs=reachability_system, patterns=[p4])
+        assert KoreUtils.is_top(pd_p4.concretize(pd_p4.abstract(p3)))
+        assert p4 == pd_p4.concretize(pd_p4.abstract(p4))
+
     def test_analyze(
         self, reachability_system: ReachabilitySystem, context_aliases: ContextAliases
     ):
+        # TODO move stats to the analyzer itself
         reachability_system.stats.reset()
         input_pattern: Kore.Pattern = reachability_system.kdw.get_input_kore(
             RSTestBase.LANGUAGES / "imp/sum.imp"
