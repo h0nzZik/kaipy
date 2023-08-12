@@ -1,10 +1,13 @@
 import dataclasses
 import typing as T
+import pprint
+import itertools
 
 from immutabledict import immutabledict
 
 import pyk.kore.syntax as Kore
 
+import kaipy.kore_utils as KoreUtils
 from kaipy.Substitution import Substitution
 from kaipy.IAbstractPatternDomain import IAbstractPatternDomain, IAbstractPattern
 from kaipy.IAbstractSubstitutionDomain import IAbstractSubstitution, IAbstractSubstitutionDomain
@@ -21,14 +24,14 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
         self.pattern_domain = pattern_domain
     
     def abstract(self, subst: Substitution) -> IAbstractSubstitution:
-        return CartesianAbstractSubstitution(
-            {
+        m = {
                 v : self.pattern_domain.abstract(p)
                 for (v,p) in subst.mapping.items()
             }
-        )
+        m_filtered = {k:v for k,v in m.items() if not self.pattern_domain.is_top(v)}
+        return CartesianAbstractSubstitution(m_filtered)
 
-    def concretize(self, a: IAbstractSubstitution) -> T.Set[Substitution]:
+    def concretize(self, a: IAbstractSubstitution) -> Substitution:
         assert type(a) is CartesianAbstractSubstitution
 
         # If `v` is top, we do not want to concretize it,
@@ -39,7 +42,35 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
             for k,v in a.mapping.items()
             if not self.pattern_domain.is_top(v)
         }
-        return {Substitution(immutabledict(concretes))}
+        for k in concretes:
+            assert not KoreUtils.is_top(concretes[k])
+
+        # It might happen that there are two evars, e1 and e2,
+        # that are mapped to patterns p1 and p2, respectively,
+        # such that p1 and p2 share some variable `v`.
+        # This is unfortunate, because `v` in `p1` is unrelated
+        # to `v` in `p2`, but the underlying pattern substitution
+        # can not do anything about it. So we handle the case here.
+        
+        # Rename all the variables
+        vars_to_rename = list(itertools.chain(*[
+                    list(KoreUtils.free_evars_of_pattern(p))
+                    for p in concretes.values()
+                ]))
+        vars_to_avoid: T.Set[Kore.EVar] = set()
+        concretes_renamed: T.Dict[Kore.EVar, Kore.Pattern] = dict()
+        for k,v in concretes.items():
+            # But compute a separate renaming for each component
+            renaming = KoreUtils.compute_renaming0(
+                vars_to_avoid=list(vars_to_avoid),
+                vars_to_rename=vars_to_rename
+            )
+            v_renamed = KoreUtils.rename_vars(renaming, v)
+            concretes_renamed[k] = v_renamed
+            vars_to_avoid = vars_to_avoid.union(
+                KoreUtils.free_evars_of_pattern(v_renamed)
+            )
+        return Substitution(immutabledict(concretes_renamed))
     
     def subsumes(self, a1: IAbstractSubstitution, a2: IAbstractSubstitution) -> bool:
         assert type(a1) is CartesianAbstractSubstitution
@@ -60,4 +91,4 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
 
     def print(self, a: IAbstractSubstitution) -> str:
         assert type(a) is CartesianAbstractSubstitution
-        return str({ k: self.pattern_domain.print(v) for k,v in a.mapping.items() })
+        return pprint.pformat({ k: self.pattern_domain.print(v) for k,v in a.mapping.items() })

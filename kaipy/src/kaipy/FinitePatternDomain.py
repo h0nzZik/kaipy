@@ -63,6 +63,7 @@ class FinitePatternDomain(IAbstractPatternDomain):
     rs : ReachabilitySystem
     closed_patterns: T.List[T.Tuple[Kore.Pattern, int]]
     open_patterns: T.List[T.Tuple[Kore.Pattern, int]]
+    subsumption_matrix: T.Set[T.Tuple[int,int]]
 
     def __init__(self, pl: T.List[Kore.Pattern], rs: ReachabilitySystem):
         self.pl = pl
@@ -71,6 +72,7 @@ class FinitePatternDomain(IAbstractPatternDomain):
         self.closed_patterns = []
         self.open_patterns = []
         for i,p in enumerate(self.pl):
+            #_LOGGER.warning(f"FPD {i}: {self.rs.kprint.kore_to_pretty(p)}")
             if len(KoreUtils.free_evars_of_pattern(p)) == 0:
                 self.closed_patterns.append((p, i))
             else:
@@ -79,15 +81,28 @@ class FinitePatternDomain(IAbstractPatternDomain):
         #print("Finite domain:")
         #for i, a_rest in enumerate(pl):
         #    print(f"{i}: {rs.kprint.kore_to_pretty(a_rest)}")
+        self.subsumption_matrix = set()
+        for i,p in enumerate(pl):
+            for j,q in enumerate(pl):
+                # make it irreflexive
+                if i == j:
+                    continue
+                if self.rs.sortof(p) != self.rs.sortof(q):
+                    continue
+                if self.rs.subsumes(p, q)[0]:
+                    # `q` is more general
+                    self.subsumption_matrix.add((i,j))
+        _LOGGER.warning(f'Computed subsumption matrix (size {len(self.subsumption_matrix)})')
+        #_LOGGER.warning(f'{self.subsumption_matrix}')
     
     def abstract(self, c: Kore.Pattern) -> FinitePattern:
         csort = self.rs.sortof(c)
-        _LOGGER.warning(f'abstracting {c.text}')
+        #_LOGGER.warning(f'abstracting {c.text}')
         # Optimization
         match c:
             case Kore.EVar(_, _):
                 # TODO generalize this to `inj(EVar)``
-                _LOGGER.warning(f'Fast -1')
+                #_LOGGER.warning(f'Fast -1')
                 return FinitePattern(-1, csort, None)
         
         # another optimization: for terms without free variables
@@ -98,9 +113,16 @@ class FinitePatternDomain(IAbstractPatternDomain):
         if len(KoreUtils.free_evars_of_pattern(c)) == 0:
             for p,i in self.closed_patterns:
                 if p == c:
-                    _LOGGER.warning(f'Fast no-vars')
+                    #_LOGGER.warning(f'Fast no-vars')
                     return FinitePattern(i, csort, {})
-            return FinitePattern(-1, csort, None)
+
+            # We should NOT abstract `c` as Top yet,
+            # because there might be some open pattern that matches it
+            # e.g. if the pattern is `kseq(foo(), .K)`,
+            # then `kseq(foo(), kseq(Z, .K))` can match it with `Z=.K`
+            # because kseq(X, kseq(.K, .K)) = kseq(X, .K)  
+            #_LOGGER.warning(f"** Abstraction closed pattern {self.rs.kprint.kore_to_pretty(c)} as Top")
+            #return FinitePattern(-1, csort, None)
 
         
         #pls: T.List[T.Tuple[int, Kore.Pattern]] = list(enumerate(self.pl))
@@ -109,14 +131,33 @@ class FinitePatternDomain(IAbstractPatternDomain):
         #holds = self.rs.kcspool.pool.map(subsumer, [p for p,i in self.open_patterns])
         # Lazy map, not parallel
         holds = map(subsumer, [p for p,i in self.open_patterns])
+        fpl: T.List[FinitePattern] = list()
         for i,(h,renaming) in enumerate(holds):
             if not h:
                 continue
             reversed_renaming = { v:k for k,v in (renaming or dict()).items() }
-            _LOGGER.warning(f'(found something)')
-            return FinitePattern(self.open_patterns[i][1], csort, reversed_renaming)
-        _LOGGER.warning(f'(no nice pattern found)')
-        return FinitePattern(-1, csort, None)
+            #_LOGGER.warning(f'(found something)')
+            fp = FinitePattern(self.open_patterns[i][1], csort, reversed_renaming)
+            fpl.append(fp)
+        if len(fpl) == 0:
+            _LOGGER.warning(f'no nice pattern found for {self.rs.kprint.kore_to_pretty(c)}')
+            return FinitePattern(-1, csort, None)
+        if len(fpl) == 1:
+            #_LOGGER.warning(f'unique nice pattern found')
+            return fpl[0]
+        _LOGGER.warning(f'NO unique nice pattern found - multiple found. Candidates:')
+        #for fp in fpl:
+        #    _LOGGER.warning(f'  have {fp} as:')
+        #    _LOGGER.warning(f'  {self.rs.kprint.kore_to_pretty(self.concretize(fp))}')
+        
+
+        fp1 = fpl[0]
+        for fp2 in fpl[1:]:
+            if not (fp1.idx,fp2.idx) in self.subsumption_matrix:
+                #_LOGGER.warning(f'Replacing with other (NOT more general)')
+                fp1 = fp2
+        _LOGGER.warning(f"Choosing {fp1.idx}")
+        return fp1
     
     def is_top(self, a: IAbstractPattern) -> bool:
         assert type(a) is FinitePattern
@@ -137,9 +178,12 @@ class FinitePatternDomain(IAbstractPatternDomain):
 
         if a2.idx == -1:
             return True
-        ## I am not sure if this is a valid optimization. It would be nice
-        # if a1.idx == a2.idx:
-        #     return True
+
+        # In this case, self.concretize(a1) and self.concretize(a2)
+        # differe only in naming of variables, and therefore the subsumption
+        # holds.
+        if a1.idx == a2.idx:
+            return True
 
         if self.is_top(a2):
             return True
@@ -150,4 +194,6 @@ class FinitePatternDomain(IAbstractPatternDomain):
         return self.rs.subsumes(self.concretize(a1), self.concretize(a2))[0]
 
     def print(self, a: IAbstractPattern) -> str:
-        return self.rs.kprint.kore_to_pretty(self.concretize(a))
+        c = self.concretize(a)
+        assert not KoreUtils.is_top(c)
+        return self.rs.kprint.kore_to_pretty(c)

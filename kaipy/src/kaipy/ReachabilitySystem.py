@@ -16,7 +16,6 @@ import pyk.kore.rpc as KoreRpc
 from pyk.ktool.kprint import KPrint
 
 from .PerfCounter import PerfCounter
-#from .kcommands import KORE_RPC_COMMAND
 from .KompiledDefinitionWrapper import KompiledDefinitionWrapper
 import kaipy.kore_utils as KoreUtils
 
@@ -260,6 +259,8 @@ class ReachabilitySystem:
         return self.kdw.sortof(p)
 
 
+    # TODO simplify, return only the boolean component
+    # (the generality is not used)
     def subsumes(self, ant: Kore.Pattern, con: Kore.Pattern) -> T.Tuple[bool, T.Dict[str,str] | None]:
         renaming = KoreUtils.compute_renaming0(
             vars_to_avoid=list(KoreUtils.free_evars_of_pattern(ant)),
