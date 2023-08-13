@@ -253,9 +253,9 @@ def compute_raw_concretizations(
             #_LOGGER.warning(f'crawcon: renaming = {ci2.renaming}')
             if KoreUtils.is_bottom(ci2.conj):
                 continue
-            _LOGGER.warning(f'crawcon: st_renamed = {rs.kprint.kore_to_pretty(ci2.st_renamed)}')
+            #_LOGGER.warning(f'crawcon: st_renamed = {rs.kprint.kore_to_pretty(ci2.st_renamed)}')
             evars = KoreUtils.free_evars_of_pattern(ci2.st_renamed)
-            _LOGGER.warning(f'EVARS: {evars}')
+            #_LOGGER.warning(f'EVARS: {evars}')
             abstract_subst,concrete_subst = get_abstract_subst_of_state(
                 rs=rs,
                 subst_domain=subst_domain,
@@ -264,10 +264,10 @@ def compute_raw_concretizations(
                 renaming=ci2.renaming,
             )
 
-            _LOGGER.warning(f'State (renamed): {rs.kprint.kore_to_pretty(ci2.st_renamed)}')
-            concrete_printed = {k:v.text for k,v in concrete_subst.mapping.items()}
-            _LOGGER.warning(f'Concrete subst: {concrete_printed}')   
-            _LOGGER.warning(f'Abstract subst: {abstract_subst}')
+            #_LOGGER.warning(f'State (renamed): {rs.kprint.kore_to_pretty(ci2.st_renamed)}')
+            #concrete_printed = {k:v.text for k,v in concrete_subst.mapping.items()}
+            #_LOGGER.warning(f'Concrete subst: {concrete_printed}')   
+            #_LOGGER.warning(f'Abstract subst: {abstract_subst}')
             is_new: bool = ci2.info.insert(subst_domain, abstract_subst)
             if is_new:
                 concretized_subst = subst_domain.concretize(abstract_subst)
