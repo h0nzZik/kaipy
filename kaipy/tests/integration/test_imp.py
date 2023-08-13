@@ -114,6 +114,32 @@ class TestImp(MyTest):
         assert p4 == pd_bigsum.concretize(pd_bigsum.abstract(p4))
         assert p2 == pd_bigsum.concretize(pd_bigsum.abstract(p2))
 
+    def test_analyze_very_simple(
+        self,
+        reachability_system: ReachabilitySystem,
+        context_aliases: ContextAliases
+    ):
+        input_pattern: Kore.Pattern = reachability_system.kdw.get_input_kore(
+            RSTestBase.LANGUAGES / "imp/very-simple.imp"
+        )
+
+        rests = pre_analyze(reachability_system, context_aliases, input_pattern)
+        subst_domain: IAbstractSubstitutionDomain = kaipy.DefaultSubstitutionDomain.build_abstract_substitution_domain(
+            reachability_system,
+            rests,
+            input_pattern
+        )
+        states = kaipy.analyzer.analyze(
+            reachability_system,
+            subst_domain=subst_domain,
+            initial_configuration=input_pattern,
+        )
+        si: kaipy.analyzer.StateInfo = states.states_by_id['IMP.assignment']
+        si.print(kprint=reachability_system.kprint, subst_domain=subst_domain)
+        concrete_substitutions = list(si.concrete_substitutions(subst_domain))
+        assert len(concrete_substitutions) == 1
+        assert reachability_system.kprint.kore_to_pretty(concrete_substitutions[0].mapping[Kore.EVar("Var'Unds'DotVar2", Kore.SortApp('SortK', ()))]).strip() == '#freezer___IMP-SYNTAX_Stmt_Stmt_Stmt1_ ( Fresh3:Stmt ~> . ) ~> Fresh2 ~> .'
+
     def test_analyze_simple(
         self,
         reachability_system: ReachabilitySystem,
@@ -134,9 +160,14 @@ class TestImp(MyTest):
             subst_domain=subst_domain,
             initial_configuration=input_pattern,
         )
-        states.states_by_id['IMP.assignment'].print(kprint=reachability_system.kprint, subst_domain=subst_domain)
-        assert False
+        si: kaipy.analyzer.StateInfo = states.states_by_id['IMP.assignment'].print(kprint=reachability_system.kprint, subst_domain=subst_domain)
+        si.print(kprint=reachability_system.kprint, subst_domain=subst_domain)
+        assert len(si.substitutions) == 4
+        concrete_subst = [subst_domain.concretize(s) for s in si.substitutions]
+        _LOGGER.warning(f'cs: {concrete_subst}')
         
+        assert False
+
     def test_analyze(
         self, reachability_system: ReachabilitySystem, context_aliases: ContextAliases
     ):

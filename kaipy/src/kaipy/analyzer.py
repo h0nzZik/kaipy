@@ -51,16 +51,23 @@ def cartesian_dict(d: T.Mapping[T.Any, T.Any]) -> T.Set[T.Mapping[T.Any, T.Any]]
 class StateInfo:
     pattern: Kore.Pattern
     description: str
-    substitutions: T.List[IAbstractSubstitution]
+    # In general, we do not know here how IAbstractSubstitution is implemented;
+    # it does not need to have keys and values.
+    # The only thing we know that its concretization will be a Substitution.
+    # and that it will have the keys that the original substitution had.
+    # Therefore, we need to store the mapping from which the original substitution was created,
+    # so that we can apply it reversely on concretized substitutions.
+    substitutions: T.List[T.Tuple[IAbstractSubstitution, T.Mapping[str,str]]]
     
     def insert(
         self,
         abstract_domain: IAbstractSubstitutionDomain,
         abstract_subst: IAbstractSubstitution,
+        renaming: T.Mapping[str,str]
     ) -> bool:
         #if self.description == 'IMP.assignment':
         #    _LOGGER.warning(f'inserting {abstract_domain.print(abstract_subst)}')
-        for sub in self.substitutions:
+        for sub,_ in self.substitutions:
             if abstract_domain.subsumes(abstract_subst, sub):
                #if self.description == 'IMP.assignment':
                 #    _LOGGER.warning(f'(subsumed)')
@@ -69,23 +76,26 @@ class StateInfo:
         # TODO: We might also want to go through the all abstract substitutions
         # that are subsumed by the new one, and remove them.
         # I do not know yet whether we want that behavior.
-        self.substitutions.append(abstract_subst)
+        self.substitutions.append((abstract_subst, renaming))
         #if self.description == 'IMP.assignment':        
         #    _LOGGER.warning(f'(new)')
         return True
 
+    def concrete_substitutions(self, subst_domain: IAbstractSubstitutionDomain) -> T.Iterable[Substitution]:
+        for sub,renaming in self.substitutions:
+            rr = reverse_renaming(renaming)
+            concrete = subst_domain.concretize(sub)
+            renamed = Substitution({Kore.EVar(rr[k.name], k.sort):v for k,v in concrete.mapping.items()})
+            yield renamed
 
     def print(self, kprint: KPrint, subst_domain: IAbstractSubstitutionDomain):
         print(f'state {self.description}')
         print(f'{kprint.kore_to_pretty(self.pattern)}')
         print(f'info:')
-        for i,subst in enumerate(self.substitutions):
-            concrete = subst_domain.concretize(subst)
-            print(f'  substitution {i}:')
-            for k,v in concrete.mapping.items():
+        for i,csubst in enumerate(self.concrete_substitutions(subst_domain)):
+            for k,v in csubst.mapping.items():
                 print(f'    {k}:')
                 print(f'    {kprint.kore_to_pretty(v)}')
-            #print(f'{subst_domain.print(subst)}')
 
 
 @dataclasses.dataclass
@@ -177,7 +187,7 @@ def rename_to_avoid(
     )
     return st_renamed,renaming
 
-def reverse_renaming(renaming: T.Dict[str, str]) -> T.Dict[str, str]:
+def reverse_renaming(renaming: T.Mapping[str, str]) -> T.Dict[str, str]:
     return {v:k for k,v in renaming.items()}
 
 @dataclasses.dataclass(frozen=True)
@@ -268,7 +278,7 @@ def compute_raw_concretizations(
             #concrete_printed = {k:v.text for k,v in concrete_subst.mapping.items()}
             #_LOGGER.warning(f'Concrete subst: {concrete_printed}')   
             #_LOGGER.warning(f'Abstract subst: {abstract_subst}')
-            is_new: bool = ci2.info.insert(subst_domain, abstract_subst)
+            is_new: bool = ci2.info.insert(subst_domain, abstract_subst, ci2.renaming)
             if is_new:
                 concretized_subst = subst_domain.concretize(abstract_subst)
                 assert concretized_subst.mapping.keys() <= concrete_subst.mapping.keys()
