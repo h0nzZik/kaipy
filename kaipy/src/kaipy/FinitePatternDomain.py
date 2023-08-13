@@ -140,7 +140,7 @@ class FinitePatternDomain(IAbstractPatternDomain):
             fp = FinitePattern(self.open_patterns[i][1], csort, reversed_renaming)
             fpl.append(fp)
         if len(fpl) == 0:
-            _LOGGER.warning(f'no nice pattern found for {self.rs.kprint.kore_to_pretty(c)}')
+            #_LOGGER.warning(f'no nice pattern found for {self.rs.kprint.kore_to_pretty(c)}')
             return FinitePattern(-1, csort, None)
         if len(fpl) == 1:
             #_LOGGER.warning(f'unique nice pattern found')
