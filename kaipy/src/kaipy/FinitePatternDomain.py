@@ -61,8 +61,6 @@ class Subsumer:
 class FinitePatternDomain(IAbstractPatternDomain):
     pl : T.List[Kore.Pattern]
     rs : ReachabilitySystem
-    closed_patterns: T.List[T.Tuple[Kore.Pattern, int]]
-    open_patterns: T.List[T.Tuple[Kore.Pattern, int]]
     subsumption_matrix: T.Set[T.Tuple[int,int]]
 
     # pl - list of patterns potentially containing free variables
@@ -70,18 +68,6 @@ class FinitePatternDomain(IAbstractPatternDomain):
         self.pl = pl
         self.rs = rs
 
-        self.closed_patterns = []
-        self.open_patterns = []
-        for i,p in enumerate(self.pl):
-            #_LOGGER.warning(f"FPD {i}: {self.rs.kprint.kore_to_pretty(p)}")
-            if len(KoreUtils.free_evars_of_pattern(p)) == 0:
-                self.closed_patterns.append((p, i))
-            else:
-                self.open_patterns.append((p, i))
-        _LOGGER.warning(f'Finite domain: {len(self.closed_patterns)} closed, {len(self.open_patterns)} open')
-        #print("Finite domain:")
-        #for i, a_rest in enumerate(pl):
-        #    print(f"{i}: {rs.kprint.kore_to_pretty(a_rest)}")
         self.subsumption_matrix = set()
         for i,p in enumerate(pl):
             for j,q in enumerate(pl):
@@ -99,46 +85,17 @@ class FinitePatternDomain(IAbstractPatternDomain):
     def abstract(self, c: Kore.Pattern) -> FinitePattern:
         csort = self.rs.sortof(c)
         #_LOGGER.warning(f'abstracting {c.text}')
-        # Optimization
-        match c:
-            case Kore.EVar(_, _):
-                # TODO generalize this to `inj(EVar)``
-                #_LOGGER.warning(f'Fast -1')
-                return FinitePattern(-1, csort, None)
-        
-        # another optimization: for terms without free variables
-        # it is enough to check for an equality with patterns without free variables.
-        # This assumes functionality of both patterns.
-        # For terms with free variables it is necessary to check for subsumtion/implication
-        # but it is enough to consider patterns *with* free variables.
-        if len(KoreUtils.free_evars_of_pattern(c)) == 0:
-            for p,i in self.closed_patterns:
-                if p == c:
-                    #_LOGGER.warning(f'Fast no-vars')
-                    return FinitePattern(i, csort, {})
-
-            # We should NOT abstract `c` as Top yet,
-            # because there might be some open pattern that matches it
-            # e.g. if the pattern is `kseq(foo(), .K)`,
-            # then `kseq(foo(), kseq(Z, .K))` can match it with `Z=.K`
-            # because kseq(X, kseq(.K, .K)) = kseq(X, .K)  
-            #_LOGGER.warning(f"** Abstraction closed pattern {self.rs.kprint.kore_to_pretty(c)} as Top")
-            #return FinitePattern(-1, csort, None)
-
-        
         #pls: T.List[T.Tuple[int, Kore.Pattern]] = list(enumerate(self.pl))
         subsumer: T.Callable[[Kore.Pattern], T.Tuple[bool, T.Dict[str,str] | None]] = Subsumer(c=c, rs=self.rs)
-        #holds: T.List[T.Tuple[bool, T.Dict[str,str] | None]] = [(False, {})]
-        #holds = self.rs.kcspool.pool.map(subsumer, [p for p,i in self.open_patterns])
         # Lazy map, not parallel
-        holds = map(subsumer, [p for p,i in self.open_patterns])
+        holds = map(subsumer, self.pl)
         fpl: T.List[FinitePattern] = list()
         for i,(h,renaming) in enumerate(holds):
             if not h:
                 continue
             reversed_renaming = { v:k for k,v in (renaming or dict()).items() }
             #_LOGGER.warning(f'(found something)')
-            fp = FinitePattern(self.open_patterns[i][1], csort, reversed_renaming)
+            fp = FinitePattern(i, csort, reversed_renaming)
             fpl.append(fp)
         if len(fpl) == 0:
             #_LOGGER.warning(f'no nice pattern found for {self.rs.kprint.kore_to_pretty(c)}')

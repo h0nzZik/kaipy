@@ -505,6 +505,13 @@ def is_top(pattern: Kore.Pattern) -> bool:
     return False
 
 
+def is_evar(pattern: Kore.Pattern) -> bool:
+    match pattern:
+        case Kore.EVar(_, _):
+            return True
+    return False
+
+
 # TODO use make_conjunction
 def mapping_to_pattern(
     sort: Kore.Sort, m: T.Mapping[Kore.EVar, Kore.Pattern]

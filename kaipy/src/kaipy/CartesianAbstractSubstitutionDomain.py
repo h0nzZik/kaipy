@@ -27,6 +27,7 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
         m = {
                 v : self.pattern_domain.abstract(p)
                 for (v,p) in subst.mapping.items()
+                if not KoreUtils.is_evar(p)
             }
         m_filtered = {k:v for k,v in m.items() if not self.pattern_domain.is_top(v)}
         return CartesianAbstractSubstitution(m_filtered)
