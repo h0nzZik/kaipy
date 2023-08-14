@@ -65,6 +65,7 @@ class FinitePatternDomain(IAbstractPatternDomain):
     open_patterns: T.List[T.Tuple[Kore.Pattern, int]]
     subsumption_matrix: T.Set[T.Tuple[int,int]]
 
+    # pl - list of patterns potentially containing free variables
     def __init__(self, pl: T.List[Kore.Pattern], rs: ReachabilitySystem):
         self.pl = pl
         self.rs = rs

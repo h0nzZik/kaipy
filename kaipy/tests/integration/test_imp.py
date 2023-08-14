@@ -174,7 +174,6 @@ class TestImp(MyTest):
     def test_analyze(
         self, reachability_system: ReachabilitySystem, context_aliases: ContextAliases
     ):
-        # TODO move stats to the analyzer itself
         reachability_system.stats.reset()
         input_pattern: Kore.Pattern = reachability_system.kdw.get_input_kore(
             RSTestBase.LANGUAGES / "imp/sum.imp"
