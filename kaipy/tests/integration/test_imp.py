@@ -160,13 +160,16 @@ class TestImp(MyTest):
             subst_domain=subst_domain,
             initial_configuration=input_pattern,
         )
-        si: kaipy.analyzer.StateInfo = states.states_by_id['IMP.assignment'].print(kprint=reachability_system.kprint, subst_domain=subst_domain)
+        si: kaipy.analyzer.StateInfo = states.states_by_id['IMP.assignment']
         si.print(kprint=reachability_system.kprint, subst_domain=subst_domain)
-        assert len(si.substitutions) == 4
-        concrete_subst = [subst_domain.concretize(s) for s in si.substitutions]
-        _LOGGER.warning(f'cs: {concrete_subst}')
-        
-        assert False
+        concrete_substitutions = list(si.concrete_substitutions(subst_domain))
+        assert len(concrete_substitutions) == 4
+        assert any([
+            reachability_system.kprint.kore_to_pretty(
+                s.mapping.get(Kore.EVar("Var'Unds'DotVar2", Kore.SortApp('SortK', ())))
+            ).strip() == '#freezer___IMP-SYNTAX_Stmt_Stmt_Stmt0_ ( y = 2 + x ; z = y + 3 ; x = x + z ; ~> . ) ~> #freezer___IMP-SYNTAX_Stmt_Stmt_Stmt1_ ( Fresh3:Stmt ~> . ) ~> Fresh2 ~> .'
+            for s in concrete_substitutions
+        ])
 
     def test_analyze(
         self, reachability_system: ReachabilitySystem, context_aliases: ContextAliases

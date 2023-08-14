@@ -68,6 +68,8 @@ class StateInfo:
         #if self.description == 'IMP.assignment':
         #    _LOGGER.warning(f'inserting {abstract_domain.print(abstract_subst)}')
         for sub,_ in self.substitutions:
+            # TODO maybe we should only check for equality
+            # (using the abstract domain)
             if abstract_domain.subsumes(abstract_subst, sub):
                #if self.description == 'IMP.assignment':
                 #    _LOGGER.warning(f'(subsumed)')
