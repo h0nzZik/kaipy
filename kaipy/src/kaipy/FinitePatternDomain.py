@@ -126,7 +126,13 @@ class FinitePatternDomain(IAbstractPatternDomain):
         if self.is_top(a):
             return Kore.Top(a.sort)
         return KoreUtils.rename_vars(a.renaming or dict(), self.pl[a.idx])
-    
+
+    def equals(self, a1: IAbstractPattern, a2: IAbstractPattern) -> bool:
+        assert type(a1) is FinitePattern
+        assert type(a2) is FinitePattern
+
+        return a1.idx == a2.idx
+
     def subsumes(self, a1: IAbstractPattern, a2: IAbstractPattern) -> bool:
         assert type(a1) is FinitePattern
         assert type(a2) is FinitePattern

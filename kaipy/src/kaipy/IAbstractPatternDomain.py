@@ -17,7 +17,11 @@ class IAbstractPatternDomain(abc.ABC):
     @abc.abstractmethod
     def concretize(self, a: IAbstractPattern) -> Kore.Pattern:
         ...
-    
+
+    @abc.abstractmethod
+    def equals(self, a1: IAbstractPattern, a2: IAbstractPattern) -> bool:
+        ...
+
     @abc.abstractmethod
     def subsumes(self, a1: IAbstractPattern, a2: IAbstractPattern) -> bool:
         ...

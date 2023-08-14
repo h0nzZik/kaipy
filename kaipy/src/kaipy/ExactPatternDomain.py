@@ -42,6 +42,11 @@ class ExactPatternDomain(IAbstractPatternDomain):
             return Kore.Top(a.sort)
         return self.pl[a.idx]
 
+    def equals(self, a1: IAbstractPattern, a2: IAbstractPattern) -> bool:
+        assert type(a1) is ExactPattern
+        assert type(a2) is ExactPattern
+        return a1.idx == a2.idx
+
     def subsumes(self, a1: IAbstractPattern, a2: IAbstractPattern) -> bool:
         assert type(a1) is ExactPattern
         assert type(a2) is ExactPattern

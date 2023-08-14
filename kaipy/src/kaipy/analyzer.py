@@ -70,6 +70,7 @@ class StateInfo:
         for sub,_ in self.substitutions:
             # TODO maybe we should only check for equality
             # (using the abstract domain)
+            #if abstract_domain.equals(abstract_subst, sub):
             if abstract_domain.subsumes(abstract_subst, sub):
                #if self.description == 'IMP.assignment':
                 #    _LOGGER.warning(f'(subsumed)')

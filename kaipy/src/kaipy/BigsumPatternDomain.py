@@ -43,6 +43,22 @@ class BigsumPatternDomain(IAbstractPatternDomain):
         assert a.ap is not None
         return self.domains[a.idx].concretize(a.ap)
 
+    def equals(self, a1: IAbstractPattern, a2: IAbstractPattern) -> bool:
+        assert type(a1) is BigsumPattern
+        assert type(a2) is BigsumPattern
+
+        if a1.idx != a2.idx:
+            return False
+        
+        assert a1.idx == a2.idx
+        if a1.idx == -1:
+            return True
+
+        assert a1.ap is not None
+        assert a2.ap is not None
+
+        return self.domains[a1.idx].equals(a1.ap, a2.ap)
+
     def subsumes(self, a1: IAbstractPattern, a2: IAbstractPattern) -> bool:
         assert type(a1) is BigsumPattern
         assert type(a2) is BigsumPattern

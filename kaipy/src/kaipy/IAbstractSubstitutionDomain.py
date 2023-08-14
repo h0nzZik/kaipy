@@ -17,6 +17,9 @@ class IAbstractSubstitutionDomain(abc.ABC):
     def abstract(self, subst: Substitution) -> IAbstractSubstitution:
         ...
 
+    @abc.abstractmethod
+    def equals(self, a1: IAbstractSubstitution, a2: IAbstractSubstitution) -> bool:
+        ...
 
     @abc.abstractmethod
     def subsumes(self, a1: IAbstractSubstitution, a2: IAbstractSubstitution) -> bool:

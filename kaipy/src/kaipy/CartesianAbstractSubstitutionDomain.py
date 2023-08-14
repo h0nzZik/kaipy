@@ -73,6 +73,19 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
             )
         return Substitution(immutabledict(concretes_renamed))
     
+    def equals(self, a1: IAbstractSubstitution, a2: IAbstractSubstitution) -> bool:
+        assert type(a1) is CartesianAbstractSubstitution
+        assert type(a2) is CartesianAbstractSubstitution
+        if a1.mapping.keys() != a2.mapping.keys():
+            return False
+        
+        for k in a1.mapping.keys():
+            ap1 = a1.mapping[k]
+            ap2 = a2.mapping[k]
+            if not self.pattern_domain.equals(ap1, ap2):
+                return False
+        return True
+
     def subsumes(self, a1: IAbstractSubstitution, a2: IAbstractSubstitution) -> bool:
         assert type(a1) is CartesianAbstractSubstitution
         assert type(a2) is CartesianAbstractSubstitution
