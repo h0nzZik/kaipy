@@ -158,7 +158,8 @@ def build_states(rs: ReachabilitySystem, vars_to_avoid: T.Set[Kore.EVar]) -> Sta
 def get_abstract_subst_of_state(
     rs: ReachabilitySystem,
     subst_domain: IAbstractSubstitutionDomain,
-    conj_simplified : Kore.Pattern,
+    st_renamed: Kore.Pattern,
+    conj_simplified: Kore.Pattern,
     fvs: T.Set[Kore.EVar],
     renaming: T.Dict[str,str]
 ) -> T.Tuple[IAbstractSubstitution,Substitution]:
@@ -166,7 +167,20 @@ def get_abstract_subst_of_state(
         {ev.name for ev in fvs},
         conj_simplified
     )
-    #_LOGGER.warning(f'conj_simplified: {rs.kprint.kore_to_pretty(conj_simplified)}')
+    _LOGGER.warning(f'conj_simplified: {rs.kprint.kore_to_pretty(conj_simplified)}')
+    # A problem occurring here is that `conj_simplified` is too simplified:
+    # it does not contain predicates that the backend is able to deduce are always true.
+    # For example, we might have a state:
+    # `</k> someValue() ~> #freezer() ...</k>`
+    # and a cooling rule
+    # ```
+    # <k> (X:Stmt ~> #freezer()) => something(...) ...</k>
+    # \and true = isKResult(X ~> .)
+    # ```
+    # , which yields a match `X \equiv someValue()`
+    # but the fact that `isKResult(X ~> .)` is forgotten.
+    # Therefore, we have to read the predicates of the state
+    # and add them to the list of predicates derived from the conjunction.
     #_LOGGER.warning('eqls:')
     #for k,v in eqls.items():
     #    _LOGGER.warning(f"  {k} : {rs.kprint.kore_to_pretty(v)}")    
@@ -174,6 +188,11 @@ def get_abstract_subst_of_state(
     _LOGGER.warning(f"Remainder: {remainders}")
     for r in remainders:
         _LOGGER.warning(f'r: {rs.kprint.kore_to_pretty(r)}')
+    
+    st_predicates = KoreUtils.get_predicates(st_renamed)
+    for sp in st_predicates:
+        _LOGGER.warning(f'sp: {rs.kprint.kore_to_pretty(sp)}')
+    all_predicates = remainders + st_predicates
     eqls_filtered = {k:v for k,v in eqls.items() if not KoreUtils.is_top(v)}
     new_subst = Substitution(immutabledict(eqls_filtered))
     # We want to remember, for example, which variables V
@@ -182,7 +201,7 @@ def get_abstract_subst_of_state(
     # (`new_subst`), possibly nested.
     # We do not know in advance how many variables like that there will be.
     # It is the `subst_domain`'s responsibility to handle these.
-    abstract_subst: IAbstractSubstitution = subst_domain.abstract(new_subst, preds=remainders)
+    abstract_subst: IAbstractSubstitution = subst_domain.abstract(new_subst, preds=all_predicates)
     return abstract_subst,new_subst
 
 def rename_to_avoid(
@@ -281,6 +300,7 @@ def compute_raw_concretizations(
             abstract_subst,concrete_subst = get_abstract_subst_of_state(
                 rs=rs,
                 subst_domain=subst_domain,
+                st_renamed=ci2.st_renamed,
                 conj_simplified=ci2.conj,
                 fvs=evars,
                 renaming=ci2.renaming,
@@ -310,12 +330,36 @@ def compute_raw_concretizations(
                     KoreUtils.free_evars_of_pattern(p)
                     for p in concretized_subst.mapping.values()
                 ]))
-                renaming = KoreUtils.compute_renaming0(vars_to_avoid, vars_to_rename)
-                concretized_subst_renamed = Substitution({k:KoreUtils.rename_vars(renaming, v) for k,v in concretized_subst.mapping.items()})
-                concretized_pattern_renamed: Kore.Pattern = KoreUtils.apply_subst(concretized_subst_renamed.mapping, ci2.st_renamed)
-                concretized_pattern: Kore.Pattern = KoreUtils.rename_vars(reverse_renaming(ci2.renaming), concretized_pattern_renamed)
+                renaming = KoreUtils.compute_renaming0(
+                    vars_to_avoid,
+                    vars_to_rename
+                )
+                concretized_subst_renamed = Substitution(
+                    {k:KoreUtils.rename_vars(renaming, v)
+                    for k,v in concretized_subst.mapping.items()}
+                )
+                new_constraint_renamed: Kore.Pattern = KoreUtils.rename_vars(
+                    renaming,
+                    new_constraint
+                )
+                _LOGGER.warning(f'new_constraint_renamed: {rs.kprint.kore_to_pretty(new_constraint_renamed)}')
+                concretized_pattern_renamed: Kore.Pattern = KoreUtils.apply_subst(
+                    concretized_subst_renamed.mapping,
+                    ci2.st_renamed
+                )
+                concretized_pattern: Kore.Pattern = KoreUtils.rename_vars(
+                    reverse_renaming(ci2.renaming),
+                    concretized_pattern_renamed
+                )
+                new_constraint_rback: Kore.Pattern = KoreUtils.rename_vars(
+                    reverse_renaming(ci2.renaming),
+                    new_constraint_renamed
+                )
+                _LOGGER.warning(f'new_constraint_rback: {rs.kprint.kore_to_pretty(new_constraint_rback)}')
                 _LOGGER.warning(f'Concretized (back with original variables): {rs.kprint.kore_to_pretty(concretized_pattern)}')
-                new_ps_raw.append(concretized_pattern)
+                #new_ps_raw.append(concretized_pattern)
+                conj = Kore.And(rs.sortof(concretized_pattern), concretized_pattern, new_constraint_rback)
+                new_ps_raw.append(conj)
                 #ci2_st_renamed = KoreUtils.rename_vars(renaming, ci2.st_renamed)
                 #_LOGGER.warning(f'ci2_st_renamed: {rs.kprint.kore_to_pretty(ci2_st_renamed)}')
                 #p0 = KoreUtils.apply_subst(concretized_subst.mapping, ci2_st_renamed)

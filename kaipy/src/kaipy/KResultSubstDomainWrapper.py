@@ -22,6 +22,8 @@ class KResultSubstDomainWrapperElement(IAbstractSubstitution):
     underlying: IAbstractSubstitution
     # None means 'overflow'
     not_necessary_kresults: T.List[Kore.EVar] | None
+    # I am not sure how exactly I should argue for the finiteness...
+    monitored_evars: T.List[Kore.EVar]
 
 class KResultSubstDomainWrapper(IAbstractSubstitutionDomain):
     rs: ReachabilitySystem
@@ -48,19 +50,29 @@ class KResultSubstDomainWrapper(IAbstractSubstitutionDomain):
             return iskr_true
 
     def abstract(self, subst: Substitution, preds: T.List[Kore.Pattern]) -> IAbstractSubstitution:
+        a_s : IAbstractSubstitution = self.underlying_subst_domain.abstract(subst, preds)
+        c_s,_ = self.underlying_subst_domain.concretize(a_s)
+        # We look for element variables of the concretized substitution,
+        # not of the original one - there might be more variables,
+        # as some terms are abstracted away.
+        # However, I am not sure how to deal with the following:
+        # say, voidVal() gets abstracted as a variable,
+        # but how do we recover that it is a KResult?
+        # I guess that voidVal() will be only abstracted when
+        # applying a cooling rule to it, which check whether it is a KResultx...
         evars = list(itertools.chain(*[
                     KoreUtils.free_evars_of_pattern(v)
-                    for k,v in subst.mapping.items()
+                    for k,v in c_s.mapping.items()
                 ]))
         monitored_evars = [e for e in evars if e.sort.name in self.rs.kdw.user_declared_sorts]
-        a_s : IAbstractSubstitution = self.underlying_subst_domain.abstract(subst, preds)
 
         not_necessary_kresults: T.List[Kore.EVar] = []
         for e in monitored_evars:
             if len(not_necessary_kresults) >= self.limit:
                 return KResultSubstDomainWrapperElement(
                     underlying=a_s,
-                    not_necessary_kresults=None
+                    not_necessary_kresults=None,
+                    monitored_evars=monitored_evars,
                 )
             iskr_true = self.mk_isKResult_pattern(e)
             not_iskr_true = Kore.Not(self.rs.top_sort, iskr_true)
@@ -78,6 +90,7 @@ class KResultSubstDomainWrapper(IAbstractSubstitutionDomain):
         return KResultSubstDomainWrapperElement(
             underlying=a_s,
             not_necessary_kresults=not_necessary_kresults,
+            monitored_evars=monitored_evars,
         )
     
     def concretize(self, a: IAbstractSubstitution) -> T.Tuple[Substitution, T.List[Kore.Pattern]]:
@@ -88,12 +101,13 @@ class KResultSubstDomainWrapper(IAbstractSubstitutionDomain):
             _LOGGER.warning(f'Concretize: no additional constraints')
             return (concrete_subst,constraints)
 
-        evars = list(itertools.chain(*[
-                    KoreUtils.free_evars_of_pattern(v)
-                    for k,v in concrete_subst.mapping.items()
-                ]))
-        _LOGGER.warning(f'Concretize: evars={evars}')
-        monitored_evars = [e for e in evars if e.sort.name in self.rs.kdw.user_declared_sorts]
+        #evars = list(itertools.chain(*[
+        #            KoreUtils.free_evars_of_pattern(v)
+        #            for k,v in concrete_subst.mapping.items()
+        #        ]))
+        #_LOGGER.warning(f'Concretize: evars={evars}')
+        #monitored_evars = [e for e in evars if e.sort.name in self.rs.kdw.user_declared_sorts]
+        monitored_evars = a.monitored_evars
         _LOGGER.warning(f'Concretize: monitored_evars={monitored_evars}')
         new_constraints: T.List[Kore.Pattern] = []
         for ev in monitored_evars:
