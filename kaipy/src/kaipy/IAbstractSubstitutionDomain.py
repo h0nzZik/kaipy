@@ -10,7 +10,7 @@ class IAbstractSubstitution(abc.ABC):
 
 class IAbstractSubstitutionDomain(abc.ABC):
     @abc.abstractmethod
-    def concretize(self, a: IAbstractSubstitution) -> Substitution:
+    def concretize(self, a: IAbstractSubstitution) -> T.Tuple[Substitution, T.List[Kore.Pattern]]:
         ...
     
     @abc.abstractmethod

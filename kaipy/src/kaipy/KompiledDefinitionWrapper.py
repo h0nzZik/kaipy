@@ -92,7 +92,7 @@ class KompiledDefinitionWrapper:
             'SortStream',
             'SortBool',
             'SortK',
-            'SortKItem'
+#            'SortKItem',
         ]
         return [
             sn

@@ -33,7 +33,7 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
         m_filtered = {k:v for k,v in m.items() if not self.pattern_domain.is_top(v)}
         return CartesianAbstractSubstitution(m_filtered)
 
-    def concretize(self, a: IAbstractSubstitution) -> Substitution:
+    def concretize(self, a: IAbstractSubstitution) -> T.Tuple[Substitution, T.List[Kore.Pattern]]:
         assert type(a) is CartesianAbstractSubstitution
 
         # If `v` is top, we do not want to concretize it,
@@ -72,7 +72,7 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
             vars_to_avoid = vars_to_avoid.union(
                 KoreUtils.free_evars_of_pattern(v_renamed)
             )
-        return Substitution(immutabledict(concretes_renamed))
+        return (Substitution(immutabledict(concretes_renamed)),[])
     
     def equals(self, a1: IAbstractSubstitution, a2: IAbstractSubstitution) -> bool:
         assert type(a1) is CartesianAbstractSubstitution

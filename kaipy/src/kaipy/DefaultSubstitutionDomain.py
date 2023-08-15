@@ -10,6 +10,7 @@ from kaipy.BigsumPatternDomain import BigsumPattern, BigsumPatternDomain
 from kaipy.FinitePatternDomain import FinitePattern, FinitePatternDomain
 from kaipy.ExactPatternDomain import ExactPattern, ExactPatternDomain
 from kaipy.CartesianAbstractSubstitutionDomain import CartesianAbstractSubstitution, CartesianAbstractSubstitutionDomain
+from kaipy.KResultSubstDomainWrapper import KResultSubstDomainWrapper
 from kaipy.ReachabilitySystem import ReachabilitySystem
 
 
@@ -44,4 +45,6 @@ def build_abstract_substitution_domain(
     
     #pattern_domain: IAbstractPatternDomain = FinitePatternDomain(finite_set_of_patterns, rs)
     subst_domain: IAbstractSubstitutionDomain = CartesianAbstractSubstitutionDomain(combined_domain)
-    return subst_domain
+    #return subst_domain
+    kresult_domain: IAbstractSubstitutionDomain = KResultSubstDomainWrapper(rs=rs, underlying_subst_domain=subst_domain, limit=1)
+    return kresult_domain

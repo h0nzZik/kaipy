@@ -84,21 +84,23 @@ class StateInfo:
         #    _LOGGER.warning(f'(new)')
         return True
 
-    def concrete_substitutions(self, subst_domain: IAbstractSubstitutionDomain) -> T.Iterable[Substitution]:
+    def concrete_substitutions(self, subst_domain: IAbstractSubstitutionDomain) -> T.Iterable[T.Tuple[Substitution, T.List[Kore.Pattern]]]:
         for sub,renaming in self.substitutions:
             rr = reverse_renaming(renaming)
-            concrete = subst_domain.concretize(sub)
+            concrete,constraints = subst_domain.concretize(sub)
             renamed = Substitution({Kore.EVar(rr[k.name], k.sort):v for k,v in concrete.mapping.items()})
-            yield renamed
+            yield (renamed,constraints)
 
     def print(self, kprint: KPrint, subst_domain: IAbstractSubstitutionDomain):
         print(f'state {self.description}')
         print(f'{kprint.kore_to_pretty(self.pattern)}')
         print(f'info:')
-        for i,csubst in enumerate(self.concrete_substitutions(subst_domain)):
+        for i,(csubst, constraints) in enumerate(self.concrete_substitutions(subst_domain)):
             for k,v in csubst.mapping.items():
                 print(f'    {k}:')
                 print(f'    {kprint.kore_to_pretty(v)}')
+                print(f'    {len(constraints)} constraints')
+                # TODO print constraints
 
 
 @dataclasses.dataclass
@@ -290,8 +292,10 @@ def compute_raw_concretizations(
             #_LOGGER.warning(f'Abstract subst: {abstract_subst}')
             is_new: bool = ci2.info.insert(subst_domain, abstract_subst, ci2.renaming)
             if is_new:
-                concretized_subst = subst_domain.concretize(abstract_subst)
+                concretized_subst,constraints = subst_domain.concretize(abstract_subst)
                 assert concretized_subst.mapping.keys() <= concrete_subst.mapping.keys()
+                new_constraint: Kore.Pattern = RSUtils.make_conjunction(rs, constraints)
+                _LOGGER.warning(f'new_constraint (without any renaming): {rs.kprint.kore_to_pretty(new_constraint)}')
                 # It might happen that some RHS of the substitution contains a free variable
                 # that also occurs in ci2.st and is not simultaneously mapped to something else.
                 # For example, we might have:
