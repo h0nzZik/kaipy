@@ -1,4 +1,5 @@
 import abc
+import typing as T
 
 import pyk.kore.syntax as Kore
 

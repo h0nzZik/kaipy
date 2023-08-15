@@ -68,6 +68,27 @@ def axioms(definition: Kore.Definition, main_module_name: str) -> T.List[Kore.Ax
     return axioms
 
 
+def sentences(definition: Kore.Definition, main_module_name: str) -> T.List[Kore.Sentence]:
+    module_names = {main_module_name}.union(
+        get_all_recursively_imported_module_names(definition, main_module_name)
+    )
+    modules = map(lambda name: get_module_by_name(definition, name), module_names)
+    sentences: T.List[Kore.Sentence] = []
+    for m in modules:
+        sentences.extend(m.sentences)
+    return sentences
+
+def is_sort_decl(s: Kore.Sentence) -> bool:
+    match s:
+        case Kore.SortDecl(_,_,_,_):
+            return True
+    return False
+
+
+def sort_decls(definition: Kore.Definition, main_module_name: str) -> T.List[Kore.SortDecl]:
+    return [s for s in sentences(definition, main_module_name) if is_sort_decl(s)] #type: ignore
+
+
 def rewrite_axioms(
     definition: Kore.Definition, main_module_name: str
 ) -> T.Iterable[Kore.Axiom]:

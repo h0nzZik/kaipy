@@ -14,7 +14,7 @@ class IAbstractSubstitutionDomain(abc.ABC):
         ...
     
     @abc.abstractmethod
-    def abstract(self, subst: Substitution) -> IAbstractSubstitution:
+    def abstract(self, subst: Substitution, preds: T.List[Kore.Pattern]) -> IAbstractSubstitution:
         ...
 
     @abc.abstractmethod

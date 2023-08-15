@@ -95,6 +95,14 @@ class TestImp(MyTest):
         expected = { immutabledict({"x" : 1, "y" : 3}), immutabledict({"x" : 1, "y" : 4}), immutabledict({"x" : 2, "y" : 3}), immutabledict({"x" : 2, "y" : 4}) }
         assert expected == actual
 
+    def test_sort_decl(
+        self,
+        reachability_system: ReachabilitySystem
+    ):
+        ss = reachability_system.kdw.user_declared_sorts
+        print(ss)
+        assert set(ss) == set(['SortVoidVal', 'SortAExp', 'SortBlock', 'SortBExp', 'SortPgm', 'SortStmt', 'SortValue'])
+
     def test_exact_and_bigsum_pattern_domain(
         self,
         reachability_system: ReachabilitySystem
@@ -170,6 +178,30 @@ class TestImp(MyTest):
             ).strip() == '#freezer___IMP-SYNTAX_Stmt_Stmt_Stmt0_ ( y = 2 + x ; z = y + 3 ; x = x + z ; ~> . ) ~> #freezer___IMP-SYNTAX_Stmt_Stmt_Stmt1_ ( Fresh3:Stmt ~> . ) ~> Fresh2 ~> .'
             for s in concrete_substitutions
         ])
+
+    def test_analyze_simple_symbolic(
+        self,
+        reachability_system: ReachabilitySystem,
+        context_aliases: ContextAliases
+    ):
+        input_pattern: Kore.Pattern = reachability_system.kdw.get_input_kore(
+            RSTestBase.LANGUAGES / "imp/simple-symbolic.imp"
+        )
+
+        rests = pre_analyze(reachability_system, context_aliases, input_pattern)
+        subst_domain: IAbstractSubstitutionDomain = kaipy.DefaultSubstitutionDomain.build_abstract_substitution_domain(
+            reachability_system,
+            rests,
+            input_pattern
+        )
+        states = kaipy.analyzer.analyze(
+            reachability_system,
+            subst_domain=subst_domain,
+            initial_configuration=input_pattern,
+        )
+        si: kaipy.analyzer.StateInfo = states.states_by_id['IMP.assignment']
+        si.print(kprint=reachability_system.kprint, subst_domain=subst_domain)
+        #concrete_substitutions = list(si.concrete_substitutions(subst_domain))
 
     def test_analyze(
         self, reachability_system: ReachabilitySystem, context_aliases: ContextAliases

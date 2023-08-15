@@ -16,7 +16,7 @@ class FinitePattern(IAbstractPattern):
     # -1 means Top
     idx: int
     sort: Kore.Sort
-    renaming: T.Dict[str,str] | None
+    renaming: T.Dict[str,str] | None # TODO do we still need this?
 
 class Subsumer:
     c: Kore.Pattern

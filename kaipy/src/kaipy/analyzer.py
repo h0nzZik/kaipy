@@ -164,16 +164,23 @@ def get_abstract_subst_of_state(
         {ev.name for ev in fvs},
         conj_simplified
     )
+    #_LOGGER.warning(f'conj_simplified: {rs.kprint.kore_to_pretty(conj_simplified)}')
+    #_LOGGER.warning('eqls:')
+    #for k,v in eqls.items():
+    #    _LOGGER.warning(f"  {k} : {rs.kprint.kore_to_pretty(v)}")    
     remainders = KoreUtils.get_predicates(raw_remainder) if raw_remainder is not None else []
-    #_LOGGER.warning(f"Remainder: {remainders}")
-    #for r in remainders:
-    #    _LOGGER.warning(f'r: {rs.kprint.kore_to_pretty(r)}')
+    _LOGGER.warning(f"Remainder: {remainders}")
+    for r in remainders:
+        _LOGGER.warning(f'r: {rs.kprint.kore_to_pretty(r)}')
     eqls_filtered = {k:v for k,v in eqls.items() if not KoreUtils.is_top(v)}
-    #renaming_back = reverse_renaming(renaming)
-    #eqls_filtered_renamed = { Kore.EVar(name=renaming_back[k.name], sort=k.sort):v for k,v in eqls_filtered.items()}
-    #new_subst = Substitution(immutabledict(eqls_filtered_renamed))
     new_subst = Substitution(immutabledict(eqls_filtered))
-    abstract_subst: IAbstractSubstitution = subst_domain.abstract(new_subst)
+    # We want to remember, for example, which variables V
+    # of the input pattern satisfy `true = isKResult(V)`.
+    # Such variables will occur on the right-side of the computed substitution
+    # (`new_subst`), possibly nested.
+    # We do not know in advance how many variables like that there will be.
+    # It is the `subst_domain`'s responsibility to handle these.
+    abstract_subst: IAbstractSubstitution = subst_domain.abstract(new_subst, preds=remainders)
     return abstract_subst,new_subst
 
 def rename_to_avoid(
@@ -266,7 +273,7 @@ def compute_raw_concretizations(
             #_LOGGER.warning(f'crawcon: renaming = {ci2.renaming}')
             if KoreUtils.is_bottom(ci2.conj):
                 continue
-            #_LOGGER.warning(f'crawcon: st_renamed = {rs.kprint.kore_to_pretty(ci2.st_renamed)}')
+            _LOGGER.warning(f'st_renamed ({ci2.info.description}) = {rs.kprint.kore_to_pretty(ci2.st_renamed)}')
             evars = KoreUtils.free_evars_of_pattern(ci2.st_renamed)
             #_LOGGER.warning(f'EVARS: {evars}')
             abstract_subst,concrete_subst = get_abstract_subst_of_state(
@@ -300,10 +307,10 @@ def compute_raw_concretizations(
                     for p in concretized_subst.mapping.values()
                 ]))
                 renaming = KoreUtils.compute_renaming0(vars_to_avoid, vars_to_rename)
-                concretized_subst_renamed = Substitution({k:KoreUtils.rename_vars(renaming, v) for k,v in concrete_subst.mapping.items()})
+                concretized_subst_renamed = Substitution({k:KoreUtils.rename_vars(renaming, v) for k,v in concretized_subst.mapping.items()})
                 concretized_pattern_renamed: Kore.Pattern = KoreUtils.apply_subst(concretized_subst_renamed.mapping, ci2.st_renamed)
                 concretized_pattern: Kore.Pattern = KoreUtils.rename_vars(reverse_renaming(ci2.renaming), concretized_pattern_renamed)
-                #_LOGGER.warning(f'Concretized (back with original variables): {rs.kprint.kore_to_pretty(concretized_pattern)}')
+                _LOGGER.warning(f'Concretized (back with original variables): {rs.kprint.kore_to_pretty(concretized_pattern)}')
                 new_ps_raw.append(concretized_pattern)
                 #ci2_st_renamed = KoreUtils.rename_vars(renaming, ci2.st_renamed)
                 #_LOGGER.warning(f'ci2_st_renamed: {rs.kprint.kore_to_pretty(ci2_st_renamed)}')
@@ -328,7 +335,7 @@ def for_each_match(
     conjinfos2: T.List[RawPatternProjection] = [ci.with_conj(conj2) for ci,conj2 in zip(conjinfos, conjs_simplified) if not KoreUtils.is_bottom(conj2)]
     # We cannot cleanup the pattern, because then it would not contain the desired equalities, but only the term common to the two conjuncts.
     #conjinfos2: T.List[RawPatternProjection] = [ci.with_conj(RSUtils.cleanup_pattern(rs, conj2)) for ci,conj2 in zip(conjinfos, conjs_simplified) if not KoreUtils.is_bottom(conj2)]
-    #_LOGGER.warning(f'Non-bottoms: {len(conjinfos2)}')
+    _LOGGER.warning(f'Non-bottoms: {len(conjinfos2)}')
     #for ci in conjinfos2:
     #    _LOGGER.warning(f'conj: {rs.kprint.kore_to_pretty(ci.conj)}')
 
@@ -376,11 +383,11 @@ def analyze(
         _LOGGER.warning(f'remaining {len(current_ps)} states')
         cfg = current_ps.pop()
         #cfg = normalize_pattern(cfg)
-        #_LOGGER.warning(f'cfg {rs.kprint.kore_to_pretty(cfg)}')
+        _LOGGER.warning(f'cfg {rs.kprint.kore_to_pretty(cfg)}')
         successors = [normalize_pattern(s) for s in get_successors(rs, cfg)]
         _LOGGER.warning(f'Has {len(successors)} successors')
-        #for succ in successors:
-        #    _LOGGER.warning(f'succ: {rs.kprint.kore_to_pretty(succ)}')
+        for succ in successors:
+            _LOGGER.warning(f'succ: {rs.kprint.kore_to_pretty(succ)}')
         new_ps: T.List[Kore.Pattern] = for_each_match(rs, states, successors, subst_domain)
         _LOGGER.warning(f'After processing: {len(new_ps)} states')
         current_ps.extend(new_ps)

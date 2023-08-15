@@ -23,7 +23,8 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
     def __init__(self, pattern_domain: IAbstractPatternDomain):
         self.pattern_domain = pattern_domain
     
-    def abstract(self, subst: Substitution) -> IAbstractSubstitution:
+    def abstract(self, subst: Substitution, preds: T.List[Kore.Pattern]) -> IAbstractSubstitution:
+        # we ignore `preds`
         m = {
                 v : self.pattern_domain.abstract(p)
                 for (v,p) in subst.mapping.items()
