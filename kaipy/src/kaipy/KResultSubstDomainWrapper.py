@@ -52,6 +52,8 @@ class KResultSubstDomainWrapper(IAbstractSubstitutionDomain):
     def abstract(self, subst: Substitution, preds: T.List[Kore.Pattern]) -> IAbstractSubstitution:
         a_s : IAbstractSubstitution = self.underlying_subst_domain.abstract(subst, preds)
         c_s,_ = self.underlying_subst_domain.concretize(a_s)
+        # One problem is that the rhss o c_s and subst may have different free variables.
+        # 
         # We look for element variables of the concretized substitution,
         # not of the original one - there might be more variables,
         # as some terms are abstracted away.
@@ -60,20 +62,18 @@ class KResultSubstDomainWrapper(IAbstractSubstitutionDomain):
         # but how do we recover that it is a KResult?
         # I guess that voidVal() will be only abstracted when
         # applying a cooling rule to it, which check whether it is a KResultx...
-        evars = list(itertools.chain(*[
+        evars1 = list(itertools.chain(*[
                     KoreUtils.free_evars_of_pattern(v)
                     for k,v in c_s.mapping.items()
                 ]))
+        evars2 = [k for k in subst.mapping.keys() if k not in c_s.mapping.keys()]
+        assert len(evars2) == 0
+        evars = evars1 + evars2
         monitored_evars = [e for e in evars if e.sort.name in self.rs.kdw.user_declared_sorts]
+        _LOGGER.warning(f"abstract(): monitored_evars={monitored_evars}")
 
         not_necessary_kresults: T.List[Kore.EVar] = []
         for e in monitored_evars:
-            if len(not_necessary_kresults) >= self.limit:
-                return KResultSubstDomainWrapperElement(
-                    underlying=a_s,
-                    not_necessary_kresults=None,
-                    monitored_evars=monitored_evars,
-                )
             iskr_true = self.mk_isKResult_pattern(e)
             not_iskr_true = Kore.Not(self.rs.top_sort, iskr_true)
             new_preds: T.List[Kore.Pattern] = preds + [not_iskr_true]
@@ -84,7 +84,15 @@ class KResultSubstDomainWrapper(IAbstractSubstitutionDomain):
                 top_pat
             )
             conj_simp = self.rs.simplify(conj)
+            _LOGGER.warning(f"{e}: {self.rs.kprint.kore_to_pretty(conj_simp)}")
             if not KoreUtils.is_bottom(conj_simp):
+                if len(not_necessary_kresults) >= self.limit:
+                    _LOGGER.warning(f"Limit ({self.limit}) reached.")
+                    return KResultSubstDomainWrapperElement(
+                        underlying=a_s,
+                        not_necessary_kresults=None,
+                        monitored_evars=monitored_evars,
+                    )
                 not_necessary_kresults.append(e)
 
         return KResultSubstDomainWrapperElement(

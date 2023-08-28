@@ -63,16 +63,23 @@ class BigsumPatternDomain(IAbstractPatternDomain):
         assert type(a1) is BigsumPattern
         assert type(a2) is BigsumPattern
 
-        if a2.idx == -1:
+        if a1.idx != a2.idx:
+            return False
+        
+        if a1.idx == -1:
             return True
 
-        if a1.sort != a1.sort:
-            return False
+        assert a1.ap is not None
+        assert a2.ap is not None
+        return self.domains[a1.idx].subsumes(a1.ap, a2.ap)
+        #if a1.sort != a1.sort:
+        #    return False
+        #
+        #p1 = self.concretize(a1)
+        #p2 = self.concretize(a2)
+        #return self.rs.subsumes(p1,p2)[0]
 
-        p1 = self.concretize(a1)
-        p2 = self.concretize(a2)
         
-        return self.rs.subsumes(p1,p2)[0]
 
     def print(self, a: IAbstractPattern) -> str:
         assert type(a) is BigsumPattern

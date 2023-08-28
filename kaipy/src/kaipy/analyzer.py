@@ -167,7 +167,7 @@ def get_abstract_subst_of_state(
         {ev.name for ev in fvs},
         conj_simplified
     )
-    _LOGGER.warning(f'conj_simplified: {rs.kprint.kore_to_pretty(conj_simplified)}')
+    #_LOGGER.warning(f'conj_simplified: {rs.kprint.kore_to_pretty(conj_simplified)}')
     # A problem occurring here is that `conj_simplified` is too simplified:
     # it does not contain predicates that the backend is able to deduce are always true.
     # For example, we might have a state:

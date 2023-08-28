@@ -28,10 +28,11 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
         m = {
                 v : self.pattern_domain.abstract(p)
                 for (v,p) in subst.mapping.items()
-                if not KoreUtils.is_evar(p)
+                #if not KoreUtils.is_evar(p)
             }
-        m_filtered = {k:v for k,v in m.items() if not self.pattern_domain.is_top(v)}
-        return CartesianAbstractSubstitution(m_filtered)
+        #m_filtered = {k:v for k,v in m.items() if not self.pattern_domain.is_top(v)}
+        return CartesianAbstractSubstitution(m)
+        #return CartesianAbstractSubstitution(m_filtered)
 
     def concretize(self, a: IAbstractSubstitution) -> T.Tuple[Substitution, T.List[Kore.Pattern]]:
         assert type(a) is CartesianAbstractSubstitution
@@ -39,10 +40,11 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
         # If `v` is top, we do not want to concretize it,
         # because the resulting constraint would be something like
         # `X = Top()`. But such substitution is useless.
+        # So, we replace Top() with a free variable of a given sort.
         concretes: T.Dict[Kore.EVar, Kore.Pattern] = {
-            k : self.pattern_domain.concretize(v)
+            k : ( Kore.EVar(name="VarDEFAULT", sort=k.sort) if self.pattern_domain.is_top(v) else self.pattern_domain.concretize(v))
             for k,v in a.mapping.items()
-            if not self.pattern_domain.is_top(v)
+            #if not self.pattern_domain.is_top(v)
         }
         for k in concretes:
             assert not KoreUtils.is_top(concretes[k])
