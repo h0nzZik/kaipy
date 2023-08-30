@@ -8,6 +8,7 @@ from immutabledict import immutabledict
 import pyk.kore.syntax as Kore
 
 import kaipy.kore_utils as KoreUtils
+from kaipy.AbstractionContext import AbstractionContext
 from kaipy.Substitution import Substitution
 from kaipy.IAbstractPatternDomain import IAbstractPatternDomain, IAbstractPattern
 from kaipy.IAbstractSubstitutionDomain import IAbstractSubstitution, IAbstractSubstitutionDomain
@@ -23,10 +24,10 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
     def __init__(self, pattern_domain: IAbstractPatternDomain):
         self.pattern_domain = pattern_domain
     
-    def abstract(self, subst: Substitution, preds: T.List[Kore.Pattern]) -> IAbstractSubstitution:
+    def abstract(self, ctx: AbstractionContext, subst: Substitution) -> CartesianAbstractSubstitution:
         # we ignore `preds`
         m = {
-                v : self.pattern_domain.abstract(p)
+                v : self.pattern_domain.abstract(ctx, p)
                 for (v,p) in subst.mapping.items()
                 #if not KoreUtils.is_evar(p)
             }
@@ -34,7 +35,28 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
         return CartesianAbstractSubstitution(m)
         #return CartesianAbstractSubstitution(m_filtered)
 
-    def concretize(self, a: IAbstractSubstitution) -> T.Tuple[Substitution, T.List[Kore.Pattern]]:
+    def refine(self, ctx: AbstractionContext, a: IAbstractSubstitution, c: T.List[Kore.MLPred]) -> CartesianAbstractSubstitution:
+        assert type(a) is CartesianAbstractSubstitution
+        d = dict(a.mapping)
+        for p in c:
+            match p:
+                case Kore.Equals(_, _, Kore.EVar(_, _), Kore.EVar(_, _)):
+                    continue
+                case Kore.Equals(_, _, Kore.EVar(n, s), right):
+                    if Kore.EVar(n, s) in d.keys():
+                        d[Kore.EVar(n,s)] = self.pattern_domain.refine(ctx, d[Kore.EVar(n, s)], right)
+                    else:
+                        d[Kore.EVar(n,s)] = self.pattern_domain.abstract(ctx, right)
+                    continue
+                case Kore.Equals(_, _, left, Kore.EVar(n, s)):
+                    if Kore.EVar(n, s) in d.keys():
+                        d[Kore.EVar(n,s)] = self.pattern_domain.refine(ctx, d[Kore.EVar(n, s)], left)
+                    else:
+                        d[Kore.EVar(n,s)] = self.pattern_domain.abstract(ctx, left)
+        return CartesianAbstractSubstitution(d)       
+
+
+    def concretize(self, a: IAbstractSubstitution) -> Substitution:
         assert type(a) is CartesianAbstractSubstitution
 
         # If `v` is top, we do not want to concretize it,
@@ -74,7 +96,7 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
             vars_to_avoid = vars_to_avoid.union(
                 KoreUtils.free_evars_of_pattern(v_renamed)
             )
-        return (Substitution(immutabledict(concretes_renamed)),[])
+        return Substitution(immutabledict(concretes_renamed))
     
     def equals(self, a1: IAbstractSubstitution, a2: IAbstractSubstitution) -> bool:
         assert type(a1) is CartesianAbstractSubstitution

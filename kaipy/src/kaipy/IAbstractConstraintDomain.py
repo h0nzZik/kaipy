@@ -16,7 +16,7 @@ class IAbstractConstraintDomain(abc.ABC):
         ...
     
     @abc.abstractmethod
-    def refine(self, a: IAbstractConstraint, c: T.List[Kore.MLPred]) -> IAbstractConstraint:
+    def refine(self, ctx: AbstractionContext, a: IAbstractConstraint, c: T.List[Kore.MLPred]) -> IAbstractConstraint:
         ...
 
     @abc.abstractmethod

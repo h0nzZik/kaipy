@@ -17,7 +17,7 @@ class IAbstractSubstitutionDomain(abc.ABC):
         ...
     
     @abc.abstractmethod
-    def refine(self, a: IAbstractSubstitution, c: T.List[Kore.MLPred]) -> IAbstractSubstitution:
+    def refine(self, ctx: AbstractionContext, a: IAbstractSubstitution, c: T.List[Kore.MLPred]) -> IAbstractSubstitution:
         ...
 
     @abc.abstractmethod

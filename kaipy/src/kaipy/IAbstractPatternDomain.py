@@ -15,6 +15,10 @@ class IAbstractPatternDomain(abc.ABC):
         ...
 
     @abc.abstractmethod
+    def refine(self, ctx: AbstractionContext, a: IAbstractPattern, c: Kore.Pattern) -> IAbstractPattern:
+        ...
+
+    @abc.abstractmethod
     def is_top(self, a: IAbstractPattern) -> bool:
         ...
 
