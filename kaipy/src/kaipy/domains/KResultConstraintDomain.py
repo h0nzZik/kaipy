@@ -3,16 +3,18 @@ import typing as T
 import logging
 
 import pyk.kore.syntax as Kore
+import pyk.kore.prelude as KorePrelude
 
 from kaipy.interfaces.IAbstractConstraintDomain import IAbstractConstraint, IAbstractConstraintDomain
+from kaipy.AbstractionContext import AbstractionContext
 from kaipy.ReachabilitySystem import ReachabilitySystem
 
 _LOGGER: T.Final = logging.getLogger(__name__)
 
 @dataclasses.dataclass
 class KResultConstraint(IAbstractConstraint):
-    # None means 'overflow'
-    not_necessary_kresults: T.List[Kore.EVar] | None
+    monitored_evars: T.List[Kore.EVar]
+    not_necessary_kresults: T.List[Kore.EVar]
 
 class KResultConstraintDomain(IAbstractConstraintDomain):
     rs: ReachabilitySystem
@@ -26,7 +28,7 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
         self.rs = rs
         self.limit = limit
     
-    def mk_isKResult_pattern(self, e: Kore.EVar) -> Kore.Pattern:
+    def _mk_isKResult_pattern(self, e: Kore.EVar) -> Kore.MLPred:
         pe = Kore.App('kseq', (), (
                 KorePrelude.inj(e.sort, KorePrelude.SORT_K_ITEM, e),
                 KorePrelude.DOTK,
@@ -35,97 +37,82 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
         iskr_true = Kore.Equals(KorePrelude.BOOL, self.rs.top_sort, iskr, KorePrelude.TRUE)
         return iskr_true
 
-    def abstract(self, c: T.List[Kore.MLPred]) -> KResultConstraint:
-        a_s : IAbstractSubstitution = self.underlying_subst_domain.abstract(subst, preds)
-        c_s,_ = self.underlying_subst_domain.concretize(a_s)
-        # One problem is that the rhss o c_s and subst may have different free variables.
-        # 
-        # We look for element variables of the concretized substitution,
-        # not of the original one - there might be more variables,
-        # as some terms are abstracted away.
-        # However, I am not sure how to deal with the following:
-        # say, voidVal() gets abstracted as a variable,
-        # but how do we recover that it is a KResult?
-        # I guess that voidVal() will be only abstracted when
-        # applying a cooling rule to it, which check whether it is a KResultx...
-        evars1 = list(itertools.chain(*[
-                    KoreUtils.free_evars_of_pattern(v)
-                    for k,v in c_s.mapping.items()
-                ]))
-        evars2 = [k for k in subst.mapping.keys() if k not in c_s.mapping.keys()]
-        assert len(evars2) == 0
-        evars = evars1 + evars2
-        monitored_evars = [e for e in evars if e.sort.name in self.rs.kdw.user_declared_sorts]
-        _LOGGER.warning(f"abstract(): monitored_evars={monitored_evars}")
+    def abstract(self, ctx: AbstractionContext, c: T.List[Kore.MLPred]) -> KResultConstraint:
+        a = KResultConstraint(monitored_evars=[], not_necessary_kresults=[])
+        return self.refine(ctx, a, c)
+    
+    def _kresults_of(self, a: KResultConstraint):
+        return [e for e in a.monitored_evars if e not in a.not_necessary_kresults]
 
-        not_necessary_kresults: T.List[Kore.EVar] = []
-        for e in monitored_evars:
-            iskr_true = self.mk_isKResult_pattern(e)
-            not_iskr_true = Kore.Not(self.rs.top_sort, iskr_true)
-            new_preds: T.List[Kore.Pattern] = preds + [not_iskr_true]
-            top_pat: Kore.Pattern = Kore.Top(self.rs.top_sort)
-            conj = functools.reduce(
-                lambda p, eq: Kore.And(self.rs.top_sort, eq, p),
-                new_preds,
-                top_pat
-            )
-            conj_simp = self.rs.simplify(conj)
-            _LOGGER.warning(f"{e}: {self.rs.kprint.kore_to_pretty(conj_simp)}")
-            if not KoreUtils.is_bottom(conj_simp):
-                if len(not_necessary_kresults) >= self.limit:
-                    _LOGGER.warning(f"Limit ({self.limit}) reached.")
-                    return KResultSubstDomainWrapperElement(
-                        underlying=a_s,
-                        not_necessary_kresults=None,
-                        monitored_evars=monitored_evars,
-                    )
-                not_necessary_kresults.append(e)
+    def is_top(self, a: IAbstractConstraint) -> bool:
+        assert type(a) is KResultConstraint
+        return len(self._kresults_of(a)) == 0
 
-        return KResultSubstDomainWrapperElement(
-            underlying=a_s,
-            not_necessary_kresults=not_necessary_kresults,
+    def _test_necessary_kresult(self, e: Kore.EVar, phi: Kore.MLPred) -> bool:
+        iskr_true = self._mk_isKResult_pattern(e)
+        not_iskr_true = Kore.Not(e.sort, iskr_true)
+        conj0 = Kore.And(sort=e.sort, left=e, right=not_iskr_true)
+        conj = Kore.And(sort=e.sort, left=conj0, right=phi)
+        conj_simp = self.rs.simplify(conj)
+        return KoreUtils.is_bottom(conj_simp)
+
+    def refine(self, ctx: AbstractionContext, a: IAbstractConstraint, c: T.List[Kore.MLPred]) -> KResultConstraint:
+        assert type(a) is KResultConstraint
+        monitored_evars: T.List[Kore.EVar] = a.monitored_evars.copy()
+        not_necessary_kresults: T.List[Kore.EVar] = a.not_necessary_kresults.copy()
+        for p in c:
+            match p:
+                case Kore.Equals(_, _, Kore.EVar(_, _), Kore.EVar(_, _)):
+                case Kore.Equals(_, _, Kore.EVar(n, s), right):
+                    monitored_evars.append(Kore.EVar(n, s))
+                    if not self._test_necessary_kresult(e=Kore.EVar(n, s), phi=p):
+                        not_necessary_kresults.append(Kore.EVar(n, s))
+                case Kore.Equals(_, _, left, Kore.EVar(n, s)):
+                    monitored_evars.append(Kore.EVar(n, s))
+                    if not self._test_necessary_kresult(e=Kore.EVar(n, s), phi=p):
+                        not_necessary_kresults.append(Kore.EVar(n, s))
+        
+        if len(not_necessary_kresults) > self.limit:
+            _LOGGER.warning(f"Limit ({self.limit}) reached.")
+            not_necessary_kresults = not_necessary_kresults[0:self.limit]
+
+        return KResultConstraint(
             monitored_evars=monitored_evars,
+            not_necessary_kresults=not_necessary_kresults,
         )
     
-    def concretize(self, a: IAbstractSubstitution) -> T.Tuple[Substitution, T.List[Kore.Pattern]]:
-        assert type(a) is KResultSubstDomainWrapperElement
+    def concretize(self, a: IAbstractConstraint) -> T.List[Kore.MLPred]:
+        assert type(a) is KResultConstraint
+        return [
+            self._mk_isKResult_pattern(e)
+            for ev in self._kresults_of(a)
+        ]
 
-        (concrete_subst,constraints) = self.underlying_subst_domain.concretize(a.underlying)
-        if a.not_necessary_kresults is None:
-            _LOGGER.warning(f'Concretize: no additional constraints')
-            return (concrete_subst,constraints)
+    def disjunction(self, ctx: AbstractionContext, a1: IAbstractConstraint, a2: IAbstractConstraint) -> KResultConstraint:
+        assert type(a1) is KResultConstraint
+        assert type(a2) is KResultConstraint
 
-        #evars = list(itertools.chain(*[
-        #            KoreUtils.free_evars_of_pattern(v)
-        #            for k,v in concrete_subst.mapping.items()
-        #        ]))
-        #_LOGGER.warning(f'Concretize: evars={evars}')
-        #monitored_evars = [e for e in evars if e.sort.name in self.rs.kdw.user_declared_sorts]
-        monitored_evars = a.monitored_evars
-        _LOGGER.warning(f'Concretize: monitored_evars={monitored_evars}')
-        new_constraints: T.List[Kore.Pattern] = []
-        for ev in monitored_evars:
-            if ev in a.not_necessary_kresults:
-                continue
-            new_constraints.append(self.mk_isKResult_pattern(ev))
+        not_necessary_kresults = list(set(a1.not_necessary_kresults).union(set(a2.not_necessary_kresults)))
+        if len(not_necessary_kresults) > self.limit:
+            not_necessary_kresults = not_necessary_kresults[0:self.limit]
         
-        _LOGGER.warning(f'Concretize: some ({len(new_constraints)}) additional constraints')
-        return (concrete_subst, constraints + new_constraints)
+        return KResultConstraint(
+            monitored_evars=list(set(a1.monitored_evars).union(set(a2.monitored_evars))), 
+            not_necessary_kresults=not_necessary_kresults,
+        )
 
 
     def equals(self, a1: IAbstractSubstitution, a2: IAbstractSubstitution) -> bool:
-        # Not implemented yet, not needed yet
-        return False
+        assert type(a1) is KResultConstraint
+        assert type(a2) is KResultConstraint
+        return set(self._kresults_of(a1)) == set(self._kresults_of(a2))
 
     def subsumes(self, a1: IAbstractSubstitution, a2: IAbstractSubstitution) -> bool:
-        assert type(a1) is KResultSubstDomainWrapperElement
-        assert type(a2) is KResultSubstDomainWrapperElement
-
-        # TODO implement properly!
-        return self.underlying_subst_domain.subsumes(a1.underlying, a2.underlying)
+        assert type(a1) is KResultConstraint
+        assert type(a2) is KResultConstraint
+        return set(self._kresults_of(a1)) >= set(self._kresults_of(a2))
     
-    def print(self, a: IAbstractSubstitution) -> str:
-        assert type(a) is KResultSubstDomainWrapperElement
-        v = len(a.not_necessary_kresults) if a.not_necessary_kresults is not None else -1
-        return f'<kr {v}, {self.underlying_subst_domain.print(a.underlying)}  >'
+    def to_str(self, a: IAbstractConstraint) -> str:
+        assert type(a) is KResultConstraint
+        return str(self._kresults_of(a))
 
