@@ -4,6 +4,7 @@ import typing as T
 import pyk.kore.syntax as Kore
 
 from kaipy.Substitution import Substitution
+from kaipy.AbstractionContext import AbstractionContext
 
 class IAbstractSubstitution(abc.ABC):
     ...
@@ -13,8 +14,9 @@ class IAbstractSubstitutionDomain(abc.ABC):
     def concretize(self, a: IAbstractSubstitution) -> T.Tuple[Substitution, T.List[Kore.Pattern]]:
         ...
     
+    # pre: ctx.variable_manager yields only variables not occurring in `subst`
     @abc.abstractmethod
-    def abstract(self, subst: Substitution, preds: T.List[Kore.Pattern]) -> IAbstractSubstitution:
+    def abstract(self, ctx: AbstractionContext, subst: Substitution) -> IAbstractSubstitution:
         ...
 
     @abc.abstractmethod

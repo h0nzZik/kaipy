@@ -3,23 +3,30 @@ import typing as T
 
 import pyk.kore.syntax as Kore
 
+from kaipy.AbstractionContext import AbstractionContext
+
 class IAbstractConstraint(abc.ABC):
     ...
 
 class IAbstractConstraintDomain(abc.ABC):
     # preds is a list of predicates
+    # pre: ctx.variable_manager yields only variables not occurring in `c`
     @abc.abstractmethod
-    def abstract(preds: T.List[Kore.MLPred]) -> IAbstractConstraint:
+    def abstract(self, ctx: AbstractionContext, c: T.List[Kore.MLPred]) -> IAbstractConstraint:
         ...
     
     @abc.abstractmethod
-    def concretize(a: IAbstractConstraint) -> T.List[Kore.MLPred]:
+    def refine(self, a: IAbstractConstraint, c: T.List[Kore.MLPred]) -> IAbstractConstraint:
+        ...
+
+    @abc.abstractmethod
+    def concretize(self, a: IAbstractConstraint) -> T.List[Kore.MLPred]:
+        ...
+
+    @abc.abstractmethod
+    def subsumes(self, a1: IAbstractConstraint, a2: IAbstractConstraint) -> bool:
         ...
     
     @abc.abstractmethod
-    def subsumes(a1, a2) -> bool:
-        ...
-    
-    @abc.abstractmethod
-    def to_str(a) -> str:
+    def to_str(self, a: IAbstractConstraint) -> str:
         ...

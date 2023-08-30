@@ -18,6 +18,7 @@ import kaipy.kore_utils as KoreUtils
 
 from kaipy.IAbstractPatternDomain import IAbstractPattern, IAbstractPatternDomain
 from kaipy.IAbstractSubstitutionDomain import IAbstractSubstitution, IAbstractSubstitutionDomain
+from kaipy.IAbstractConstraintDomain import IAbstractConstraintDomain, IAbstractConstraint
 
 from .ReachabilitySystem import ReachabilitySystem, KoreClientServer, get_global_kcs
 from .KompiledDefinitionWrapper import KompiledDefinitionWrapper
@@ -26,7 +27,7 @@ from .Substitution import Substitution
 _LOGGER: T.Final = logging.getLogger(__name__)
 
 
-
+# TODO remove
 # Turns
 # { x |-> {phi1, phi2}, y |-> {phi3, phi4} }
 # into
@@ -57,7 +58,8 @@ class StateInfo:
     # and that it will have the keys that the original substitution had.
     # Therefore, we need to store the mapping from which the original substitution was created,
     # so that we can apply it reversely on concretized substitutions.
-    substitutions: T.List[T.Tuple[IAbstractSubstitution, T.Mapping[str,str]]]
+    #substitutions: T.List[T.Tuple[IAbstractSubstitution, T.Mapping[str,str]]]
+    specializations: T.List[IAbstractConstraint]
     
     def insert(
         self,

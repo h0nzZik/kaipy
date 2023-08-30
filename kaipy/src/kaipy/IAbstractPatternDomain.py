@@ -3,12 +3,15 @@ import typing as T
 
 import pyk.kore.syntax as Kore
 
+from kaipy.AbstractionContext import AbstractionContext
+
 class IAbstractPattern(abc.ABC):
     ...
 
 class IAbstractPatternDomain(abc.ABC):
+    # pre: ctx.variable_manager yields only variables not occurring in `c`
     @abc.abstractmethod
-    def abstract(self, c: Kore.Pattern) -> IAbstractPattern:
+    def abstract(self, ctx: AbstractionContext,  c: Kore.Pattern) -> IAbstractPattern:
         ...
 
     @abc.abstractmethod

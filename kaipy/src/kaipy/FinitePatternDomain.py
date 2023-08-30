@@ -8,6 +8,8 @@ import pyk.kore.syntax as Kore
 import kaipy.kore_utils as KoreUtils
 from kaipy.ReachabilitySystem import ReachabilitySystem, KoreClientServer, get_global_kcs
 from kaipy.IAbstractPatternDomain import IAbstractPattern, IAbstractPatternDomain
+from kaipy.IBroadcastChannel import IBroadcastChannel
+from kaipy.VariableManager import VariableManager
 
 _LOGGER: T.Final = logging.getLogger(__name__)
 
