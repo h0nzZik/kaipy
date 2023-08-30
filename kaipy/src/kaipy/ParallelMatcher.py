@@ -77,13 +77,14 @@ class MatchResult:
     renaming: T.Dict[str, str]       # how we renamed the variables of `.state`
     constraints: T.List[Kore.MLPred]
 
+# Guarantees that the i-th position of the result corresponds to the i-th position of `states`
 def parallel_match(rs: ReachabilitySystem, cfg: Kore.Pattern, states: T.List[Kore.Pattern]) -> T.List[MatchResult]:
     # list of conjunctions of `cfgs` and renamed `states`
     conjinfos: T.List[_RawPatternProjection] = _compute_list_of_raw_pattern_projections(rs=rs, states=states, cfg=cfg)
     #_LOGGER.warning(f'Simplifying {len(conjinfos)} items at once')
     conjs_simplified = rs.map_simplify([ci.conj for ci in conjinfos])
     #_LOGGER.warning(f'done.')
-    conjinfos2: T.List[_RawPatternProjection] = [ci.with_conj(conj2) for ci,conj2 in zip(conjinfos, conjs_simplified) if not KoreUtils.is_bottom(conj2)]
+    conjinfos2: T.List[_RawPatternProjection] = [ci.with_conj(conj2) for ci,conj2 in zip(conjinfos, conjs_simplified)]
     result = [
         MatchResult(
             cfg=ci.cfg,
@@ -102,7 +103,7 @@ def parallel_match(rs: ReachabilitySystem, cfg: Kore.Pattern, states: T.List[Kor
             # but the fact that `isKResult(X ~> .)` is forgotten.
             # Therefore, we have to read the predicates of the state
             # and add them to the list of predicates derived from the conjunction.
-            constraints=KoreUtils.get_predicates(ci.conj)+KoreUtils.get_predicates(ci.st_renamed)
+            constraints=([ci.conj] if KoreUtils.is_bottom(ci.conj) else KoreUtils.get_predicates(ci.conj)+KoreUtils.get_predicates(ci.st_renamed))
         )
         for ci in conjinfos2
     ]

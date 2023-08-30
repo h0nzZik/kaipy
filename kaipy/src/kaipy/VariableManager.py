@@ -9,7 +9,11 @@ class VariableManager:
     def __init__(self, initial_counter: int):
         self.counter = initial_counter
     
-    def get_fresh_evar(self, sort: Kore.Sort) -> Kore.EVar:
+    def get_fresh_evar_name(self) -> str:
         c = self.counter
         self.counter = self.counter + 1
-        return Kore.EVar(name="SV"+str(c), sort=sort)
+        return "VARSV"+str(c)
+
+    def get_fresh_evar(self, sort: Kore.Sort) -> Kore.EVar:
+        name = self.get_fresh_evar_name()
+        return Kore.EVar(name=name, sort=sort)

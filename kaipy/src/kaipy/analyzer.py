@@ -154,9 +154,6 @@ def build_states(rs: ReachabilitySystem, vars_to_avoid: T.Set[Kore.EVar]) -> Sta
     return States(states_by_pattern=d, states_by_id=d2)
 
 
-def reverse_renaming(renaming: T.Mapping[str, str]) -> T.Dict[str, str]:
-    return {v:k for k,v in renaming.items()}
-
 
 
 # What is going on with the renamings?

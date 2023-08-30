@@ -22,6 +22,12 @@ def make_conjunction(rs: ReachabilitySystem, l: T.List[Kore.Pattern]) -> Kore.Pa
         result = Kore.And(rs.top_sort, result, x)
     return result
 
+def make_disjunction(rs: ReachabilitySystem, l: T.List[Kore.Pattern]) -> Kore.Pattern:
+    result: Kore.Pattern = Kore.Bottom(rs.top_sort)
+    for x in l:
+        result = Kore.Or(rs.top_sort, result, x)
+    return result
+
 
 def cleanup_pattern(rs: ReachabilitySystem, phi: Kore.Pattern) -> Kore.Pattern:
     main_part, _ = filter_out_predicates(phi)

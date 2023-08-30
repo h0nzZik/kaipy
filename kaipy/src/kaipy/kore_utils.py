@@ -541,3 +541,7 @@ def mapping_to_pattern(
     for lhs, rhs in m.items():
         result = Kore.And(sort, result, Kore.Equals(lhs.sort, sort, lhs, rhs))
     return result
+
+
+def reverse_renaming(renaming: T.Mapping[str, str]) -> T.Dict[str, str]:
+    return {v:k for k,v in renaming.items()}

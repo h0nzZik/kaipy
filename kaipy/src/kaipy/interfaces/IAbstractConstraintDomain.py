@@ -32,5 +32,9 @@ class IAbstractConstraintDomain(abc.ABC):
         ...
     
     @abc.abstractmethod
+    def equals(self, a1: IAbstractConstraint, a2: IAbstractConstraint) -> bool:
+        ...
+
+    @abc.abstractmethod
     def to_str(self, a: IAbstractConstraint) -> str:
         ...

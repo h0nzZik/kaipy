@@ -28,6 +28,10 @@ class IAbstractPatternDomain(abc.ABC):
         ...
 
     @abc.abstractmethod
+    def is_bottom(self, a: IAbstractPattern) -> bool:
+        ...
+
+    @abc.abstractmethod
     def concretize(self, a: IAbstractPattern) -> Kore.Pattern:
         ...
 
@@ -39,7 +43,6 @@ class IAbstractPatternDomain(abc.ABC):
     def subsumes(self, a1: IAbstractPattern, a2: IAbstractPattern) -> bool:
         ...
     
-    # TODO rename to `to_str`
     @abc.abstractmethod
-    def print(self, a: IAbstractPattern) -> str:
+    def to_str(self, a: IAbstractPattern) -> str:
         ...
