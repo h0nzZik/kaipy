@@ -20,6 +20,10 @@ class IAbstractConstraintDomain(abc.ABC):
         ...
 
     @abc.abstractmethod
+    def disjunction(self, ctx: AbstractionContext, a1: IAbstractConstraint, a2: IAbstractConstraint) -> IAbstractConstraint:
+        ...
+
+    @abc.abstractmethod
     def concretize(self, a: IAbstractConstraint) -> T.List[Kore.MLPred]:
         ...
 

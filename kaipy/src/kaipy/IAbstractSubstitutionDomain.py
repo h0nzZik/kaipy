@@ -17,6 +17,10 @@ class IAbstractSubstitutionDomain(abc.ABC):
         ...
     
     @abc.abstractmethod
+    def disjunction(self, ctx: AbstractionContext, a1: IAbstractSubstitution, a2: IAbstractSubstitution) -> IAbstractSubstitution:
+        ...
+
+    @abc.abstractmethod
     def refine(self, ctx: AbstractionContext, a: IAbstractSubstitution, c: T.List[Kore.MLPred]) -> IAbstractSubstitution:
         ...
 

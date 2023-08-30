@@ -19,6 +19,11 @@ class IAbstractPatternDomain(abc.ABC):
         ...
 
     @abc.abstractmethod
+    def disjunction(self, ctx: AbstractionContext, a1: IAbstractPattern, a2: IAbstractPattern) -> IAbstractPattern:
+        ...
+
+
+    @abc.abstractmethod
     def is_top(self, a: IAbstractPattern) -> bool:
         ...
 
