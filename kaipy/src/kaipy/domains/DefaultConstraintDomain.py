@@ -17,11 +17,11 @@ from kaipy.KResultConstraintDomain import KResultConstraintDomain
 from kaipy.ReachabilitySystem import ReachabilitySystem
 
 
-def build_abstract_substitution_domain(
+def build_abstract_constraint_domain(
     rs: ReachabilitySystem,
     rests: T.List[Kore.Pattern],
     initial_configuration: Kore.Pattern
-) -> IAbstractSubstitutionDomain:
+) -> IAbstractConstraintDomain:
     initial_configuration = rs.simplify(initial_configuration)
     subpatterns: T.List[Kore.Pattern] = list(KoreUtils.some_subpatterns_of(initial_configuration).keys())
     finite_set_of_patterns = rests + subpatterns
