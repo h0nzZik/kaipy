@@ -10,8 +10,8 @@ import pyk.kore.syntax as Kore
 import kaipy.kore_utils as KoreUtils
 from kaipy.AbstractionContext import AbstractionContext
 from kaipy.Substitution import Substitution
-from kaipy.IAbstractPatternDomain import IAbstractPatternDomain, IAbstractPattern
-from kaipy.IAbstractSubstitutionDomain import IAbstractSubstitution, IAbstractSubstitutionDomain
+from kaipy.interfaces.IAbstractPatternDomain import IAbstractPatternDomain, IAbstractPattern
+from kaipy.interfaces.IAbstractSubstitutionDomain import IAbstractSubstitution, IAbstractSubstitutionDomain
 
 
 @dataclasses.dataclass
@@ -128,6 +128,6 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
             ]
         )
 
-    def print(self, a: IAbstractSubstitution) -> str:
+    def to_str(self, a: IAbstractSubstitution) -> str:
         assert type(a) is CartesianAbstractSubstitution
-        return pprint.pformat({ k: self.pattern_domain.print(v) for k,v in a.mapping.items() })
+        return pprint.pformat({ k: self.pattern_domain.to_str(v) for k,v in a.mapping.items() })

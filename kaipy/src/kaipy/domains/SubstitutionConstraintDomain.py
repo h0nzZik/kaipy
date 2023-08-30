@@ -6,8 +6,8 @@ import pyk.kore.syntax as Kore
 
 from kaipy.ReachabilitySystem import ReachabilitySystem
 from kaipy.AbstractionContext import AbstractionContext
-from kaipy.IAbstractConstraintDomain import IAbstractConstraint, IAbstractConstraintDomain
-from kaipy.IAbstractSubstitutionDomain import IAbstractSubstitution, IAbstractSubstitutionDomain
+from kaipy.interfaces.IAbstractConstraintDomain import IAbstractConstraint, IAbstractConstraintDomain
+from kaipy.interfaces.IAbstractSubstitutionDomain import IAbstractSubstitution, IAbstractSubstitutionDomain
 from kaipy.Substitution import Substitution
 
 @dataclasses.dataclass
@@ -40,9 +40,9 @@ class SubstitutionConstraintDomain(IAbstractConstraintDomain):
         return a
 
     
-    def refine(self, a: IAbstractConstraint, c: T.List[Kore.MLPred]) -> IAbstractConstraint:
+    def refine(self, ctx: AbstractionContext, a: IAbstractConstraint, c: T.List[Kore.MLPred]) -> IAbstractConstraint:
         assert type(a) is SubstitutionConstraint
-        new_nested = self.nested.refine(a.nested, c)
+        new_nested = self.nested.refine(ctx, a.nested, c)
         new_a = SubstitutionConstraint(new_nested)
         return new_a
 

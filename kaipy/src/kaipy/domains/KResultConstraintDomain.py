@@ -1,9 +1,13 @@
 import dataclasses
 import typing as T
+import logging
 
 import pyk.kore.syntax as Kore
 
-import kaipy.IAbstractConstraintDomain
+from kaipy.interfaces.IAbstractConstraintDomain import IAbstractConstraint, IAbstractConstraintDomain
+from kaipy.ReachabilitySystem import ReachabilitySystem
+
+_LOGGER: T.Final = logging.getLogger(__name__)
 
 @dataclasses.dataclass
 class KResultConstraint(IAbstractConstraint):

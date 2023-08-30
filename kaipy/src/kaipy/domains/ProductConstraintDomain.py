@@ -4,7 +4,7 @@ import typing as T
 import pyk.kore.syntax as Kore
 
 from kaipy.AbstractionContext import AbstractionContext
-from kaipy.IAbstractConstraintDomain import IAbstractConstraint, IAbstractConstraintDomain
+from kaipy.interfaces.IAbstractConstraintDomain import IAbstractConstraint, IAbstractConstraintDomain
 
 @dataclasses.dataclass
 class ProductConstraint(IAbstractConstraint):
@@ -24,10 +24,10 @@ class ProductConstraintDomain(IAbstractConstraintDomain):
         right = self.right_domain.abstract(ctx, c)
         return ProductConstraint(left=left, right=right)
     
-    def refine(self, a: IAbstractConstraint, c: T.List[Kore.MLPred]) -> IAbstractConstraint:
+    def refine(self, ctx: AbstractionContext, a: IAbstractConstraint, c: T.List[Kore.MLPred]) -> IAbstractConstraint:
         assert type(a) is ProductConstraint
-        left = self.left_domain.refine(a.left, c)
-        right = self.right_domain.refine(a.right, c)
+        left = self.left_domain.refine(ctx, a.left, c)
+        right = self.right_domain.refine(ctx, a.right, c)
         return ProductConstraint(left=left, right=right)
 
     def concretize(self, a: IAbstractConstraint) -> T.List[Kore.MLPred]:

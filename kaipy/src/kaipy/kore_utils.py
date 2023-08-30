@@ -493,7 +493,7 @@ def filter_out_predicates(
     phi: Kore.Pattern,
 ) -> T.Tuple[T.Optional[Kore.Pattern], T.List[Kore.MLPred]]:
     if issubclass(type(phi), Kore.MLPred):
-        return None, [phi]
+        return None, [phi] # type: ignore
     match phi:
         case Kore.And(sort, left, right):
             lf, ps1 = filter_out_predicates(left)
