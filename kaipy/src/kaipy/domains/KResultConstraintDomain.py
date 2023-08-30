@@ -15,7 +15,7 @@ _LOGGER: T.Final = logging.getLogger(__name__)
 @dataclasses.dataclass
 class KResultConstraint(IAbstractConstraint):
     monitored_evars: T.List[Kore.EVar]
-    not_necessary_kresults: T.List[Kore.EVar]
+    not_necessary_kresults: T.List[Kore.EVar] | None
 
 class KResultConstraintDomain(IAbstractConstraintDomain):
     rs: ReachabilitySystem
@@ -43,6 +43,8 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
         return self.refine(ctx, a, c)
     
     def _kresults_of(self, a: KResultConstraint):
+        if a.not_necessary_kresults is None:
+            return []
         return [e for e in a.monitored_evars if e not in a.not_necessary_kresults]
 
     def is_top(self, a: IAbstractConstraint) -> bool:
@@ -59,6 +61,9 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
 
     def refine(self, ctx: AbstractionContext, a: IAbstractConstraint, c: T.List[Kore.MLPred]) -> KResultConstraint:
         assert type(a) is KResultConstraint
+        if a.not_necessary_kresults is None:
+            return a
+        
         monitored_evars: T.List[Kore.EVar] = a.monitored_evars.copy()
         not_necessary_kresults: T.List[Kore.EVar] = a.not_necessary_kresults.copy()
         for p in c:
@@ -85,6 +90,9 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
     
     def concretize(self, a: IAbstractConstraint) -> T.List[Kore.MLPred]:
         assert type(a) is KResultConstraint
+        if a.not_necessary_kresults is None:
+            return []
+
         return [
             self._mk_isKResult_pattern(ev)
             for ev in self._kresults_of(a)
@@ -93,6 +101,11 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
     def disjunction(self, ctx: AbstractionContext, a1: IAbstractConstraint, a2: IAbstractConstraint) -> KResultConstraint:
         assert type(a1) is KResultConstraint
         assert type(a2) is KResultConstraint
+
+        if a1.not_necessary_kresults is None:
+            return a1
+        if a2.not_necessary_kresults is None:
+            return a2
 
         not_necessary_kresults = list(set(a1.not_necessary_kresults).union(set(a2.not_necessary_kresults)))
         if len(not_necessary_kresults) > self.limit:
@@ -103,16 +116,15 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
             not_necessary_kresults=not_necessary_kresults,
         )
 
-
     def equals(self, a1: IAbstractConstraint, a2: IAbstractConstraint) -> bool:
         assert type(a1) is KResultConstraint
         assert type(a2) is KResultConstraint
-        return set(self._kresults_of(a1)) == set(self._kresults_of(a2))
+        return set(self.concretize(a1)) == set(self.concretize(a2))
 
     def subsumes(self, a1: IAbstractConstraint, a2: IAbstractConstraint) -> bool:
         assert type(a1) is KResultConstraint
         assert type(a2) is KResultConstraint
-        return set(self._kresults_of(a1)) >= set(self._kresults_of(a2))
+        return set(self.concretize(a1)) <= set(self.concretize(a2))
     
     def to_str(self, a: IAbstractConstraint) -> str:
         assert type(a) is KResultConstraint
