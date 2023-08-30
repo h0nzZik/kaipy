@@ -491,7 +491,7 @@ def compute_renaming(
 
 def filter_out_predicates(
     phi: Kore.Pattern,
-) -> T.Tuple[T.Optional[Kore.Pattern], T.List[Kore.Pattern]]:
+) -> T.Tuple[T.Optional[Kore.Pattern], T.List[Kore.MLPred]]:
     if issubclass(type(phi), Kore.MLPred):
         return None, [phi]
     match phi:
@@ -507,7 +507,7 @@ def filter_out_predicates(
             return phi, []
 
 
-def get_predicates(phi: Kore.Pattern) -> T.List[Kore.Pattern]:
+def get_predicates(phi: Kore.Pattern) -> T.List[Kore.MLPred]:
     _, preds = filter_out_predicates(phi)
     return preds
 
