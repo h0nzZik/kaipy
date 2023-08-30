@@ -87,14 +87,16 @@ class PatternMatchDomain(IAbstractPatternDomain):
     def disjunction(self, ctx: AbstractionContext, a1: IAbstractPattern, a2: IAbstractPattern) -> IAbstractPattern:
         assert type(a1) is PatternMatchDomainElement
         assert type(a2) is PatternMatchDomainElement
-        assert len(a1.reverse_renaming.keys().intersect(a2.reverse_renaming.keys)) == 0
+        assert len(set.intersection(set(a1.reversed_renaming.keys()), set(a2.reversed_renaming.keys()))) == 0
         cps = [ 
             ud.disjunction(ctx, b1, b2)
             for ud,b1,b2 in zip(self.underlying_domains, a1.constraint_per_state,a2.constraint_per_state)
         ]
+        rr = dict(a1.reversed_renaming)
+        rr.update(a2.reversed_renaming)
         return PatternMatchDomainElement(
             constraint_per_state=cps,
-            reversed_renaming=dict(collections.ChainMap(a1.reverse_renaming, a2.reverse_renaming))
+            reversed_renaming=rr
         )
 
     def is_top(self, a: IAbstractPattern) -> bool:
@@ -108,16 +110,16 @@ class PatternMatchDomain(IAbstractPatternDomain):
     @abc.abstractmethod
     def concretize(self, a: IAbstractPattern) -> Kore.Pattern:
         assert type(a) is PatternMatchDomainElement
-        concretized_constraints = [
+        concretized_constraints: T.List[T.List[Kore.MLPred]] = [
             ud.concretize(b)
             for ud,b in zip(self.underlying_domains, a.constraint_per_state)
         ]
         concretized_constraints_renamed = [
-            KoreUtils.rename_vars(KoreUtils.reverse_renaming(a.reverse_renaming), cc)
+            [ KoreUtils.rename_vars(KoreUtils.reverse_renaming(a.reversed_renaming), c) for c in cc]
             for cc in concretized_constraints
         ]
         constrained_states: T.List[Kore.Pattern] = [
-            Kore.And(self.rs.sortof(state), state, ccr)
+            Kore.And(self.rs.sortof(state), state, RSUtils.make_conjunction(self.rs, ccr))
             for state,ccr in zip(self.states, concretized_constraints_renamed)
         ]
         result = RSUtils.make_disjunction(self.rs, constrained_states)

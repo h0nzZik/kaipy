@@ -26,6 +26,14 @@ class IAbstractConstraintDomain(abc.ABC):
     @abc.abstractmethod
     def concretize(self, a: IAbstractConstraint) -> T.List[Kore.MLPred]:
         ...
+    
+    @abc.abstractmethod
+    def is_top(self, a: IAbstractConstraint) -> bool:
+        ...
+
+    @abc.abstractmethod
+    def is_bottom(self, a: IAbstractConstraint) -> bool:
+        ...
 
     @abc.abstractmethod
     def subsumes(self, a1: IAbstractConstraint, a2: IAbstractConstraint) -> bool:
