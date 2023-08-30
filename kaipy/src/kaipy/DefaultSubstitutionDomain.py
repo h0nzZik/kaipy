@@ -4,13 +4,16 @@ import pyk.kore.syntax as Kore
 
 import kaipy.kore_utils as KoreUtils
 
-from kaipy.IAbstractPatternDomain import IAbstractPattern, IAbstractPatternDomain
-from kaipy.IAbstractSubstitutionDomain import IAbstractSubstitution, IAbstractSubstitutionDomain
-from kaipy.BigsumPatternDomain import BigsumPattern, BigsumPatternDomain
-from kaipy.FinitePatternDomain import FinitePattern, FinitePatternDomain
-from kaipy.ExactPatternDomain import ExactPattern, ExactPatternDomain
-from kaipy.CartesianAbstractSubstitutionDomain import CartesianAbstractSubstitution, CartesianAbstractSubstitutionDomain
-from kaipy.KResultSubstDomainWrapper import KResultSubstDomainWrapper
+from kaipy.IAbstractConstraintDomain import IAbstractConstraintDomain
+from kaipy.SubstitutionConstraintDomain import SubstitutionConstraintDomain
+from kaipy.IAbstractPatternDomain import IAbstractPatternDomain
+from kaipy.IAbstractSubstitutionDomain import IAbstractSubstitutionDomain
+from kaipy.BigsumPatternDomain import BigsumPatternDomain
+from kaipy.FinitePatternDomain import FinitePatternDomain
+from kaipy.ExactPatternDomain import ExactPatternDomain
+from kaipy.CartesianAbstractSubstitutionDomain import CartesianAbstractSubstitutionDomain
+from kaipy.ProductConstraintDomain import ProductConstraintDomain
+from kaipy.KResultConstraintDomain import KResultConstraintDomain
 from kaipy.ReachabilitySystem import ReachabilitySystem
 
 
@@ -45,6 +48,10 @@ def build_abstract_substitution_domain(
     
     #pattern_domain: IAbstractPatternDomain = FinitePatternDomain(finite_set_of_patterns, rs)
     subst_domain: IAbstractSubstitutionDomain = CartesianAbstractSubstitutionDomain(combined_domain)
+    subst_domain_1: IAbstractConstraintDomain = SubstitutionConstraintDomain(rs=rs, nested=subst_domain)
+
     #return subst_domain
-    kresult_domain: IAbstractSubstitutionDomain = KResultSubstDomainWrapper(rs=rs, underlying_subst_domain=subst_domain, limit=1)
-    return kresult_domain
+    #kresult_domain: IAbstractSubstitutionDomain = KResultSubstDomainWrapper(rs=rs, underlying_subst_domain=subst_domain, limit=1)
+    kresult_domain: IAbstractConstraintDomain = KResultConstraintDomain(rs=rs, limit=1)
+    product_domain_1 = ProductConstraintDomain(subst_domain_1, kresult_domain)
+    return product_domain_1
