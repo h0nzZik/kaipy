@@ -4,16 +4,18 @@ import pyk.kore.syntax as Kore
 
 import kaipy.kore_utils as KoreUtils
 
-from kaipy.IAbstractConstraintDomain import IAbstractConstraintDomain
-from kaipy.SubstitutionConstraintDomain import SubstitutionConstraintDomain
-from kaipy.IAbstractPatternDomain import IAbstractPatternDomain
-from kaipy.IAbstractSubstitutionDomain import IAbstractSubstitutionDomain
-from kaipy.BigsumPatternDomain import BigsumPatternDomain
-from kaipy.FinitePatternDomain import FinitePatternDomain
-from kaipy.ExactPatternDomain import ExactPatternDomain
-from kaipy.CartesianAbstractSubstitutionDomain import CartesianAbstractSubstitutionDomain
-from kaipy.ProductConstraintDomain import ProductConstraintDomain
-from kaipy.KResultConstraintDomain import KResultConstraintDomain
+from kaipy.interfaces.IAbstractConstraintDomain import IAbstractConstraintDomain
+from kaipy.interfaces.IAbstractPatternDomain import IAbstractPatternDomain
+from kaipy.interfaces.IAbstractSubstitutionDomain import IAbstractSubstitutionDomain
+
+from kaipy.domains.SubstitutionConstraintDomain import SubstitutionConstraintDomain
+from kaipy.domains.BigsumPatternDomain import BigsumPatternDomain
+from kaipy.domains.FinitePatternDomain import FinitePatternDomain
+from kaipy.domains.ExactPatternDomain import ExactPatternDomain
+from kaipy.domains.CartesianAbstractSubstitutionDomain import CartesianAbstractSubstitutionDomain
+from kaipy.domains.ProductConstraintDomain import ProductConstraintDomain
+from kaipy.domains.KResultConstraintDomain import KResultConstraintDomain
+
 from kaipy.ReachabilitySystem import ReachabilitySystem
 
 
