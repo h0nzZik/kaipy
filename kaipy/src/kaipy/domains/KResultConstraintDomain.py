@@ -5,6 +5,7 @@ import logging
 import pyk.kore.syntax as Kore
 import pyk.kore.prelude as KorePrelude
 
+import kaipy.kore_utils as KoreUtils
 from kaipy.interfaces.IAbstractConstraintDomain import IAbstractConstraint, IAbstractConstraintDomain
 from kaipy.AbstractionContext import AbstractionContext
 from kaipy.ReachabilitySystem import ReachabilitySystem
@@ -63,6 +64,7 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
         for p in c:
             match p:
                 case Kore.Equals(_, _, Kore.EVar(_, _), Kore.EVar(_, _)):
+                    continue
                 case Kore.Equals(_, _, Kore.EVar(n, s), right):
                     monitored_evars.append(Kore.EVar(n, s))
                     if not self._test_necessary_kresult(e=Kore.EVar(n, s), phi=p):
@@ -84,7 +86,7 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
     def concretize(self, a: IAbstractConstraint) -> T.List[Kore.MLPred]:
         assert type(a) is KResultConstraint
         return [
-            self._mk_isKResult_pattern(e)
+            self._mk_isKResult_pattern(ev)
             for ev in self._kresults_of(a)
         ]
 
@@ -102,12 +104,12 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
         )
 
 
-    def equals(self, a1: IAbstractSubstitution, a2: IAbstractSubstitution) -> bool:
+    def equals(self, a1: IAbstractConstraint, a2: IAbstractConstraint) -> bool:
         assert type(a1) is KResultConstraint
         assert type(a2) is KResultConstraint
         return set(self._kresults_of(a1)) == set(self._kresults_of(a2))
 
-    def subsumes(self, a1: IAbstractSubstitution, a2: IAbstractSubstitution) -> bool:
+    def subsumes(self, a1: IAbstractConstraint, a2: IAbstractConstraint) -> bool:
         assert type(a1) is KResultConstraint
         assert type(a2) is KResultConstraint
         return set(self._kresults_of(a1)) >= set(self._kresults_of(a2))
