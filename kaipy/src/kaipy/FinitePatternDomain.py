@@ -117,8 +117,15 @@ class FinitePatternDomain(IAbstractPatternDomain):
                 #_LOGGER.warning(f'Replacing with other (NOT more general)')
                 fp1 = fp2
         _LOGGER.warning(f"Choosing {fp1.idx}")
+
+        # TODO Now we need to come up with fresh variables that will go into
+
         return fp1
     
+    def refine(self, ctx: AbstractionContext, a: IAbstractPattern, c: Kore.Pattern) -> FinitePattern:
+        assert type(a) is FinitePattern
+        return a
+
     def is_top(self, a: IAbstractPattern) -> bool:
         assert type(a) is FinitePattern
         return a.idx == -1

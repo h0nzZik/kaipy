@@ -153,73 +153,11 @@ def build_states(rs: ReachabilitySystem, vars_to_avoid: T.Set[Kore.EVar]) -> Sta
                 #print(f'renamed LHS (new state): {rs.kprint.kore_to_pretty(pattern_renamed)}')
     return States(states_by_pattern=d, states_by_id=d2)
 
-def rename_to_avoid(
-    pattern_to_rename: Kore.Pattern,
-    pattern_to_avoid: Kore.Pattern
-) -> T.Tuple[Kore.Pattern, T.Dict[str, str]]:
-    renaming = KoreUtils.compute_renaming0(
-        vars_to_avoid=list(KoreUtils.free_evars_of_pattern(pattern_to_avoid)),
-        vars_to_rename=list(KoreUtils.free_evars_of_pattern(pattern_to_rename))
-    )
-    st_renamed = KoreUtils.rename_vars(
-        renaming,
-        pattern_to_rename
-    )
-    return st_renamed,renaming
 
 def reverse_renaming(renaming: T.Mapping[str, str]) -> T.Dict[str, str]:
     return {v:k for k,v in renaming.items()}
 
-@dataclasses.dataclass(frozen=True)
-class RawPatternProjection:
-    conj: Kore.Pattern
-    info: StateInfo
-    st: Kore.Pattern
-    st_renamed: Kore.Pattern
-    renaming: T.Dict[str, str]
 
-    def with_conj(self, new_conj: Kore.Pattern) -> "RawPatternProjection":
-        return RawPatternProjection(
-            conj=new_conj,
-            info=self.info,
-            st=self.st,
-            st_renamed=self.st_renamed,
-            renaming=self.renaming
-        )
-
-def compute_raw_pattern_projection(
-    rs: ReachabilitySystem,
-    what: Kore.Pattern,
-    to: Kore.Pattern,
-    info: StateInfo
-) -> RawPatternProjection:
-    to_renamed,renaming = rename_to_avoid(to, what)
-    conj = Kore.And(rs.top_sort, what, to_renamed)
-    return RawPatternProjection(
-        conj=conj,
-        info=info,
-        st=to,
-        st_renamed=to_renamed,
-        renaming=renaming,
-    )
-
-def compute_list_of_raw_pattern_projections(
-    rs: ReachabilitySystem,
-    states: States,
-    cfgs: T.List[Kore.Pattern],
-) -> T.List[RawPatternProjection]:
-    conjinfos: T.List[RawPatternProjection] = list()
-    for cfg in cfgs:
-        for st,info in states.states_by_pattern.items():
-            conjinfos.append(
-                compute_raw_pattern_projection(
-                    rs,
-                    cfg,
-                    st,
-                    info
-                )
-            )
-    return conjinfos
 
 # What is going on with the renamings?
 # 1. we have a state pattern `st` with set of free variables `vs1`.
@@ -246,6 +184,15 @@ def compute_raw_concretizations(
                 continue
             _LOGGER.warning(f'st_renamed ({ci2.info.description}) = {rs.kprint.kore_to_pretty(ci2.st_renamed)}')
             evars = KoreUtils.free_evars_of_pattern(ci2.st_renamed)
+
+
+            class BC(IBroadcastChannel):
+                def broadcast(self, m: T.List[Kore.MLPred]):
+                    pass
+            bc = BC()
+            vm = VariableManager(5) # TODO generate high-enough number
+            ctx = AbstractionContext(broadcast_channel=bc, variable_manager=vm)
+
             #_LOGGER.warning(f'EVARS: {evars}')
             #_LOGGER.warning(f'conj_simplified: {rs.kprint.kore_to_pretty(conj_simplified)}')
             # A problem occurring here is that `conj_simplified` is too simplified:
@@ -333,8 +280,8 @@ def for_each_match(
     states: States,
     cfgs: T.List[Kore.Pattern],
     constraint_domain: IAbstractConstraintDomain,
-    ctx: AbstractionContext,
 ) -> T.List[Kore.Pattern]:
+
     # list of conjunctions of `cfgs` and renamed `states`
     conjinfos: T.List[RawPatternProjection] = compute_list_of_raw_pattern_projections(rs, states, cfgs)
     #_LOGGER.warning(f'Simplifying {len(conjinfos)} items at once')
@@ -347,7 +294,7 @@ def for_each_match(
     #for ci in conjinfos2:
     #    _LOGGER.warning(f'conj: {rs.kprint.kore_to_pretty(ci.conj)}')
 
-    new_ps_raw : T.List[Kore.Pattern] = compute_raw_concretizations(ctx=ctx, rs=rs, constraint_domain=constraint_domain, conjinfos2=conjinfos2)
+    new_ps_raw : T.List[Kore.Pattern] = compute_raw_concretizations(rs=rs, constraint_domain=constraint_domain, conjinfos2=conjinfos2)
     #_LOGGER.warning(f'new_ps_raw: {len(new_ps_raw)}')
     # We do not need to simplify anymore
     #_LOGGER.warning(f'Simplifying {len(new_ps_raw)} items at once (second)')
@@ -384,12 +331,6 @@ def analyze(
     initial_configuration: Kore.Pattern,
 ) -> States:
     states: States = build_states(rs, KoreUtils.free_evars_of_pattern(initial_configuration))
-    class BC(IBroadcastChannel):
-        def broadcast(self, m: T.List[Kore.MLPred]):
-            pass
-    bc = BC()
-    vm = VariableManager(5) # TODO generate high-enough number
-    ctx = AbstractionContext(broadcast_channel=bc, variable_manager=vm)
 
     cfgs = [normalize_pattern(rs.simplify(initial_configuration))]
     current_ps = for_each_match(ctx=ctx, rs=rs, states=states, cfgs=cfgs, constraint_domain=constraint_domain)
@@ -401,7 +342,7 @@ def analyze(
         _LOGGER.warning(f'Has {len(successors)} successors')
         for succ in successors:
             _LOGGER.warning(f'succ: {rs.kprint.kore_to_pretty(succ)}')
-        new_ps: T.List[Kore.Pattern] = for_each_match(rs, states, successors, constraint_domain, ctx=ctx)
+        new_ps: T.List[Kore.Pattern] = for_each_match(rs, states, successors, constraint_domain)
         _LOGGER.warning(f'After processing: {len(new_ps)} states')
         current_ps.extend(new_ps)
 
