@@ -10,13 +10,18 @@ class IAbstractSubstitution(abc.ABC):
     ...
 
 class IAbstractSubstitutionDomain(abc.ABC):
-    @abc.abstractmethod
-    def concretize(self, a: IAbstractSubstitution) -> T.Tuple[Substitution, T.List[Kore.Pattern]]:
-        ...
     
     # pre: ctx.variable_manager yields only variables not occurring in `subst`
     @abc.abstractmethod
     def abstract(self, ctx: AbstractionContext, subst: Substitution) -> IAbstractSubstitution:
+        ...
+    
+    @abc.abstractmethod
+    def refine(self, a: IAbstractSubstitution, c: T.List[Kore.MLPred]) -> IAbstractSubstitution:
+        ...
+
+    @abc.abstractmethod
+    def concretize(self, a: IAbstractSubstitution) -> Substitution:
         ...
 
     @abc.abstractmethod
