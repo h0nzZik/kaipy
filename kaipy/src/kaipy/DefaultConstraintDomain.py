@@ -13,7 +13,7 @@ from kaipy.domains.BigsumPatternDomain import BigsumPatternDomain
 from kaipy.domains.FinitePatternDomain import FinitePatternDomain
 from kaipy.domains.ExactPatternDomain import ExactPatternDomain
 from kaipy.domains.CartesianAbstractSubstitutionDomain import CartesianAbstractSubstitutionDomain
-from kaipy.domains.ProductConstraintDomain import ProductConstraintDomain
+from kaipy.domains.ProductConstraintDomain import ProductConstraintDomainBuilder
 from kaipy.domains.KResultConstraintDomain import KResultConstraintDomain
 from kaipy.domains.PatternMatchDomain import PatternMatchDomain
 from kaipy.PatternMatchDomainBuilder import build_pattern_match_domain
@@ -52,13 +52,12 @@ def build_abstract_constraint_domain(
     
     #pattern_domain: IAbstractPatternDomain = FinitePatternDomain(finite_set_of_patterns, rs)
     subst_domain: IAbstractSubstitutionDomain = CartesianAbstractSubstitutionDomain(combined_domain)
-    subst_domain_1: IAbstractConstraintDomain = SubstitutionConstraintDomain(rs=rs, nested=subst_domain)
+    subst_domain_builder: IAbstractConstraintDomain = SubstitutionConstraintDomainBuilder(rs=rs, nested=subst_domain)
 
     #return subst_domain
     #kresult_domain: IAbstractSubstitutionDomain = KResultSubstDomainWrapper(rs=rs, underlying_subst_domain=subst_domain, limit=1)
-    kresult_domain: IAbstractConstraintDomain = KResultConstraintDomain(rs=rs, limit=1)
-    product_domain_1 = ProductConstraintDomain(subst_domain_1, kresult_domain)
-
-    pattern_match_domain = build_pattern_match_domain(rs)
+    kresult_domain_builder: IAbstractConstraintDomain = KResultConstraintDomain(rs=rs, limit=1)
+    product_domain_builder = ProductConstraintDomainBuilder(subst_domain_builder, kresult_domain_builder)
+    pattern_match_domain = build_pattern_match_domain(rs, underlying_domain_builder=product_domain_builder)
 
     return product_domain_1

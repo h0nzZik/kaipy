@@ -8,6 +8,7 @@ from kaipy.ReachabilitySystem import ReachabilitySystem
 from kaipy.AbstractionContext import AbstractionContext
 from kaipy.interfaces.IAbstractConstraintDomain import IAbstractConstraint, IAbstractConstraintDomain
 from kaipy.interfaces.IAbstractSubstitutionDomain import IAbstractSubstitution, IAbstractSubstitutionDomain
+from kaipy.interfaces.IAbstractConstraintDomainBuilder import IAbstractConstraintDomainBuilder
 from kaipy.Substitution import Substitution
 
 @dataclasses.dataclass
@@ -18,10 +19,17 @@ class SubstitutionConstraint(IAbstractConstraint):
 class SubstitutionConstraintDomain(IAbstractConstraintDomain):
     nested: IAbstractSubstitutionDomain
     rs: ReachabilitySystem
+    evars: T.Set[Kore.EVar]
 
-    def __init__(self, rs: ReachabilitySystem, nested: IAbstractSubstitutionDomain):
+    def __init__(
+        self,
+        rs: ReachabilitySystem,
+        nested: IAbstractSubstitutionDomain,
+        evars: T.Set[Kore.EVar],
+    ):
         self.nested = nested
         self.rs = rs
+        self.evars = evars
 
     def abstract(self, ctx: AbstractionContext, c: T.List[Kore.MLPred]) -> IAbstractConstraint:
         eqls: T.Dict[Kore.EVar, Kore.Pattern] = dict()
@@ -30,10 +38,11 @@ class SubstitutionConstraintDomain(IAbstractConstraintDomain):
                 case Kore.Equals(_, _, Kore.EVar(_, _), Kore.EVar(_, _)):
                     continue
                 case Kore.Equals(_, _, Kore.EVar(n, s), right):
-                    eqls[Kore.EVar(n,s)] = right
-                    continue
+                    if Kore.EVar(n,s) in self.evars:
+                        eqls[Kore.EVar(n,s)] = right
                 case Kore.Equals(_, _, left, Kore.EVar(n, s)):
-                    eqls[Kore.EVar(n,s)] = left
+                    if Kore.EVar(n,s) in self.evars:
+                        eqls[Kore.EVar(n,s)] = left
 
         subst = Substitution(immutabledict(eqls))
         a = SubstitutionConstraint(self.nested.abstract(ctx, subst))
@@ -60,3 +69,19 @@ class SubstitutionConstraintDomain(IAbstractConstraintDomain):
         assert type(a) is SubstitutionConstraint
         return f'<sc: {self.nested.print(a.nested)}>'
     
+
+
+class SubstitutionConstraintDomainBuilder(IAbstractConstraintDomainBuilder):
+    nested: IAbstractSubstitutionDomain
+    rs: ReachabilitySystem
+
+    def __init__(self, nested: IAbstractSubstitutionDomain, rs: ReachabilitySystem):
+        self.nested = nested
+        self.rs = rs
+    
+    def build_abstract_constraint_domain(self, over_variables: T.Set[Kore.EVar]) -> SubstitutionConstraintDomain:
+        return SubstitutionConstraintDomain(
+            rs=self.rs,
+            nested=self.nested,
+            evars=evar_variables,
+        )

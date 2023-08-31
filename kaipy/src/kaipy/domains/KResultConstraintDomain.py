@@ -7,6 +7,7 @@ import pyk.kore.prelude as KorePrelude
 
 import kaipy.kore_utils as KoreUtils
 from kaipy.interfaces.IAbstractConstraintDomain import IAbstractConstraint, IAbstractConstraintDomain
+from kaipy.interfaces.IAbstractConstraintDomainBuilder import IAbstractConstraintDomainBuilder
 from kaipy.AbstractionContext import AbstractionContext
 from kaipy.ReachabilitySystem import ReachabilitySystem
 
@@ -130,3 +131,15 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
         assert type(a) is KResultConstraint
         return str(self._kresults_of(a))
 
+
+class KResultConstraintDomainBuilder(IAbstractConstraintDomainBuilder):
+    rs: ReachabilitySystem
+    limit: int
+
+    def __init__(self, rs: ReachabilitySystem, limit: int):
+        self.rs = rs
+        self.limit = limit
+    
+    def build_abstract_constraint_domain(self, over_variables: T.Set[Kore.EVar]) -> KResultConstraintDomainBuilder:
+        # ignore over_variables
+        return KResultConstraintDomain(self.rs, self.limit)
