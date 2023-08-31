@@ -22,7 +22,7 @@ from kaipy.PatternMatchDomainBuilder import build_pattern_match_domain
 from kaipy.ReachabilitySystem import ReachabilitySystem
 
 
-def build_abstract_constraint_domain(
+def build_abstract_pattern_domain(
     rs: ReachabilitySystem,
     rests: T.List[Kore.Pattern],
     initial_configuration: Kore.Pattern

@@ -23,6 +23,7 @@ from kaipy.interfaces.IAbstractConstraintDomainBuilder import IAbstractConstrain
 from kaipy.interfaces.IAbstractPatternDomain import IAbstractPattern, IAbstractPatternDomain
 from kaipy.interfaces.IAbstractSubstitutionDomain import IAbstractSubstitution, IAbstractSubstitutionDomain
 from kaipy.interfaces.IAbstractConstraintDomain import IAbstractConstraintDomain, IAbstractConstraint
+from kaipy.DefaultAbstractionContext import make_ctx
 
 from .ReachabilitySystem import ReachabilitySystem, KoreClientServer, get_global_kcs
 from .KompiledDefinitionWrapper import KompiledDefinitionWrapper
@@ -44,31 +45,32 @@ def get_successors(rs: ReachabilitySystem, cfg: Kore.Pattern) -> T.List[Kore.Pat
         successors = [exec_result.state.kore]
     return successors
 
-def make_ctx() -> AbstractionContext:
-    class BC(IBroadcastChannel):
-        def broadcast(self, m: T.List[Kore.MLPred]):
-            pass
-    bc = BC()
-    vm = VariableManager(5) # TODO generate high-enough number
-    ctx = AbstractionContext(broadcast_channel=bc, variable_manager=vm)
-    return ctx
+@dataclasses.dataclass
+class AnalysisResult:
+    reachable_configurations: IAbstractPattern
+    iterations: int
 
 def analyze(
     rs: ReachabilitySystem,
     pattern_domain: IAbstractPatternDomain,
     initial_configuration: Kore.Pattern,
-) -> IAbstractPattern:
+    max_depth: int|None = None
+) -> AnalysisResult:
     #states: States = build_states(rs, KoreUtils.free_evars_of_pattern(initial_configuration))
 
     cfgs_below_current: T.Dict[Kore.Pattern,T.List[Kore.Pattern]] = dict()
 
     initial_concrete: Kore.Pattern = normalize_pattern(rs.simplify(initial_configuration))
     current_abstract: IAbstractPattern = pattern_domain.abstract(make_ctx(), initial_concrete)
+    curr_depth = 0
     while True:
+        if max_depth is not None and curr_depth > max_depth:
+            break
+        curr_depth= curr_depth + 1
         current_concretized: T.List[Kore.Pattern] = KoreUtils.or_to_list(pattern_domain.concretize(current_abstract))
         diff = [c for c in current_concretized if c not in cfgs_below_current.keys()]
         if len(diff) <= 0:
-            return current_abstract
+            break
         diff_step = { c:get_successors(rs, c) for c in diff }
         diff_step_norm = { c:[ normalize_pattern(s) for s in succs] for c,succs in diff_step.items() }
         unified = cfgs_below_current.copy()
@@ -80,3 +82,4 @@ def analyze(
             pattern_domain.abstract(make_ctx(), phi)
         )
  
+    return AnalysisResult(reachable_configurations=current_abstract, iterations=curr_depth)
