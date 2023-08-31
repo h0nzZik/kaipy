@@ -144,6 +144,7 @@ class TestImp(MyTest):
             pattern_domain=pattern_domain,
             initial_configuration=input_pattern,
         )
+        _LOGGER.warning(f"abstract: {pattern_domain.to_str(result.reachable_configurations)}")
         concrete_reachable_configurations = pattern_domain.concretize(result.reachable_configurations)
         _LOGGER.warning(reachability_system.kprint.kore_to_pretty(concrete_reachable_configurations))
         return result
