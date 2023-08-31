@@ -108,3 +108,4 @@ def parallel_match(rs: ReachabilitySystem, cfg: Kore.Pattern, states: T.List[Kor
         for ci in conjinfos2
     ]
     return result
+

@@ -6,8 +6,11 @@ import typing as T
 import pyk.kore.syntax as Kore
 
 import kaipy.kore_utils as KoreUtils
+from kaipy.AbstractionContext import AbstractionContext
+from kaipy.VariableManager import VariableManager
+from kaipy.ParallelMatcher import parallel_match, MatchResult
 from kaipy.ReachabilitySystem import ReachabilitySystem, KoreClientServer, get_global_kcs
-from kaipy.IAbstractPatternDomain import IAbstractPattern, IAbstractPatternDomain
+from kaipy.interfaces.IAbstractPatternDomain import IAbstractPattern, IAbstractPatternDomain
 from kaipy.IBroadcastChannel import IBroadcastChannel
 from kaipy.VariableManager import VariableManager
 
@@ -18,50 +21,50 @@ class FinitePattern(IAbstractPattern):
     # -1 means Top
     idx: int
     sort: Kore.Sort
-    renaming: T.Dict[str,str] | None # TODO do we still need this?
+    renaming: T.Mapping[str,str] | None
 
-class Subsumer:
-    c: Kore.Pattern
-    rs: ReachabilitySystem
+# class Subsumer:
+#     c: Kore.Pattern
+#     rs: ReachabilitySystem
 
-    def __init__(self, c: Kore.Pattern, rs: ReachabilitySystem):
-        self.c = c
-        self.rs = rs
+#     def __init__(self, c: Kore.Pattern, rs: ReachabilitySystem):
+#         self.c = c
+#         self.rs = rs
     
-    @functools.cached_property
-    def c_sort(self) -> Kore.Sort:
-        return self.rs.kdw.sortof(self.c)
+#     @functools.cached_property
+#     def c_sort(self) -> Kore.Sort:
+#         return self.rs.kdw.sortof(self.c)
 
-    def __call__(self, p: Kore.Pattern) -> T.Tuple[bool, T.Dict[str,str] | None]:
-        kcs: KoreClientServer|None = get_global_kcs()
-        # This means we are not running in a worker process
-        # but in the main one.
-        if kcs is None:
-            kcs = self.rs.kcs
+#     def __call__(self, p: Kore.Pattern) -> T.Tuple[bool, T.Dict[str,str] | None]:
+#         kcs: KoreClientServer|None = get_global_kcs()
+#         # This means we are not running in a worker process
+#         # but in the main one.
+#         if kcs is None:
+#             kcs = self.rs.kcs
 
-        p_sort = self.rs.kdw.sortof(p)
-        if self.c_sort != p_sort:
-            return False,{}
+#         p_sort = self.rs.kdw.sortof(p)
+#         if self.c_sort != p_sort:
+#             return False,{}
         
-        ant: Kore.Pattern = self.c
-        con: Kore.Pattern = p
+#         ant: Kore.Pattern = self.c
+#         con: Kore.Pattern = p
 
-        renaming = KoreUtils.compute_renaming0(
-            vars_to_avoid=list(KoreUtils.free_evars_of_pattern(ant)),
-            vars_to_rename=list(KoreUtils.free_evars_of_pattern(con))
-        )
-        con_renamed: Kore.Pattern = KoreUtils.rename_vars(
-            renaming,
-            con,
-        )
-        con_eqa = KoreUtils.existentially_quantify_free_variables(self.c_sort, con_renamed)
-        ir = kcs.client.implies(ant, con_eqa)
-        return ir.satisfiable, (renaming if ir.satisfiable else None)
+#         renaming = KoreUtils.compute_renaming0(
+#             vars_to_avoid=list(KoreUtils.free_evars_of_pattern(ant)),
+#             vars_to_rename=list(KoreUtils.free_evars_of_pattern(con))
+#         )
+#         con_renamed: Kore.Pattern = KoreUtils.rename_vars(
+#             renaming,
+#             con,
+#         )
+#         con_eqa = KoreUtils.existentially_quantify_free_variables(self.c_sort, con_renamed)
+#         ir = kcs.client.implies(ant, con_eqa)
+#         return ir.satisfiable, (renaming if ir.satisfiable else None)
 
 
 
 class FinitePatternDomain(IAbstractPatternDomain):
-    pl : T.List[Kore.Pattern]
+    pl : T.List[Kore.Pattern] # list of terms with free variables
     rs : ReachabilitySystem
     subsumption_matrix: T.Set[T.Tuple[int,int]]
 
@@ -84,20 +87,15 @@ class FinitePatternDomain(IAbstractPatternDomain):
         _LOGGER.warning(f'Computed subsumption matrix (size {len(self.subsumption_matrix)})')
         #_LOGGER.warning(f'{self.subsumption_matrix}')
     
-    def abstract(self, c: Kore.Pattern) -> FinitePattern:
+    def abstract(self, ctx: AbstractionContext, c: Kore.Pattern) -> FinitePattern:
         csort = self.rs.sortof(c)
-        #_LOGGER.warning(f'abstracting {c.text}')
-        #pls: T.List[T.Tuple[int, Kore.Pattern]] = list(enumerate(self.pl))
-        subsumer: T.Callable[[Kore.Pattern], T.Tuple[bool, T.Dict[str,str] | None]] = Subsumer(c=c, rs=self.rs)
-        # Lazy map, not parallel
-        holds = map(subsumer, self.pl)
+        mrs: T.List[MatchResult] = parallel_match(rs=self.rs, cfg=c, states=self.pl)
+
         fpl: T.List[FinitePattern] = list()
-        for i,(h,renaming) in enumerate(holds):
-            if not h:
+        for i,mr in enumerate(mrs):
+            if len(mr.constraints) == 1 and KoreUtils.is_bottom(mr.constraints[0]):
                 continue
-            reversed_renaming = { v:k for k,v in (renaming or dict()).items() }
-            #_LOGGER.warning(f'(found something)')
-            fp = FinitePattern(i, csort, reversed_renaming)
+            fp = FinitePattern(i, csort, mr.renaming or dict())
             fpl.append(fp)
         if len(fpl) == 0:
             #_LOGGER.warning(f'no nice pattern found for {self.rs.kprint.kore_to_pretty(c)}')
@@ -110,7 +108,6 @@ class FinitePatternDomain(IAbstractPatternDomain):
         #    _LOGGER.warning(f'  have {fp} as:')
         #    _LOGGER.warning(f'  {self.rs.kprint.kore_to_pretty(self.concretize(fp))}')
         
-
         fp1 = fpl[0]
         for fp2 in fpl[1:]:
             if not (fp1.idx,fp2.idx) in self.subsumption_matrix:
@@ -118,9 +115,24 @@ class FinitePatternDomain(IAbstractPatternDomain):
                 fp1 = fp2
         _LOGGER.warning(f"Choosing {fp1.idx}")
 
-        # TODO Now we need to come up with fresh variables that will go into
+        renaming_2: T.Mapping[str, str] = {
+            v: ctx.variable_manager.get_fresh_evar_name() for k,v in (fp1.renaming or dict()).items()
+        }
 
-        return fp1
+        constraints_renamed: T.List[Kore.MLPred] = [
+            KoreUtils.rename_vars(renaming_2, c) for c in mrs[fp1.idx].constraints # type: ignore
+        ]
+        # TODO emit the constraints through the channel
+
+        renaming_composed: T.Mapping[str, str] = {
+            k:renaming_2[v] for k,v in (fp1.renaming or dict()).items()
+        }
+
+        return FinitePattern(
+            idx=fp1.idx,
+            sort=fp1.sort,
+            renaming=dict(renaming_composed)
+        )
     
     def refine(self, ctx: AbstractionContext, a: IAbstractPattern, c: Kore.Pattern) -> FinitePattern:
         assert type(a) is FinitePattern
@@ -134,13 +146,20 @@ class FinitePatternDomain(IAbstractPatternDomain):
         assert type(a) is FinitePattern
         if self.is_top(a):
             return Kore.Top(a.sort)
-        return KoreUtils.rename_vars(a.renaming or dict(), self.pl[a.idx])
+        return KoreUtils.rename_vars(dict(a.renaming) if a.renaming else dict(), self.pl[a.idx])
 
     def equals(self, a1: IAbstractPattern, a2: IAbstractPattern) -> bool:
         assert type(a1) is FinitePattern
         assert type(a2) is FinitePattern
 
         return a1.idx == a2.idx
+
+    def disjunction(self, ctx: AbstractionContext, a1: IAbstractPattern, a2: IAbstractPattern) -> FinitePattern:
+        assert type(a1) is FinitePattern
+        assert type(a2) is FinitePattern
+        if (a1.idx == a2.idx) and (a1.sort == a2.sort) and (a1.renaming == a2.renaming):
+            return a1
+        return FinitePattern(idx=-1, sort=a1.sort, renaming=dict())
 
     def subsumes(self, a1: IAbstractPattern, a2: IAbstractPattern) -> bool:
         assert type(a1) is FinitePattern
@@ -164,7 +183,8 @@ class FinitePatternDomain(IAbstractPatternDomain):
         if self.is_top(a1):
             return False
         
-        return self.rs.subsumes(self.concretize(a1), self.concretize(a2))[0]
+        return False
+        #return self.rs.subsumes(self.concretize(a1), self.concretize(a2))[0]
 
     def print(self, a: IAbstractPattern) -> str:
         c = self.concretize(a)
