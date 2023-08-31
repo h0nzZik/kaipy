@@ -87,14 +87,6 @@ class TestImp(MyTest):
 
         assert len(rests) == 17
 
-    def test_cartesian_dict(self):
-        # { x |-> {phi1, phi2}, y |-> {phi3, phi4} }
-        # into
-        # { {x |-> phi1, y |-> phi3}, {x |-> phi1, y |-> phi4}, {x |-> phi2, y |-> phi3}, {x |-> phi2, y |-> phi4}  }
-        actual = kaipy.analyzer.cartesian_dict(immutabledict({"x" : {1,2}, "y" : {3, 4}}))
-        expected = { immutabledict({"x" : 1, "y" : 3}), immutabledict({"x" : 1, "y" : 4}), immutabledict({"x" : 2, "y" : 3}), immutabledict({"x" : 2, "y" : 4}) }
-        assert expected == actual
-
     def test_sort_decl(
         self,
         reachability_system: ReachabilitySystem

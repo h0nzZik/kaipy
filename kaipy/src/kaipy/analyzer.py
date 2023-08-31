@@ -30,29 +30,6 @@ from .Substitution import Substitution
 
 _LOGGER: T.Final = logging.getLogger(__name__)
 
-
-# TODO remove
-# Turns
-# { x |-> {phi1, phi2}, y |-> {phi3, phi4} }
-# into
-# { {x |-> phi1, y |-> phi3}, {x |-> phi1, y |-> phi4}, {x |-> phi2, y |-> phi3}, {x |-> phi2, y |-> phi4}  }
-def cartesian_dict(d: T.Mapping[T.Any, T.Any]) -> T.Set[T.Mapping[T.Any, T.Any]]:
-    if len(list(d.keys())) == 0:
-        return {immutabledict()}
-    k = list(d.keys())[0]
-    xs = d[k]
-    d1: immutabledict[T.Any,T.Any] = immutabledict({k1:v1 for k1,v1 in d.items() if not k1 == k})
-    cd = cartesian_dict(d1)
-    result: T.Set[T.Any] = set()
-    for di in cd:
-        for x in xs:
-            d2 = { k0:v0 for k0,v0 in di.items() }
-            d2.update({k:x})
-            result.add(immutabledict(d2))
-    return result
-
-
-
 def normalize_pattern(cfg: Kore.Pattern) -> Kore.Pattern:
     vs = KoreUtils.free_occs_det(cfg)
     renaming = { v.name : ("VAR"+str(i)) for i,v in enumerate(vs)}
