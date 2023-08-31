@@ -30,13 +30,13 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
         self.rs = rs
         self.limit = limit
     
-    def _mk_isKResult_pattern(self, e: Kore.EVar) -> Kore.MLPred:
+    def _mk_isKResult_pattern(self, e: Kore.EVar, sort: Kore.Sort) -> Kore.MLPred:
         pe = Kore.App('kseq', (), (
                 KorePrelude.inj(e.sort, KorePrelude.SORT_K_ITEM, e),
                 KorePrelude.DOTK,
         ))
         iskr = Kore.App('LblisKResult', (), (pe,))
-        iskr_true = Kore.Equals(KorePrelude.BOOL, self.rs.top_sort, iskr, KorePrelude.TRUE)
+        iskr_true = Kore.Equals(KorePrelude.BOOL, sort, iskr, KorePrelude.TRUE)
         return iskr_true
 
     def abstract(self, ctx: AbstractionContext, c: T.List[Kore.MLPred]) -> KResultConstraint:
@@ -57,10 +57,10 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
         return False
 
     def _test_necessary_kresult(self, e: Kore.EVar, phi: Kore.MLPred) -> bool:
-        iskr_true = self._mk_isKResult_pattern(e)
+        iskr_true = self._mk_isKResult_pattern(e, sort=e.sort)
         not_iskr_true = Kore.Not(e.sort, iskr_true)
         conj0 = Kore.And(sort=e.sort, left=e, right=not_iskr_true)
-        conj = Kore.And(sort=e.sort, left=conj0, right=phi)
+        conj = Kore.And(sort=e.sort, left=conj0, right=phi.let_sort(e.sort))
         conj_simp = self.rs.simplify(conj)
         return KoreUtils.is_bottom(conj_simp)
 
@@ -99,7 +99,7 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
             return []
 
         return [
-            self._mk_isKResult_pattern(ev)
+            self._mk_isKResult_pattern(ev, self.rs.top_sort)
             for ev in self._kresults_of(a)
         ]
 

@@ -42,11 +42,11 @@ class PatternMatchDomain(IAbstractPatternDomain):
 
     def abstract(self, ctx: AbstractionContext,  c: Kore.Pattern) -> PatternMatchDomainElement:
         mrs: T.List[MatchResult] = parallel_match(rs=self.rs, cfg=c, states=self.states)
-        # We need to rename all free variables in the result of the paralle match
+        # We need to rename all free variables in the result of the parallel match
         # to some globally recognized variables. We need to do that anyway,
         # but one special reason for that is that we want different calls of `abstract`
         # to result in patterns with different variables being fed to the underlying domains.
-        # Then, when we concretized two abstract values through an underlying domain,
+        # Then, when we have concretized two abstract values through an underlying domain,
         # they will have different variables, and therefore we can simply join the two reversed renamings.
         # For example, suppose we have two states, first with variables A, B and second with variable A, again.
         # Then, `parallel_match` will create two renamings: {A: A', B: B'}, and {A: A'}.
@@ -87,6 +87,8 @@ class PatternMatchDomain(IAbstractPatternDomain):
     def disjunction(self, ctx: AbstractionContext, a1: IAbstractPattern, a2: IAbstractPattern) -> IAbstractPattern:
         assert type(a1) is PatternMatchDomainElement
         assert type(a2) is PatternMatchDomainElement
+        #if self.equals(a1, a2):
+        #    return a1
         assert len(set.intersection(set(a1.reversed_renaming.keys()), set(a2.reversed_renaming.keys()))) == 0
         cps = [ 
             ud.disjunction(ctx, b1, b2)

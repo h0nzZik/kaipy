@@ -19,6 +19,9 @@ class IAbstractConstraintDomain(abc.ABC):
     def refine(self, ctx: AbstractionContext, a: IAbstractConstraint, c: T.List[Kore.MLPred]) -> IAbstractConstraint:
         ...
 
+    # Requirement: FV(concretize(disjunction(ctx, a1, a2))) \subseteq FV(concretize(a1)) \cup FV(concretize(a2)).
+    # In other words, disjunction is not allowed to invent variables.
+    # Therefore, it shall not use ctx.variable_manager to create any.
     @abc.abstractmethod
     def disjunction(self, ctx: AbstractionContext, a1: IAbstractConstraint, a2: IAbstractConstraint) -> IAbstractConstraint:
         ...
