@@ -49,7 +49,7 @@ def _compute_raw_pattern_projection(
     to: Kore.Pattern,
 ) -> _RawPatternProjection:
     what_renamed,renaming = _rename_to_avoid(what, to)
-    conj = Kore.And(rs.top_sort, what_renamed, to)
+    conj = Kore.And(rs.sortof(what_renamed), what_renamed, to)
     return _RawPatternProjection(
         cfg=what,
         conj=conj,
@@ -109,7 +109,7 @@ def parallel_match(rs: ReachabilitySystem, cfg: Kore.Pattern, states: T.List[Kor
             # but the fact that `isKResult(X ~> .)` is forgotten.
             # Therefore, we have to read the predicates of the state
             # and add them to the list of predicates derived from the conjunction.
-            constraints=([ci.conj] if KoreUtils.is_bottom(ci.conj) else KoreUtils.get_predicates(ci.conj)+KoreUtils.get_predicates(ci.st_renamed)) #type: ignore
+            constraints=([ci.conj] if KoreUtils.is_bottom(ci.conj) else KoreUtils.get_predicates(ci.conj)+KoreUtils.get_predicates(ci.cfg_renamed)) #type: ignore
         )
         for ci in conjinfos2
     ]

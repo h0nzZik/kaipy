@@ -89,7 +89,7 @@ class FinitePatternDomain(IAbstractPatternDomain):
     
     def abstract(self, ctx: AbstractionContext, c: Kore.Pattern) -> FinitePattern:
         csort = self.rs.sortof(c)
-        mrs: T.List[MatchResult] = parallel_match(rs=self.rs, cfg=c, states=self.pl)
+        mrs: T.List[MatchResult] = parallel_match(rs=self.rs, cfg=c, states=[(s if self.rs.sortof(s) == csort else Kore.Bottom(csort)) for s in self.pl])
 
         fpl: T.List[FinitePattern] = list()
         for i,mr in enumerate(mrs):
@@ -122,7 +122,10 @@ class FinitePatternDomain(IAbstractPatternDomain):
         constraints_renamed: T.List[Kore.MLPred] = [
             KoreUtils.rename_vars(renaming_2, c) for c in mrs[fp1.idx].constraints # type: ignore
         ]
+
         # TODO emit the constraints through the channel
+        for c in constraints_renamed:
+            _LOGGER.warning(f'TODO emit: {self.rs.kprint.kore_to_pretty(c)}')
 
         renaming_composed: T.Mapping[str, str] = {
             k:renaming_2[v] for k,v in (fp1.renaming or dict()).items()

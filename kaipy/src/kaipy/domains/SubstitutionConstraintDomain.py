@@ -33,7 +33,7 @@ class SubstitutionConstraintDomain(IAbstractConstraintDomain):
         self.nested = nested
         self.rs = rs
         self.evars = evars
-        _LOGGER.warning(f"SCD evars: {self.evars}")
+        #_LOGGER.warning(f"SCD evars: {self.evars}")
 
 
     def abstract(self, ctx: AbstractionContext, c: T.List[Kore.MLPred]) -> IAbstractConstraint:
@@ -45,9 +45,13 @@ class SubstitutionConstraintDomain(IAbstractConstraintDomain):
                 case Kore.Equals(_, _, Kore.EVar(n, s), right):
                     if Kore.EVar(n,s) in self.evars:
                         eqls[Kore.EVar(n,s)] = right
+                    else:
+                        _LOGGER.warning(f"Unknown variable {n}:{s}")
                 case Kore.Equals(_, _, left, Kore.EVar(n, s)):
                     if Kore.EVar(n,s) in self.evars:
                         eqls[Kore.EVar(n,s)] = left
+                    else:
+                        _LOGGER.warning(f"Unknown variable {n}:{s}")
 
         subst = Substitution(immutabledict(eqls))
         a = SubstitutionConstraint(self.nested.abstract(ctx, subst))
