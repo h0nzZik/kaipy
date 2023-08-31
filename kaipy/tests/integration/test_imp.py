@@ -15,11 +15,11 @@ import kaipy.kore_utils as KoreUtils
 import kaipy.rs_utils as RSUtils
 from kaipy.HeatPreAnalysis import ContextAlias, ContextAliases, pre_analyze
 from kaipy.ReachabilitySystem import ReachabilitySystem
-from kaipy.BigsumPatternDomain import BigsumPattern, BigsumPatternDomain
-from kaipy.ExactPatternDomain import ExactPattern, ExactPatternDomain
+from kaipy.domains.BigsumPatternDomain import BigsumPattern, BigsumPatternDomain
+from kaipy.domains.ExactPatternDomain import ExactPattern, ExactPatternDomain
 from kaipy.testing.testingbase import RSTestBase
 
-import kaipy.DefaultSubstitutionDomain
+import kaipy.DefaultPatternDomain
 import kaipy.analyzer
 
 _LOGGER: T.Final = logging.getLogger(__name__)
