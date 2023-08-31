@@ -37,5 +37,13 @@ class IAbstractSubstitutionDomain(abc.ABC):
         ...
     
     @abc.abstractmethod
-    def print(self, a: IAbstractSubstitution) -> str:
+    def is_top(self, a: IAbstractSubstitution) -> bool:
+        ...
+
+    @abc.abstractmethod
+    def is_bottom(self, a: IAbstractSubstitution) -> bool:
+        ...
+
+    @abc.abstractmethod
+    def to_str(self, a: IAbstractSubstitution) -> str:
         ...

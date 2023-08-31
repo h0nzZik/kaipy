@@ -68,7 +68,7 @@ class ProductConstraintDomain(IAbstractConstraintDomain):
         return f'<prod {self.left_domain.to_str(a.left)}, {self.right_domain.to_str(a.right)}>'
 
 
-class ProductConstructDomainBuilder(IAbstractConstraintDomainBuilder):
+class ProductConstraintDomainBuilder(IAbstractConstraintDomainBuilder):
     left_builder: IAbstractConstraintDomainBuilder
     right_builder: IAbstractConstraintDomainBuilder
     

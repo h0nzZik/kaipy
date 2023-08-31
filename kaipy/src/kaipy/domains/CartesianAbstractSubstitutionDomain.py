@@ -53,7 +53,7 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
                         d[Kore.EVar(n,s)] = self.pattern_domain.refine(ctx, d[Kore.EVar(n, s)], left)
                     else:
                         d[Kore.EVar(n,s)] = self.pattern_domain.abstract(ctx, left)
-        return CartesianAbstractSubstitution(d)       
+        return CartesianAbstractSubstitution(d)
 
 
     def concretize(self, a: IAbstractSubstitution) -> Substitution:
@@ -98,6 +98,25 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
             )
         return Substitution(immutabledict(concretes_renamed))
     
+
+    def disjunction(self, ctx: AbstractionContext, a1: IAbstractSubstitution, a2: IAbstractSubstitution) -> IAbstractSubstitution:
+        assert type(a1) is CartesianAbstractSubstitution
+        assert type(a2) is CartesianAbstractSubstitution
+        mapping = {
+            k: self.pattern_domain.disjunction(ctx, a1.mapping[k], a2.mapping[k])
+            for k in set.intersection(set(a1.mapping.keys()), set(a2.mapping.keys()))
+        }
+        return CartesianAbstractSubstitution(mapping)
+
+
+    def is_top(self, a: IAbstractSubstitution) -> bool:
+        assert type(a) is CartesianAbstractSubstitution
+        return len(a.mapping.keys()) <= 0
+
+    def is_bottom(self, a: IAbstractSubstitution) -> bool:
+        assert type(a) is CartesianAbstractSubstitution
+        return False
+
     def equals(self, a1: IAbstractSubstitution, a2: IAbstractSubstitution) -> bool:
         assert type(a1) is CartesianAbstractSubstitution
         assert type(a2) is CartesianAbstractSubstitution

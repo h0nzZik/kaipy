@@ -52,6 +52,10 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
         assert type(a) is KResultConstraint
         return len(self._kresults_of(a)) == 0
 
+    def is_bottom(self, a: IAbstractConstraint) -> bool:
+        assert type(a) is KResultConstraint
+        return False
+
     def _test_necessary_kresult(self, e: Kore.EVar, phi: Kore.MLPred) -> bool:
         iskr_true = self._mk_isKResult_pattern(e)
         not_iskr_true = Kore.Not(e.sort, iskr_true)
@@ -140,6 +144,6 @@ class KResultConstraintDomainBuilder(IAbstractConstraintDomainBuilder):
         self.rs = rs
         self.limit = limit
     
-    def build_abstract_constraint_domain(self, over_variables: T.Set[Kore.EVar]) -> KResultConstraintDomainBuilder:
+    def build_abstract_constraint_domain(self, over_variables: T.Set[Kore.EVar]) -> KResultConstraintDomain:
         # ignore over_variables
         return KResultConstraintDomain(self.rs, self.limit)
