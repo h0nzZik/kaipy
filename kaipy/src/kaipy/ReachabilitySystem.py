@@ -220,7 +220,8 @@ class ReachabilitySystem:
             self.stats.simplify.add(new - old)
             return rv
         except KoreRpc.KoreClientError as e:
-            _LOGGER.warning(f"Error when simplifying: {self.kprint.kore_to_pretty(pattern)}")
+            _LOGGER.warning(f"Error when simplifying: {pattern.text}")
+            _LOGGER.warning(f"(pretty): {self.kprint.kore_to_pretty(pattern)}")
             _LOGGER.warning(f"exception: {str(e)}")
             _LOGGER.warning(f"data: {str(e.data)}")
             raise

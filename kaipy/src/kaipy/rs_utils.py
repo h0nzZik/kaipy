@@ -16,10 +16,16 @@ from .kore_utils import (
 from .ReachabilitySystem import ReachabilitySystem
 
 
-def make_conjunction(rs: ReachabilitySystem, l: T.List[Kore.Pattern]) -> Kore.Pattern:
+def make_conjunction(rs: ReachabilitySystem, l: T.Sequence[Kore.Pattern]) -> Kore.Pattern:
     result: Kore.Pattern = Kore.Top(rs.top_sort)
     for x in l:
         result = Kore.And(rs.top_sort, result, x)
+    return result
+
+def make_disjunction(rs: ReachabilitySystem, l: T.Sequence[Kore.Pattern]) -> Kore.Pattern:
+    result: Kore.Pattern = Kore.Bottom(rs.top_sort)
+    for x in l:
+        result = Kore.Or(rs.top_sort, result, x)
     return result
 
 

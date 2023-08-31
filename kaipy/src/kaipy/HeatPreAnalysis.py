@@ -90,6 +90,7 @@ def collect_rests(
         # plug 'term' into the 'before' part of the alias
         # TODO: this is probably not the most efficient way of replacing `VARHERE` with `term`
         # and `VARREST` with `rest`. It works for now, but we probably want to use a substitution instead.
+        #  Although, we need to do the conjunction with the side condition anyway.
         input_pattern = Kore.And(
             rs.top_sort,
             Kore.And(

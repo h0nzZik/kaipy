@@ -13,10 +13,6 @@ from pyk.ktool import krun
 import kaipy.kore_utils as KoreUtils
 from .HeatonlyDefinition import heat_cool_only_definition
 from .IManagedKompiledKore import IManagedKompiledKore
-from .kore_utils import (  # axiom_label,; get_symbol_sort,; get_top_cell_initializer,; is_nonhooked_constructor_symbol,
-    free_evars_of_pattern,
-    rewrite_axioms,
-)
 from .TmpKompiledKore import TmpKompiledKore
 from .TriviallyManagedKompiledKore import TriviallyManagedKompiledKore
 
@@ -71,16 +67,56 @@ class KompiledDefinitionWrapper:
         raise NotImplementedError("Not implemented yet")
 
     @F.cached_property
+    def declared_sorts(self) -> T.List[str]:
+        sort_decls = KoreUtils.sort_decls(self.kompiled_kore.definition, self.main_module_name)
+        return [sd.name for sd in sort_decls]
+
+
+    @F.cached_property
+    def user_declared_sorts(self) -> T.List[str]:
+        blacklist = [
+            'SortIds',
+            'SortIOInt',
+            'SortIOFile',
+            'SortList',
+            'SortFloat',
+            'SortMap',
+            'SortString',
+            'SortIOString',
+            'SortId',
+            'SortKConfigVar',
+            'SortInt',
+            'SortIOError',
+            'SortSet',
+            'SortKResult',
+            'SortStream',
+            'SortBool',
+            'SortK',
+#            'SortKItem',
+        ]
+        return [
+            sn
+            for sn in self.declared_sorts
+            if not (
+                sn.endswith('CellFragment') or
+                sn.endswith('CellOpt') or
+                sn.endswith('Cell') or
+                sn in blacklist
+                )
+        ]
+
+
+    @F.cached_property
     def rewrite_rules(self) -> T.List[Kore.Axiom]:
         return list(
-            rewrite_axioms(self.kompiled_kore.definition, self.main_module_name)
+            KoreUtils.rewrite_axioms(self.kompiled_kore.definition, self.main_module_name)
         )
 
     @F.cached_property
     def rules_variables(self) -> T.Set[Kore.EVar]:
         evars: T.Set[Kore.EVar] = set()
         for axiom in self.rewrite_rules:
-            evars = evars.union(free_evars_of_pattern(axiom.pattern))
+            evars = evars.union(KoreUtils.free_evars_of_pattern(axiom.pattern))
         return evars
 
     def get_input_kore(self, program: Path) -> Kore.Pattern:

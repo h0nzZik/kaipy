@@ -11,13 +11,22 @@ from pyk.kore.parser import KoreParser
 from pyk.ktool.kprint import KPrint
 from pyk.testing._kompiler import KompiledTest
 
+import kaipy.kore_utils as KoreUtils
 import kaipy.rs_utils as RSUtils
+
+from kaipy.interfaces.IAbstractSubstitutionDomain import IAbstractSubstitutionDomain
+from kaipy.interfaces.IAbstractPatternDomain import IAbstractPatternDomain
+
 from kaipy.HeatPreAnalysis import ContextAlias, ContextAliases, pre_analyze
 from kaipy.ReachabilitySystem import ReachabilitySystem
+from kaipy.domains.BigsumPatternDomain import BigsumPattern, BigsumPatternDomain
+from kaipy.domains.ExactPatternDomain import ExactPattern, ExactPatternDomain
 from kaipy.testing.testingbase import RSTestBase
+from kaipy.DefaultAbstractionContext import make_ctx
+from kaipy.DefaultPatternDomain import build_abstract_pattern_domain
 
-import kaipy.DefaultSubstitutionDomain
-import kaipy.analyzer
+import kaipy.DefaultPatternDomain
+from kaipy.analyzer import AnalysisResult, analyze
 
 _LOGGER: T.Final = logging.getLogger(__name__)
 
@@ -61,7 +70,10 @@ class TestImp(MyTest):
     #     )
 
     def test_heatcoolonly(
-        self, reachability_system: ReachabilitySystem, context_aliases: ContextAliases
+        self,
+        reachability_system: ReachabilitySystem,
+        context_aliases: ContextAliases,
+        request,
     ):
         input_pattern: Kore.Pattern = reachability_system.kdw.get_input_kore(
             RSTestBase.LANGUAGES / "imp/sum.imp"
@@ -84,72 +96,109 @@ class TestImp(MyTest):
 
         assert len(rests) == 17
 
-    def test_cartesian_dict(self):
-        # { x |-> {phi1, phi2}, y |-> {phi3, phi4} }
-        # into
-        # { {x |-> phi1, y |-> phi3}, {x |-> phi1, y |-> phi4}, {x |-> phi2, y |-> phi3}, {x |-> phi2, y |-> phi4}  }
-        actual = kaipy.analyzer.cartesian_dict(immutabledict({"x" : {1,2}, "y" : {3, 4}}))
-        expected = { immutabledict({"x" : 1, "y" : 3}), immutabledict({"x" : 1, "y" : 4}), immutabledict({"x" : 2, "y" : 3}), immutabledict({"x" : 2, "y" : 4}) }
-        assert expected == actual
-
-    def test_analyze(
-        self, reachability_system: ReachabilitySystem, context_aliases: ContextAliases
+    def test_sort_decl(
+        self,
+        reachability_system: ReachabilitySystem
     ):
-        reachability_system.stats.reset()
+        ss = reachability_system.kdw.user_declared_sorts
+        print(ss)
+        assert set(ss) == set(['SortKItem', 'SortVoidVal', 'SortAExp', 'SortBlock', 'SortBExp', 'SortPgm', 'SortStmt', 'SortValue'])
+
+    def test_exact_and_bigsum_pattern_domain(
+        self,
+        reachability_system: ReachabilitySystem
+    ):
+        p1: Kore.Pattern = Kore.App('dotk', sorts=(), args=())
+        p2: Kore.Pattern = Kore.DV(Kore.SortApp('SortInt', ()), Kore.String("3"))
+        p3: Kore.Pattern = KorePrelude.inj(Kore.SortApp('SortInt', ()), Kore.SortApp('SortKItem', ()), p2)
+        p4: Kore.Pattern = Kore.App('kseq', (), (p1,p3))
+        
+        pd_p4 = ExactPatternDomain(rs=reachability_system, patterns=[p4])
+        assert KoreUtils.is_top(pd_p4.concretize(pd_p4.abstract(ctx=make_ctx(), c=p3)))
+        assert p4 == pd_p4.concretize(pd_p4.abstract(ctx=make_ctx(), c=p4))
+
+        pd_p2 = ExactPatternDomain(rs=reachability_system, patterns=[p2])
+        pd_bigsum = BigsumPatternDomain(rs=reachability_system, domains=[pd_p4, pd_p2])
+        assert KoreUtils.is_top(pd_bigsum.concretize(pd_bigsum.abstract(ctx=make_ctx(), c=p3)))
+        assert p4 == pd_bigsum.concretize(pd_bigsum.abstract(ctx=make_ctx(), c=p4))
+        assert p2 == pd_bigsum.concretize(pd_bigsum.abstract(ctx=make_ctx(), c=p2))
+
+    def _analyze_file(
+        self,
+        reachability_system: ReachabilitySystem,
+        context_aliases: ContextAliases,
+        filename: str,
+    ) -> AnalysisResult:
         input_pattern: Kore.Pattern = reachability_system.kdw.get_input_kore(
-            RSTestBase.LANGUAGES / "imp/sum.imp"
+            RSTestBase.LANGUAGES / filename
         )
 
         rests = pre_analyze(reachability_system, context_aliases, input_pattern)
-        subst_domain: IAbstractSubstitutionDomain = kaipy.DefaultSubstitutionDomain.build_abstract_substitution_domain(
+        pattern_domain: IAbstractPatternDomain = build_abstract_pattern_domain(
             reachability_system,
             rests,
             input_pattern
         )
-        states = kaipy.analyzer.analyze(
+        result = analyze(
             reachability_system,
-            subst_domain=subst_domain,
+            pattern_domain=pattern_domain,
             initial_configuration=input_pattern,
         )
-        _LOGGER.info(reachability_system.stats.dict)
-        states.states_by_id['IMP.assignment'].print(kprint=reachability_system.kprint, subst_domain=subst_domain)
-        #states.print(kprint=reachability_system.kprint, subst_domain=subst_domain)
-        #assert(False) # To print stuff
+        _LOGGER.warning(f"abstract: {pattern_domain.to_str(result.reachable_configurations)}")
+        concrete_reachable_configurations = pattern_domain.concretize(result.reachable_configurations)
+        _LOGGER.warning(reachability_system.kprint.kore_to_pretty(concrete_reachable_configurations))
+        return result
 
-    # def test_execute_var(self, reachability_system: ReachabilitySystem):
-    #     #x = Kore.EVar("VARX", KorePrelude.SORT_K_ITEM)
-    #     #x_k: Kore.Pattern = KorePrelude.kseq([x])
-    #     x_k = Kore.EVar("VARX", KorePrelude.SORT_K)
-    #     er = reachability_system.kcs.client.execute(x_k, max_depth=1)
-    #     print(er)
-    #     assert False
+    def test_analyze_very_simple(
+        self,
+        reachability_system: ReachabilitySystem,
+        context_aliases: ContextAliases
+    ):
+        result = self._analyze_file(
+            reachability_system=reachability_system,
+            context_aliases=context_aliases,
+            filename="imp/very-simple.imp"
+        )
+        print(result)
+        #si: kaipy.analyzer.StateInfo = states.states_by_id['IMP.assignment']
+        #si.print(kprint=reachability_system.kprint, subst_domain=subst_domain)
+        #concrete_substitutions = list(si.concrete_substitutions(subst_domain))
+        #assert len(concrete_substitutions) == 1
+        #assert reachability_system.kprint.kore_to_pretty(concrete_substitutions[0].mapping[Kore.EVar("Var'Unds'DotVar2", Kore.SortApp('SortK', ()))]).strip() == '#freezer___IMP-SYNTAX_Stmt_Stmt_Stmt1_ ( Fresh3:Stmt ~> . ) ~> Fresh2 ~> .'
 
-    # def test_simplify_kresult_kitem(self, reachability_system: ReachabilitySystem):
-    #     x = Kore.EVar("VARX", KorePrelude.SORT_K_ITEM)
-    #     #x_k = KorePrelude.inj(KorePrelude.SORT_K_ITEM, KorePrelude.SORT_K, x)
-    #     x_k = KorePrelude.kseq([x])
-    #     input_pattern = Kore.And(
-    #         KorePrelude.SORT_K_ITEM,
-    #         x,
-    #         Kore.Equals(
-    #             KorePrelude.BOOL,
-    #             KorePrelude.SORT_K_ITEM,
-    #             KorePrelude.TRUE,
-    #             Kore.App("LblisKResult", (), (x_k,)),
-    #         ),
-    #     )
-    #     # input_pattern = Kore.And(KorePrelude.SORT_K_ITEM, input_pattern, Kore.Equals(KorePrelude.SORT_K_ITEM, KorePrelude.SORT_K_ITEM, x, KorePrelude.inj(KorePrelude.INT, KorePrelude.SORT_K_ITEM, KorePrelude.int_dv(3))))
-    #     print(
-    #         f"input_pattern: {reachability_system.kprint.kore_to_pretty(input_pattern)}"
-    #     )
-    #     simp = reachability_system.kcs.client.simplify(input_pattern)[0]
-    #     print(f"simplified: {reachability_system.kprint.kore_to_pretty(simp)}")
-    #     mr = reachability_system.kcs.client.get_model(input_pattern)
-    #     #print(f"sat? {mr}")
-    #     #match mr:
-    #     #    case KoreRpc.SatResult(pat):
-    #     #        print(f"simplified: {reachability_system.kprint.kore_to_pretty(pat)}")
-    #     assert False
+    def test_analyze_simple(
+        self,
+        reachability_system: ReachabilitySystem,
+        context_aliases: ContextAliases
+    ):
+        result = self._analyze_file(
+            reachability_system=reachability_system,
+            context_aliases=context_aliases,
+            filename="imp/simple.imp"
+        )
+        print(result)
+
+    def test_analyze_simple_symbolic(
+        self,
+        reachability_system: ReachabilitySystem,
+        context_aliases: ContextAliases
+    ):
+        result = self._analyze_file(
+            reachability_system=reachability_system,
+            context_aliases=context_aliases,
+            filename="imp/simple-symbolic.imp"
+        )
+        print(result)
+
+    def test_analyze_sum(
+        self, reachability_system: ReachabilitySystem, context_aliases: ContextAliases
+    ):
+        result = self._analyze_file(
+            reachability_system=reachability_system,
+            context_aliases=context_aliases,
+            filename="imp/sum.imp"
+        )
+        print(result)
 
     def test_simplify_kresult_3(self, reachability_system: ReachabilitySystem):
         krterm = Kore.App(

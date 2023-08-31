@@ -68,6 +68,27 @@ def axioms(definition: Kore.Definition, main_module_name: str) -> T.List[Kore.Ax
     return axioms
 
 
+def sentences(definition: Kore.Definition, main_module_name: str) -> T.List[Kore.Sentence]:
+    module_names = {main_module_name}.union(
+        get_all_recursively_imported_module_names(definition, main_module_name)
+    )
+    modules = map(lambda name: get_module_by_name(definition, name), module_names)
+    sentences: T.List[Kore.Sentence] = []
+    for m in modules:
+        sentences.extend(m.sentences)
+    return sentences
+
+def is_sort_decl(s: Kore.Sentence) -> bool:
+    match s:
+        case Kore.SortDecl(_,_,_,_):
+            return True
+    return False
+
+
+def sort_decls(definition: Kore.Definition, main_module_name: str) -> T.List[Kore.SortDecl]:
+    return [s for s in sentences(definition, main_module_name) if is_sort_decl(s)] #type: ignore
+
+
 def rewrite_axioms(
     definition: Kore.Definition, main_module_name: str
 ) -> T.Iterable[Kore.Axiom]:
@@ -470,9 +491,9 @@ def compute_renaming(
 
 def filter_out_predicates(
     phi: Kore.Pattern,
-) -> T.Tuple[T.Optional[Kore.Pattern], T.List[Kore.Pattern]]:
+) -> T.Tuple[T.Optional[Kore.Pattern], T.List[Kore.MLPred]]:
     if issubclass(type(phi), Kore.MLPred):
-        return None, [phi]
+        return None, [phi] # type: ignore
     match phi:
         case Kore.And(sort, left, right):
             lf, ps1 = filter_out_predicates(left)
@@ -486,7 +507,7 @@ def filter_out_predicates(
             return phi, []
 
 
-def get_predicates(phi: Kore.Pattern) -> T.List[Kore.Pattern]:
+def get_predicates(phi: Kore.Pattern) -> T.List[Kore.MLPred]:
     _, preds = filter_out_predicates(phi)
     return preds
 
@@ -505,6 +526,13 @@ def is_top(pattern: Kore.Pattern) -> bool:
     return False
 
 
+def is_evar(pattern: Kore.Pattern) -> bool:
+    match pattern:
+        case Kore.EVar(_, _):
+            return True
+    return False
+
+
 # TODO use make_conjunction
 def mapping_to_pattern(
     sort: Kore.Sort, m: T.Mapping[Kore.EVar, Kore.Pattern]
@@ -513,3 +541,14 @@ def mapping_to_pattern(
     for lhs, rhs in m.items():
         result = Kore.And(sort, result, Kore.Equals(lhs.sort, sort, lhs, rhs))
     return result
+
+
+def reverse_renaming(renaming: T.Mapping[str, str]) -> T.Dict[str, str]:
+    return {v:k for k,v in renaming.items()}
+
+def or_to_list(phi: Kore.Pattern) -> T.List[Kore.Pattern]:
+    match phi:
+        case Kore.Or(_, l, r):
+            return or_to_list(l) + or_to_list(r)
+        case _:
+            return [phi]

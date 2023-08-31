@@ -1,0 +1,7 @@
+int y,z;
+if (3 <= getArg(0)) {
+    y = 2 + getArg(0);
+} else {
+    y = 1 + getArg(0);
+}
+z = y + -1;
