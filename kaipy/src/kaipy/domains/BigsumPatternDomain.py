@@ -40,10 +40,34 @@ class BigsumPatternDomain(IAbstractPatternDomain):
             return BigsumPattern(idx=a1.idx, sort=a1.sort, ap=self.domains[a1.idx].disjunction(ctx, a1.ap, a2.ap))
         return BigsumPattern(-1, sort=a1.sort, ap=None)
 
+    def refine(self, ctx: AbstractionContext, a: IAbstractPattern, c: Kore.Pattern) -> IAbstractPattern:
+        assert type(a) is BigsumPattern
+        if a.idx == -1:
+            return a
+        if a.ap is None:
+            return a
+        return BigsumPattern(
+            idx=a.idx,
+            sort=a.sort,
+            ap=self.domains[a.idx].refine(ctx, a.ap, c)
+        )
+
     def is_top(self, a: IAbstractPattern) -> bool:
         assert type(a) is BigsumPattern
-        return (a.idx == -1) or (a.ap is None)
+        if a.idx == -1:
+            return True
+        if a.ap is None:
+            return True
+        return self.domains[a.idx].is_top(a.ap)
     
+    def is_bottom(self, a: IAbstractPattern) -> bool:
+        assert type(a) is BigsumPattern
+        if a.idx == -1:
+            return False
+        if a.ap is None:
+            return False
+        return self.domains[a.idx].is_bottom(a.ap)
+
     def concretize(self, a: IAbstractPattern) -> Kore.Pattern:
         assert type(a) is BigsumPattern
         if self.is_top(a):

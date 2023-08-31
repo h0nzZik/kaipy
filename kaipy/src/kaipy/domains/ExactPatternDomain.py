@@ -33,10 +33,17 @@ class ExactPatternDomain(IAbstractPatternDomain):
                 return ExactPattern(idx=i, sort=sort)
         return ExactPattern(idx=-1, sort=sort)
     
+    def refine(self, ctx: AbstractionContext, a: IAbstractPattern, c: Kore.Pattern) -> ExactPattern:
+        assert type(a) is ExactPattern
+        return a
+
     def is_top(self, a: IAbstractPattern) -> bool:
         assert type(a) is ExactPattern
         return a.idx == -1
     
+    def is_bottom(self, a: IAbstractPattern) -> bool:
+        return False
+
     def concretize(self, a: IAbstractPattern) -> Kore.Pattern:
         assert type(a) is ExactPattern
         if self.is_top(a):

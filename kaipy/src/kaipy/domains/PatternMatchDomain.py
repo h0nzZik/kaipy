@@ -107,7 +107,6 @@ class PatternMatchDomain(IAbstractPatternDomain):
         assert type(a) is PatternMatchDomainElement
         return all([ud.is_bottom(b) for ud,b in zip(self.underlying_domains, a.constraint_per_state)])
 
-    @abc.abstractmethod
     def concretize(self, a: IAbstractPattern) -> Kore.Pattern:
         assert type(a) is PatternMatchDomainElement
         concretized_constraints: T.List[T.List[Kore.MLPred]] = [

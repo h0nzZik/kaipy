@@ -142,6 +142,10 @@ class FinitePatternDomain(IAbstractPatternDomain):
         assert type(a) is FinitePattern
         return a.idx == -1
 
+    def is_bottom(self, a: IAbstractPattern) -> bool:
+        assert type(a) is FinitePattern
+        return False
+
     def concretize(self, a: IAbstractPattern) -> Kore.Pattern:
         assert type(a) is FinitePattern
         if self.is_top(a):
@@ -186,7 +190,7 @@ class FinitePatternDomain(IAbstractPatternDomain):
         return False
         #return self.rs.subsumes(self.concretize(a1), self.concretize(a2))[0]
 
-    def print(self, a: IAbstractPattern) -> str:
+    def to_str(self, a: IAbstractPattern) -> str:
         c = self.concretize(a)
-        assert not KoreUtils.is_top(c)
+        #assert not KoreUtils.is_top(c) ?????
         return self.rs.kprint.kore_to_pretty(c)
