@@ -15,6 +15,8 @@ from kaipy.domains.ExactPatternDomain import ExactPatternDomain
 from kaipy.domains.CartesianAbstractSubstitutionDomain import CartesianAbstractSubstitutionDomain
 from kaipy.domains.ProductConstraintDomain import ProductConstraintDomain
 from kaipy.domains.KResultConstraintDomain import KResultConstraintDomain
+from kaipy.domains.PatternMatchDomain import PatternMatchDomain
+from kaipy.PatternMatchDomainBuilder import build_pattern_match_domain
 
 from kaipy.ReachabilitySystem import ReachabilitySystem
 
@@ -56,4 +58,7 @@ def build_abstract_constraint_domain(
     #kresult_domain: IAbstractSubstitutionDomain = KResultSubstDomainWrapper(rs=rs, underlying_subst_domain=subst_domain, limit=1)
     kresult_domain: IAbstractConstraintDomain = KResultConstraintDomain(rs=rs, limit=1)
     product_domain_1 = ProductConstraintDomain(subst_domain_1, kresult_domain)
+
+    pattern_match_domain = build_pattern_match_domain(rs)
+
     return product_domain_1

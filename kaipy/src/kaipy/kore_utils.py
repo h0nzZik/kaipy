@@ -545,3 +545,10 @@ def mapping_to_pattern(
 
 def reverse_renaming(renaming: T.Mapping[str, str]) -> T.Dict[str, str]:
     return {v:k for k,v in renaming.items()}
+
+def or_to_list(phi: Kore.Pattern) -> T.List[Kore.Pattern]:
+    match phi:
+        case Kore.Or(_, l, r):
+            return or_to_list(l) + or_to_list(r)
+        case _:
+            return [phi]
