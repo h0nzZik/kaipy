@@ -1,5 +1,6 @@
 import dataclasses
 import typing as T
+import logging
 from immutabledict import immutabledict
 
 import pyk.kore.syntax as Kore
@@ -10,6 +11,8 @@ from kaipy.interfaces.IAbstractConstraintDomain import IAbstractConstraint, IAbs
 from kaipy.interfaces.IAbstractSubstitutionDomain import IAbstractSubstitution, IAbstractSubstitutionDomain
 from kaipy.interfaces.IAbstractConstraintDomainBuilder import IAbstractConstraintDomainBuilder
 from kaipy.Substitution import Substitution
+
+_LOGGER: T.Final = logging.getLogger(__name__)
 
 @dataclasses.dataclass
 class SubstitutionConstraint(IAbstractConstraint):
@@ -30,6 +33,8 @@ class SubstitutionConstraintDomain(IAbstractConstraintDomain):
         self.nested = nested
         self.rs = rs
         self.evars = evars
+        _LOGGER.warning(f"SCD evars: {self.evars}")
+
 
     def abstract(self, ctx: AbstractionContext, c: T.List[Kore.MLPred]) -> IAbstractConstraint:
         eqls: T.Dict[Kore.EVar, Kore.Pattern] = dict()

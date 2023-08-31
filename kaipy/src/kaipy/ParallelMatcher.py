@@ -12,16 +12,20 @@ class _RawPatternProjection:
     conj: Kore.Pattern
     #info: StateInfo
     st: Kore.Pattern
-    st_renamed: Kore.Pattern
-    renaming: T.Dict[str, str]
+    #st_renamed: Kore.Pattern
+    cfg_renamed: Kore.Pattern
+    cfg_renaming: T.Dict[str, str]
+    #renaming: T.Dict[str, str]
 
     def with_conj(self, new_conj: Kore.Pattern) -> "_RawPatternProjection":
         return _RawPatternProjection(
             cfg=self.cfg,
             conj=new_conj,
             st=self.st,
-            st_renamed=self.st_renamed,
-            renaming=self.renaming
+            cfg_renamed=self.cfg_renamed,
+            cfg_renaming=self.cfg_renaming
+            #st_renamed=self.st_renamed,
+            #renaming=self.renaming
         )
 
 def _rename_to_avoid(
@@ -32,11 +36,11 @@ def _rename_to_avoid(
         vars_to_avoid=list(KoreUtils.free_evars_of_pattern(pattern_to_avoid)),
         vars_to_rename=list(KoreUtils.free_evars_of_pattern(pattern_to_rename))
     )
-    st_renamed = KoreUtils.rename_vars(
+    renamed = KoreUtils.rename_vars(
         renaming,
         pattern_to_rename
     )
-    return st_renamed,renaming
+    return renamed,renaming
 
 
 def _compute_raw_pattern_projection(
@@ -44,14 +48,16 @@ def _compute_raw_pattern_projection(
     what: Kore.Pattern,
     to: Kore.Pattern,
 ) -> _RawPatternProjection:
-    to_renamed,renaming = _rename_to_avoid(to, what)
-    conj = Kore.And(rs.top_sort, what, to_renamed)
+    what_renamed,renaming = _rename_to_avoid(what, to)
+    conj = Kore.And(rs.top_sort, what_renamed, to)
     return _RawPatternProjection(
         cfg=what,
         conj=conj,
         st=to,
-        st_renamed=to_renamed,
-        renaming=renaming,
+        cfg_renamed=what_renamed,
+        cfg_renaming=renaming,
+        #st_renamed=to_renamed,
+        #renaming=renaming,
     )
 
 def _compute_list_of_raw_pattern_projections(
@@ -89,7 +95,7 @@ def parallel_match(rs: ReachabilitySystem, cfg: Kore.Pattern, states: T.List[Kor
         MatchResult(
             cfg=ci.cfg,
             state=ci.st,
-            renaming=ci.renaming,
+            renaming=ci.cfg_renaming,
             # A problem occurring here is that `ci.conj` is too simplified:
             # it does not contain predicates that the backend is able to deduce are always true.
             # For example, we might have a state:
