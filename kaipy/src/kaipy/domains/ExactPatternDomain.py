@@ -4,8 +4,9 @@ import typing as T
 import pyk.kore.syntax as Kore
 
 import kaipy.kore_utils as KoreUtils
+from kaipy.AbstractionContext import AbstractionContext
 from kaipy.ReachabilitySystem import ReachabilitySystem
-from kaipy.IAbstractPatternDomain import IAbstractPattern, IAbstractPatternDomain
+from kaipy.interfaces.IAbstractPatternDomain import IAbstractPattern, IAbstractPatternDomain
 
 @dataclasses.dataclass
 class ExactPattern(IAbstractPattern):
@@ -25,7 +26,7 @@ class ExactPatternDomain(IAbstractPatternDomain):
         self.rs = rs
         self.pl = patterns 
 
-    def abstract(self, c: Kore.Pattern) -> ExactPattern:
+    def abstract(self, ctx: AbstractionContext, c: Kore.Pattern) -> ExactPattern:
         sort = self.rs.kdw.sortof(c)
         for i,p in enumerate(self.pl):
             if p == c:
@@ -47,6 +48,15 @@ class ExactPatternDomain(IAbstractPatternDomain):
         assert type(a2) is ExactPattern
         return a1.idx == a2.idx
 
+    def disjunction(self, ctx: AbstractionContext, a1: IAbstractPattern, a2: IAbstractPattern) -> ExactPattern:
+        assert type(a1) is ExactPattern
+        assert type(a2) is ExactPattern
+
+        if a1.idx == a2.idx and a1.sort == a2.sort:
+            return a1
+
+        return ExactPattern(idx=-1, sort=a1.sort)
+
     def subsumes(self, a1: IAbstractPattern, a2: IAbstractPattern) -> bool:
         assert type(a1) is ExactPattern
         assert type(a2) is ExactPattern
@@ -62,6 +72,6 @@ class ExactPatternDomain(IAbstractPatternDomain):
 
         return self.rs.subsumes(self.concretize(a1), self.concretize(a2))[0]
 
-    def print(self, a: IAbstractPattern) -> str:
+    def to_str(self, a: IAbstractPattern) -> str:
         assert type(a) is ExactPattern
         return f'<idx={a.idx},sort={a.sort}>'
