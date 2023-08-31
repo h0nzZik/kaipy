@@ -26,7 +26,7 @@ from kaipy.DefaultAbstractionContext import make_ctx
 from kaipy.DefaultPatternDomain import build_abstract_pattern_domain
 
 import kaipy.DefaultPatternDomain
-import kaipy.analyzer
+from kaipy.analyzer import AnalysisResult, analyze
 
 _LOGGER: T.Final = logging.getLogger(__name__)
 
@@ -128,7 +128,7 @@ class TestImp(MyTest):
         reachability_system: ReachabilitySystem,
         context_aliases: ContextAliases,
         filename: str,
-    ):
+    ) -> AnalysisResult:
         input_pattern: Kore.Pattern = reachability_system.kdw.get_input_kore(
             RSTestBase.LANGUAGES / filename
         )
@@ -139,11 +139,13 @@ class TestImp(MyTest):
             rests,
             input_pattern
         )
-        result = kaipy.analyzer.analyze(
+        result = analyze(
             reachability_system,
             pattern_domain=pattern_domain,
             initial_configuration=input_pattern,
         )
+        concrete_reachable_configurations = pattern_domain.concretize(result.reachable_configurations)
+        _LOGGER.warning(reachability_system.kprint.kore_to_pretty(concrete_reachable_configurations))
         return result
 
     def test_analyze_very_simple(
