@@ -31,13 +31,16 @@ def _to_sympy(phi: Kore.Pattern):
     return new_phi, d
 
 
-def _from_sympy(phi, d, sort: Kore.Sort) -> Kore.Pattern:
+def _from_sympy(phi, dback, sort: Kore.Sort) -> Kore.Pattern:
+    if phi in dback:
+        return dback[phi]
+    
     if type(phi) is And:
-        args = [_from_sympy(a, d, sort) for a in phi.args]
-        KoreUtils.make_conjunction(sort, l=args)
+        args = [_from_sympy(a, dback, sort) for a in phi.args]
+        return KoreUtils.make_conjunction(sort, l=args)
     if type(phi) is Or:
-        args = [_from_sympy(a, d, sort) for a in phi.args]
-        KoreUtils.make_disjunction(sort, l=args)
+        args = [_from_sympy(a, dback, sort) for a in phi.args]
+        return KoreUtils.make_disjunction(sort, l=args)
     if type(phi) is False:
         return Kore.Bottom(sort)
     if type(phi) is True:
@@ -46,4 +49,5 @@ def _from_sympy(phi, d, sort: Kore.Sort) -> Kore.Pattern:
 
 def to_cnf(phi: Kore.Pattern, sort: Kore.Sort) -> Kore.Pattern:
     new_phi, d = _to_sympy(phi)
-    return _from_sympy(phi=SympyLogic.to_cnf(new_phi), d=d, sort=sort)
+    dback = {v:k for k,v in d.items()}
+    return _from_sympy(phi=SympyLogic.to_cnf(new_phi), dback=dback, sort=sort)
