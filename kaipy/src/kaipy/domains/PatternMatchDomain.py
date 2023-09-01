@@ -38,6 +38,7 @@ class PatternMatchDomain(IAbstractPatternDomain):
     ):
         self.rs = rs
         self.states = states
+        _LOGGER.warning(f"States: {len(states)}")
         self.underlying_domains = [
             underlying_domain_builder.build_abstract_constraint_domain(KoreUtils.free_evars_of_pattern(st))
             for st in states
@@ -58,7 +59,8 @@ class PatternMatchDomain(IAbstractPatternDomain):
             for mr in mrs
         ]
 
-        _LOGGER.warning(f"bottoms: {len([KoreUtils.any_is_bottom(mr.constraints) for mr in mrs])}")
+        # Well, I am only measuring the length of the list of bools here
+        #_LOGGER.warning(f"bottoms: {len([KoreUtils.any_is_bottom(mr.constraints) for mr in mrs])}")
 
         # Now, `renamings_2` will be [{A': SV1}]
         constraints_renamed: T.List[T.List[Kore.MLPred]] = [
@@ -131,7 +133,11 @@ class PatternMatchDomain(IAbstractPatternDomain):
             for state,ccr in zip(self.states, concretized_constraints_renamed)
         ]
         result = RSUtils.make_disjunction(self.rs, constrained_states)
+        _LOGGER.warning(f'BEFORE= {self.rs.kprint.kore_to_pretty(result)}')
+
+        # TODO we cannot do simplify here because of variables from different states....
         result = self.rs.simplify(result)
+        _LOGGER.warning(f'AFTER= {self.rs.kprint.kore_to_pretty(result)}')
         return result
 
     def equals(self, a1: IAbstractPattern, a2: IAbstractPattern) -> bool:

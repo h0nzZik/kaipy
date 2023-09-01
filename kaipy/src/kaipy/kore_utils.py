@@ -576,3 +576,11 @@ def and_to_list(phi: Kore.Pattern) -> T.List[Kore.Pattern]:
             return and_to_list(l) + and_to_list(r)
         case _:
             return [phi]
+
+
+def normalize_pattern(cfg: Kore.Pattern) -> Kore.Pattern:
+    vs = free_occs_det(cfg)
+    # Different sorts will have different namespaces.
+    # This way we avoid clashes of names like `X:SortInt` with `X:SortList`
+    renaming = { v.name : (f"VAR'V{v.sort.name}'{str(i)}") for i,v in enumerate(vs)}
+    return rename_vars(renaming, cfg)
