@@ -45,6 +45,7 @@ class SubstitutionListDomain(IAbstractSubstitutionsDomain):
                     break
             if not skip:
                 elements.append(e2)
+        #_LOGGER.warning(f"disjunction: result_len={len(elements)}")
         return SubstitutionList(elements=elements)
 
     def refine(self, ctx: AbstractionContext, a: IAbstractSubstitutions, c: T.List[Kore.MLPred]) -> SubstitutionList:

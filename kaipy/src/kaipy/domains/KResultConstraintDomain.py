@@ -56,6 +56,11 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
         assert type(a) is KResultConstraint
         return False
 
+    def _monitor_evar(self, e: Kore.EVar):
+        if e.sort.name == 'SortK':
+            return False
+        return True
+
     def _test_necessary_kresult(self, e: Kore.EVar, phi: Kore.MLPred) -> bool:
         iskr_true = self._mk_isKResult_pattern(e, sort=e.sort)
         not_iskr_true = Kore.Not(e.sort, iskr_true)
@@ -76,13 +81,15 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
                 case Kore.Equals(_, _, Kore.EVar(_, _), Kore.EVar(_, _)):
                     continue
                 case Kore.Equals(_, _, Kore.EVar(n, s), right):
-                    monitored_evars.append(Kore.EVar(n, s))
-                    if not self._test_necessary_kresult(e=Kore.EVar(n, s), phi=p):
-                        not_necessary_kresults.append(Kore.EVar(n, s))
+                    if self._monitor_evar(Kore.EVar(n,s)):
+                        monitored_evars.append(Kore.EVar(n, s))
+                        if not self._test_necessary_kresult(e=Kore.EVar(n, s), phi=p):
+                            not_necessary_kresults.append(Kore.EVar(n, s))
                 case Kore.Equals(_, _, left, Kore.EVar(n, s)):
-                    monitored_evars.append(Kore.EVar(n, s))
-                    if not self._test_necessary_kresult(e=Kore.EVar(n, s), phi=p):
-                        not_necessary_kresults.append(Kore.EVar(n, s))
+                    if self._monitor_evar(Kore.EVar(n,s)):
+                        monitored_evars.append(Kore.EVar(n, s))
+                        if not self._test_necessary_kresult(e=Kore.EVar(n, s), phi=p):
+                            not_necessary_kresults.append(Kore.EVar(n, s))
         
         if len(not_necessary_kresults) > self.limit:
             _LOGGER.warning(f"Limit ({self.limit}) reached.")

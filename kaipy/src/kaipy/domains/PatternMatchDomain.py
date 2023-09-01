@@ -38,7 +38,7 @@ class PatternMatchDomain(IAbstractPatternDomain):
     ):
         self.rs = rs
         self.states = states
-        _LOGGER.warning(f"States: {len(states)}")
+        #_LOGGER.warning(f"States: {len(states)}")
         self.underlying_domains = [
             underlying_domain_builder.build_abstract_constraint_domain(KoreUtils.free_evars_of_pattern(st))
             for st in states
@@ -124,20 +124,29 @@ class PatternMatchDomain(IAbstractPatternDomain):
             ud.concretize(b)
             for ud,b in zip(self.underlying_domains, a.constraint_per_state)
         ]
+        #_LOGGER.warning(f'concretized_constraitns: {[[y.text for y in x] for x in concretized_constraints]}')
         concretized_constraints_renamed = [
             [ KoreUtils.rename_vars(dict(a.reversed_renaming), c) for c in cc]
             for cc in concretized_constraints
         ]
+        ccr_conjs = [
+            self.rs.simplify(RSUtils.make_conjunction(self.rs, ccr))
+            for ccr in concretized_constraints_renamed
+        ]
+
+        #_LOGGER.warning(f'ccr_conjs: {ccr_conjs}')
+
         constrained_states: T.List[Kore.Pattern] = [
-            Kore.And(self.rs.sortof(state), state, RSUtils.make_conjunction(self.rs, ccr))
-            for state,ccr in zip(self.states, concretized_constraints_renamed)
+            self.rs.simplify(Kore.And(self.rs.sortof(state), state, ccr_conj)) # The simplification here is mainly for debugging purposes
+            for state,ccr_conj in zip(self.states, ccr_conjs)
         ]
         result = RSUtils.make_disjunction(self.rs, constrained_states)
-        _LOGGER.warning(f'BEFORE= {self.rs.kprint.kore_to_pretty(result)}')
+        #_LOGGER.warning(f'BEFORE= {self.rs.kprint.kore_to_pretty(result)}')
+        #.warning(f'BEFORE= {result.text}')
 
         # TODO we cannot do simplify here because of variables from different states....
         result = self.rs.simplify(result)
-        _LOGGER.warning(f'AFTER= {self.rs.kprint.kore_to_pretty(result)}')
+        #_LOGGER.warning(f'AFTER= {self.rs.kprint.kore_to_pretty(result)}')
         return result
 
     def equals(self, a1: IAbstractPattern, a2: IAbstractPattern) -> bool:

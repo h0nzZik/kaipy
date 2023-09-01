@@ -63,9 +63,9 @@ def analyze(
             break
         curr_depth = curr_depth + 1
         _LOGGER.warning(f"Iteration {curr_depth}")
-        _LOGGER.warning(f"current_abstract: {pattern_domain.to_str(current_abstract)}")
+        #_LOGGER.warning(f"current_abstract: {pattern_domain.to_str(current_abstract)}")
         current_concretized = pattern_domain.concretize(current_abstract)
-        _LOGGER.warning(f"current_concretized: {rs.kprint.kore_to_pretty(current_concretized)}")
+        #_LOGGER.warning(f"current_concretized: {rs.kprint.kore_to_pretty(current_concretized)}")
         current_concretized_list: T.List[Kore.Pattern] = KoreUtils.or_to_list(current_concretized)
         current_concretized_list_normalized = [ KoreUtils.normalize_pattern(c) for c in current_concretized_list ]
         diff = [c for c in current_concretized_list_normalized if c not in cfgs_below_current.keys()]
