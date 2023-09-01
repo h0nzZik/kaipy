@@ -2,6 +2,7 @@ import abc
 import collections
 import dataclasses
 import typing as T
+import logging
 
 import pyk.kore.syntax as Kore
 
@@ -14,6 +15,8 @@ from kaipy.interfaces.IAbstractConstraintDomainBuilder import IAbstractConstrain
 from kaipy.interfaces.IAbstractConstraintDomain import IAbstractConstraint, IAbstractConstraintDomain
 from kaipy.interfaces.IAbstractPatternDomain import IAbstractPattern, IAbstractPatternDomain
 from kaipy.ParallelMatcher import parallel_match, MatchResult
+
+_LOGGER: T.Final = logging.getLogger(__name__)
 
 @dataclasses.dataclass
 class PatternMatchDomainElement(IAbstractPattern):
@@ -54,6 +57,9 @@ class PatternMatchDomain(IAbstractPatternDomain):
             { v: ctx.variable_manager.get_fresh_evar_name() for k,v in mr.renaming.items() }
             for mr in mrs
         ]
+
+        _LOGGER.warning(f"bottoms: {len([KoreUtils.any_is_bottom(mr.constraints) for mr in mrs])}")
+
         # Now, `renamings_2` will be [{A': SV1}]
         constraints_renamed: T.List[T.List[Kore.MLPred]] = [
             [ KoreUtils.rename_vars(r2, c) for c in mr.constraints ] # type: ignore
@@ -125,6 +131,7 @@ class PatternMatchDomain(IAbstractPatternDomain):
             for state,ccr in zip(self.states, concretized_constraints_renamed)
         ]
         result = RSUtils.make_disjunction(self.rs, constrained_states)
+        result = self.rs.simplify(result)
         return result
 
     def equals(self, a1: IAbstractPattern, a2: IAbstractPattern) -> bool:

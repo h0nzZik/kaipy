@@ -20,7 +20,7 @@ _LOGGER: T.Final = logging.getLogger(__name__)
 
 @dataclasses.dataclass
 class SubstitutionsConstraint(IAbstractConstraint):
-    nested: IAbstractSubstitutions
+    nested: IAbstractSubstitutions|None
 
 
 class SubstitutionsConstraintDomain(IAbstractConstraintDomain):
@@ -41,6 +41,9 @@ class SubstitutionsConstraintDomain(IAbstractConstraintDomain):
 
 
     def abstract(self, ctx: AbstractionContext, c: T.List[Kore.MLPred]) -> IAbstractConstraint:
+        if KoreUtils.any_is_bottom(c):
+            return SubstitutionsConstraint(None)
+        
         eqls: T.Dict[Kore.EVar, Kore.Pattern] = dict()
         for p in c:
             match p:
@@ -64,6 +67,9 @@ class SubstitutionsConstraintDomain(IAbstractConstraintDomain):
     
     def refine(self, ctx: AbstractionContext, a: IAbstractConstraint, c: T.List[Kore.MLPred]) -> SubstitutionsConstraint:
         assert type(a) is SubstitutionsConstraint
+        if a.nested is None:
+            return a
+        
         new_nested = self.nested.refine(ctx, a.nested, c)
         new_a = SubstitutionsConstraint(new_nested)
         return new_a
@@ -71,13 +77,20 @@ class SubstitutionsConstraintDomain(IAbstractConstraintDomain):
     def disjunction(self, ctx: AbstractionContext, a1: IAbstractConstraint, a2: IAbstractConstraint) -> SubstitutionsConstraint:
         assert type(a1) is SubstitutionsConstraint
         assert type(a2) is SubstitutionsConstraint
+        if a1.nested is None:
+            return a2
+        if a2.nested is None:
+            return a1
         return SubstitutionsConstraint(self.nested.disjunction(ctx, a1.nested, a2.nested))
 
     def concretize(self, a: IAbstractConstraint) -> T.List[Kore.MLPred]:
         assert type(a) is SubstitutionsConstraint
+        if a.nested is None:
+            return [Kore.Bottom(self.rs.top_sort)] # type:ignore
         concrete_substs = self.nested.concretize(a.nested)
         atoms = [ [Kore.Equals(k.sort, self.rs.top_sort, k, v) for k,v in s.mapping.items()] for s in concrete_substs]
         dnf = KoreUtils.make_disjunction(self.rs.top_sort, [ KoreUtils.make_conjunction(self.rs.top_sort, dclause) for dclause in atoms])
+        dnf = self.rs.simplify(dnf) # maybe not necessary?
         cnf = to_cnf(dnf, sort=self.rs.top_sort)
         preds = KoreUtils.and_to_list(cnf)
         return preds # type: ignore
@@ -85,23 +98,37 @@ class SubstitutionsConstraintDomain(IAbstractConstraintDomain):
     def subsumes(self, a1: IAbstractConstraint, a2: IAbstractConstraint) -> bool:
         assert type(a1) is SubstitutionsConstraint
         assert type(a2) is SubstitutionsConstraint
+        if a1.nested is None:
+            return True
+        if a2.nested is None:
+            return False
         return self.nested.subsumes(a1.nested, a2.nested)
     
     def equals(self, a1: IAbstractConstraint, a2: IAbstractConstraint) -> bool:
         assert type(a1) is SubstitutionsConstraint
         assert type(a2) is SubstitutionsConstraint
+        if a1.nested is None:
+            return a2.nested is None
+        if a2.nested is None:
+            return False
         return self.nested.equals(a1.nested, a2.nested)
 
     def is_top(self, a: IAbstractConstraint) -> bool:
         assert type(a) is SubstitutionsConstraint
+        if a.nested is None:
+            return False
         return self.nested.is_top(a.nested)
 
     def is_bottom(self, a: IAbstractConstraint) -> bool:
         assert type(a) is SubstitutionsConstraint
+        if a.nested is None:
+            return True
         return self.nested.is_bottom(a.nested)
     
     def to_str(self, a: IAbstractConstraint) -> str:
         assert type(a) is SubstitutionsConstraint
+        if a.nested is None:
+            return '<Bot'
         return f'<sc: {self.nested.to_str(a.nested)}>'
     
 

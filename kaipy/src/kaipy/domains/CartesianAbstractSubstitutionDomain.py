@@ -28,7 +28,7 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
         self.pattern_domain = pattern_domain
     
     def abstract(self, ctx: AbstractionContext, subst: Substitution) -> CartesianAbstractSubstitution:
-        _LOGGER.warning(f"abstract({subst})")
+        #_LOGGER.warning(f"abstract({subst})")
         # we ignore `preds`
         m = {
                 v : self.pattern_domain.abstract(ctx, p)
@@ -68,7 +68,7 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
             if not self.pattern_domain.is_top(v)
         }
         s =  Substitution(mapping)
-        _LOGGER.warning(f"concretize() = {s}")
+        #_LOGGER.warning(f"concretize() = {s}")
         return s
         # # If `v` is top, we do not want to concretize it,
         # # because the resulting constraint would be something like

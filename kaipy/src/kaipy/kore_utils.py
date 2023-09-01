@@ -532,6 +532,9 @@ def is_bottom(pattern: Kore.Pattern) -> bool:
             return True
     return False
 
+def any_is_bottom(l: T.Iterable[Kore.Pattern]) -> bool:
+    return any([is_bottom(x) for x in l])
+
 
 def is_top(pattern: Kore.Pattern) -> bool:
     match pattern:
