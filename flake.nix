@@ -25,9 +25,10 @@
                 #prev.pyk-python311
                 pyk-py
                 python.pkgs.setuptools
-                python.pkgs.networkx
+                python.pkgs.networkx # TODO remove
                 python.pkgs.immutabledict
                 python.pkgs.pytest
+                python.pkgs.sympy
               ];
           };
         in {

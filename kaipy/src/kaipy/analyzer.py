@@ -70,6 +70,7 @@ def analyze(
             break
         curr_depth = curr_depth + 1
         _LOGGER.warning(f"Iteration {curr_depth}")
+        _LOGGER.warning(f"current_abstract: {pattern_domain.to_str(current_abstract)}")
         current_concretized: T.List[Kore.Pattern] = KoreUtils.or_to_list(pattern_domain.concretize(current_abstract))
         diff = [c for c in current_concretized if c not in cfgs_below_current.keys()]
         if len(diff) <= 0:
