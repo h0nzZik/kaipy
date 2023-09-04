@@ -3,8 +3,8 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.05";
     flake-utils.url = "github:numtide/flake-utils";
-    pyk.url = "github:runtimeverification/pyk/v0.1.408";
-    k-framework.url = "github:runtimeverification/k/v6.0.50";
+    pyk.url = "github:runtimeverification/pyk/v0.1.431";
+    k-framework.url = "github:runtimeverification/k/v6.0.82";
   };
 
   outputs = { self,flake-utils, nixpkgs, pyk, k-framework, ...}:
