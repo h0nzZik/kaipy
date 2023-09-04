@@ -1,4 +1,5 @@
 import dataclasses
+import logging
 import typing as T
 import pprint
 import itertools
@@ -14,6 +15,8 @@ from kaipy.interfaces.IAbstractPatternDomain import IAbstractPatternDomain, IAbs
 from kaipy.interfaces.IAbstractSubstitutionDomain import IAbstractSubstitution, IAbstractSubstitutionDomain
 
 
+_LOGGER: T.Final = logging.getLogger(__name__)
+
 @dataclasses.dataclass
 class CartesianAbstractSubstitution(IAbstractSubstitution):
     mapping: T.Mapping[Kore.EVar, IAbstractPattern]
@@ -25,6 +28,7 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
         self.pattern_domain = pattern_domain
     
     def abstract(self, ctx: AbstractionContext, subst: Substitution) -> CartesianAbstractSubstitution:
+        #_LOGGER.warning(f"abstract({subst})")
         # we ignore `preds`
         m = {
                 v : self.pattern_domain.abstract(ctx, p)
@@ -58,45 +62,52 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
 
     def concretize(self, a: IAbstractSubstitution) -> Substitution:
         assert type(a) is CartesianAbstractSubstitution
-
-        # If `v` is top, we do not want to concretize it,
-        # because the resulting constraint would be something like
-        # `X = Top()`. But such substitution is useless.
-        # So, we replace Top() with a free variable of a given sort.
-        concretes: T.Dict[Kore.EVar, Kore.Pattern] = {
-            k : ( Kore.EVar(name="VarDEFAULT", sort=k.sort) if self.pattern_domain.is_top(v) else self.pattern_domain.concretize(v))
+        mapping = {
+            k: self.pattern_domain.concretize(v)
             for k,v in a.mapping.items()
-            #if not self.pattern_domain.is_top(v)
+            if not self.pattern_domain.is_top(v)
         }
-        for k in concretes:
-            assert not KoreUtils.is_top(concretes[k])
+        s =  Substitution(mapping)
+        #_LOGGER.warning(f"concretize() = {s}")
+        return s
+        # # If `v` is top, we do not want to concretize it,
+        # # because the resulting constraint would be something like
+        # # `X = Top()`. But such substitution is useless.
+        # # So, we replace Top() with a free variable of a given sort.
+        # concretes: T.Dict[Kore.EVar, Kore.Pattern] = {
+        #     k : ( Kore.EVar(name="VarDEFAULT", sort=k.sort) if self.pattern_domain.is_top(v) else self.pattern_domain.concretize(v))
+        #     for k,v in a.mapping.items()
+        #     #if not self.pattern_domain.is_top(v)
+        # }
+        # for k in concretes:
+        #     assert not KoreUtils.is_top(concretes[k])
 
-        # It might happen that there are two evars, e1 and e2,
-        # that are mapped to patterns p1 and p2, respectively,
-        # such that p1 and p2 share some variable `v`.
-        # This is unfortunate, because `v` in `p1` is unrelated
-        # to `v` in `p2`, but the underlying pattern substitution
-        # can not do anything about it. So we handle the case here.
+        # # It might happen that there are two evars, e1 and e2,
+        # # that are mapped to patterns p1 and p2, respectively,
+        # # such that p1 and p2 share some variable `v`.
+        # # This is unfortunate, because `v` in `p1` is unrelated
+        # # to `v` in `p2`, but the underlying pattern substitution
+        # # can not do anything about it. So we handle the case here.
         
-        # Rename all the variables
-        vars_to_rename = list(itertools.chain(*[
-                    list(KoreUtils.free_evars_of_pattern(p))
-                    for p in concretes.values()
-                ]))
-        vars_to_avoid: T.Set[Kore.EVar] = set()
-        concretes_renamed: T.Dict[Kore.EVar, Kore.Pattern] = dict()
-        for k,v in concretes.items():
-            # But compute a separate renaming for each component
-            renaming = KoreUtils.compute_renaming0(
-                vars_to_avoid=list(vars_to_avoid),
-                vars_to_rename=vars_to_rename
-            )
-            v_renamed = KoreUtils.rename_vars(renaming, v)
-            concretes_renamed[k] = v_renamed
-            vars_to_avoid = vars_to_avoid.union(
-                KoreUtils.free_evars_of_pattern(v_renamed)
-            )
-        return Substitution(immutabledict(concretes_renamed))
+        # # Rename all the variables
+        # vars_to_rename = list(itertools.chain(*[
+        #             list(KoreUtils.free_evars_of_pattern(p))
+        #             for p in concretes.values()
+        #         ]))
+        # vars_to_avoid: T.Set[Kore.EVar] = set()
+        # concretes_renamed: T.Dict[Kore.EVar, Kore.Pattern] = dict()
+        # for k,v in concretes.items():
+        #     # But compute a separate renaming for each component
+        #     renaming = KoreUtils.compute_renaming0(
+        #         vars_to_avoid=list(vars_to_avoid),
+        #         vars_to_rename=vars_to_rename
+        #     )
+        #     v_renamed = KoreUtils.rename_vars(renaming, v)
+        #     concretes_renamed[k] = v_renamed
+        #     vars_to_avoid = vars_to_avoid.union(
+        #         KoreUtils.free_evars_of_pattern(v_renamed)
+        #     )
+        # return Substitution(immutabledict(concretes_renamed))
     
 
     def disjunction(self, ctx: AbstractionContext, a1: IAbstractSubstitution, a2: IAbstractSubstitution) -> IAbstractSubstitution:
@@ -106,6 +117,8 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
             k: self.pattern_domain.disjunction(ctx, a1.mapping[k], a2.mapping[k])
             for k in set.intersection(set(a1.mapping.keys()), set(a2.mapping.keys()))
         }
+        if len(a1.mapping.keys())  > len(mapping.keys()):
+            _LOGGER.warning(f"Disjunction on CASD is generalizing way too much")
         return CartesianAbstractSubstitution(mapping)
 
 

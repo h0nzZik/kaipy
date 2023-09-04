@@ -6,6 +6,20 @@ import pyk.kore.syntax as Kore
 from pyk.kore.manip import free_occs
 
 
+
+def make_conjunction(sort, l: T.Sequence[Kore.Pattern]) -> Kore.Pattern:
+    result: Kore.Pattern = Kore.Top(sort)
+    for x in l:
+        result = Kore.And(sort, result, x)
+    return result
+
+def make_disjunction(sort, l: T.Sequence[Kore.Pattern]) -> Kore.Pattern:
+    result: Kore.Pattern = Kore.Bottom(sort)
+    for x in l:
+        result = Kore.Or(sort, result, x)
+    return result
+
+
 class DefinitionError(Exception):
     pass
 
@@ -518,6 +532,9 @@ def is_bottom(pattern: Kore.Pattern) -> bool:
             return True
     return False
 
+def any_is_bottom(l: T.Iterable[Kore.Pattern]) -> bool:
+    return any([is_bottom(x) for x in l])
+
 
 def is_top(pattern: Kore.Pattern) -> bool:
     match pattern:
@@ -552,3 +569,19 @@ def or_to_list(phi: Kore.Pattern) -> T.List[Kore.Pattern]:
             return or_to_list(l) + or_to_list(r)
         case _:
             return [phi]
+
+def and_to_list(phi: Kore.Pattern) -> T.List[Kore.Pattern]:
+    match phi:
+        case Kore.And(_, l, r):
+            return and_to_list(l) + and_to_list(r)
+        case _:
+            return [phi]
+
+
+def normalize_pattern(cfg: Kore.Pattern) -> Kore.Pattern:
+    vs = free_occs_det(cfg)
+    # Different sorts will have different namespaces.
+    # This way we avoid clashes of names like `X:SortInt` with `X:SortList`
+    #renaming = { v.name : (f"VAR'V{v.sort.name}'{str(i)}") for i,v in enumerate(vs)}
+    renaming = { v.name : (f"VARV{v.sort.name}X{str(i)}") for i,v in enumerate(vs)}
+    return rename_vars(renaming, cfg)

@@ -89,7 +89,7 @@ class FinitePatternDomain(IAbstractPatternDomain):
     
     def abstract(self, ctx: AbstractionContext, c: Kore.Pattern) -> FinitePattern:
         csort = self.rs.sortof(c)
-        mrs: T.List[MatchResult] = parallel_match(rs=self.rs, cfg=c, states=self.pl)
+        mrs: T.List[MatchResult] = parallel_match(rs=self.rs, cfg=c, states=[(s if self.rs.sortof(s) == csort else Kore.Bottom(csort)) for s in self.pl])
 
         fpl: T.List[FinitePattern] = list()
         for i,mr in enumerate(mrs):
@@ -100,10 +100,10 @@ class FinitePatternDomain(IAbstractPatternDomain):
         if len(fpl) == 0:
             #_LOGGER.warning(f'no nice pattern found for {self.rs.kprint.kore_to_pretty(c)}')
             return FinitePattern(-1, csort, None)
-        if len(fpl) == 1:
-            #_LOGGER.warning(f'unique nice pattern found')
-            return fpl[0]
-        _LOGGER.warning(f'NO unique nice pattern found - multiple found. Candidates:')
+        #if len(fpl) == 1:
+        #    #_LOGGER.warning(f'unique nice pattern found')
+        #    return fpl[0]
+        #_LOGGER.warning(f'NO unique nice pattern found - multiple found. Candidates:')
         #for fp in fpl:
         #    _LOGGER.warning(f'  have {fp} as:')
         #    _LOGGER.warning(f'  {self.rs.kprint.kore_to_pretty(self.concretize(fp))}')
@@ -113,7 +113,7 @@ class FinitePatternDomain(IAbstractPatternDomain):
             if not (fp1.idx,fp2.idx) in self.subsumption_matrix:
                 #_LOGGER.warning(f'Replacing with other (NOT more general)')
                 fp1 = fp2
-        _LOGGER.warning(f"Choosing {fp1.idx}")
+        #_LOGGER.warning(f"Choosing {fp1.idx}")
 
         renaming_2: T.Mapping[str, str] = {
             v: ctx.variable_manager.get_fresh_evar_name() for k,v in (fp1.renaming or dict()).items()
@@ -122,7 +122,10 @@ class FinitePatternDomain(IAbstractPatternDomain):
         constraints_renamed: T.List[Kore.MLPred] = [
             KoreUtils.rename_vars(renaming_2, c) for c in mrs[fp1.idx].constraints # type: ignore
         ]
+
         # TODO emit the constraints through the channel
+        #for c in constraints_renamed:
+        #    _LOGGER.warning(f'TODO emit: {self.rs.kprint.kore_to_pretty(c)}')
 
         renaming_composed: T.Mapping[str, str] = {
             k:renaming_2[v] for k,v in (fp1.renaming or dict()).items()

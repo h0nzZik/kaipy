@@ -2,6 +2,7 @@ import abc
 import collections
 import dataclasses
 import typing as T
+import logging
 
 import pyk.kore.syntax as Kore
 
@@ -14,6 +15,8 @@ from kaipy.interfaces.IAbstractConstraintDomainBuilder import IAbstractConstrain
 from kaipy.interfaces.IAbstractConstraintDomain import IAbstractConstraint, IAbstractConstraintDomain
 from kaipy.interfaces.IAbstractPatternDomain import IAbstractPattern, IAbstractPatternDomain
 from kaipy.ParallelMatcher import parallel_match, MatchResult
+
+_LOGGER: T.Final = logging.getLogger(__name__)
 
 @dataclasses.dataclass
 class PatternMatchDomainElement(IAbstractPattern):
@@ -35,26 +38,31 @@ class PatternMatchDomain(IAbstractPatternDomain):
     ):
         self.rs = rs
         self.states = states
+        #_LOGGER.warning(f"States: {len(states)}")
         self.underlying_domains = [
             underlying_domain_builder.build_abstract_constraint_domain(KoreUtils.free_evars_of_pattern(st))
             for st in states
         ]
 
-    def abstract(self, ctx: AbstractionContext,  c: Kore.Pattern) -> PatternMatchDomainElement:
+    def abstract(self, ctx: AbstractionContext, c: Kore.Pattern) -> PatternMatchDomainElement:
+        # Suppose states=[foo(A)] and c=foo(bar(A)). 
         mrs: T.List[MatchResult] = parallel_match(rs=self.rs, cfg=c, states=self.states)
-        # We need to rename all free variables in the result of the parallel match
+        # We get [{constraints: A = bar(A'), renaming: {A: A'}}]
+        # We need to rename all free variables in the `constraints` of the parallel match
         # to some globally recognized variables. We need to do that anyway,
         # but one special reason for that is that we want different calls of `abstract`
         # to result in patterns with different variables being fed to the underlying domains.
         # Then, when we have concretized two abstract values through an underlying domain,
         # they will have different variables, and therefore we can simply join the two reversed renamings.
-        # For example, suppose we have two states, first with variables A, B and second with variable A, again.
-        # Then, `parallel_match` will create two renamings: {A: A', B: B'}, and {A: A'}.
         renamings_2: T.List[T.Mapping[str, str]] = [
             { v: ctx.variable_manager.get_fresh_evar_name() for k,v in mr.renaming.items() }
             for mr in mrs
         ]
-        # Now, `renamings_2` will be `[{A': SV1, B': SV2}, {A': SV3}]`.
+
+        # Well, I am only measuring the length of the list of bools here
+        #_LOGGER.warning(f"bottoms: {len([KoreUtils.any_is_bottom(mr.constraints) for mr in mrs])}")
+
+        # Now, `renamings_2` will be [{A': SV1}]
         constraints_renamed: T.List[T.List[Kore.MLPred]] = [
             [ KoreUtils.rename_vars(r2, c) for c in mr.constraints ] # type: ignore
             for mr,r2 in zip(mrs, renamings_2)
@@ -65,11 +73,12 @@ class PatternMatchDomain(IAbstractPatternDomain):
             { k:r2[v] for k,v in mr.renaming.items()}
             for mr,r2 in zip(mrs, renamings_2)
         ]
-        # Now, renamings_composed is `[{A: SV1, B: SV2}, {A: SV3}].`
-        # We need to create a way back from these to A and B.
+        # Now, renamings_composed is `[{A: SV1}].`
+        # We need to create a way back SV1 to A.
         renamings_reversed = [KoreUtils.reverse_renaming(r) for r in renamings_composed]
+        # TODO we should assert that ChainMap didn't lose / shadow anything.
         renamings_joined = dict(collections.ChainMap(*renamings_reversed))
-        # Now renamings_joined is `{SV1: A, SV2: B, SV3: A}`
+        # Now renamings_joined is `{SV1: A}`
         cps: T.List[IAbstractConstraint] = [
             self.underlying_domains[i].abstract(
                 ctx=ctx,
@@ -115,15 +124,29 @@ class PatternMatchDomain(IAbstractPatternDomain):
             ud.concretize(b)
             for ud,b in zip(self.underlying_domains, a.constraint_per_state)
         ]
+        #_LOGGER.warning(f'concretized_constraitns: {[[y.text for y in x] for x in concretized_constraints]}')
         concretized_constraints_renamed = [
-            [ KoreUtils.rename_vars(KoreUtils.reverse_renaming(a.reversed_renaming), c) for c in cc]
+            [ KoreUtils.rename_vars(dict(a.reversed_renaming), c) for c in cc]
             for cc in concretized_constraints
         ]
+        ccr_conjs = [
+            self.rs.simplify(RSUtils.make_conjunction(self.rs, ccr))
+            for ccr in concretized_constraints_renamed
+        ]
+
+        #_LOGGER.warning(f'ccr_conjs: {ccr_conjs}')
+
         constrained_states: T.List[Kore.Pattern] = [
-            Kore.And(self.rs.sortof(state), state, RSUtils.make_conjunction(self.rs, ccr))
-            for state,ccr in zip(self.states, concretized_constraints_renamed)
+            self.rs.simplify(Kore.And(self.rs.sortof(state), state, ccr_conj)) # The simplification here is mainly for debugging purposes
+            for state,ccr_conj in zip(self.states, ccr_conjs)
         ]
         result = RSUtils.make_disjunction(self.rs, constrained_states)
+        #_LOGGER.warning(f'BEFORE= {self.rs.kprint.kore_to_pretty(result)}')
+        #.warning(f'BEFORE= {result.text}')
+
+        # TODO we cannot do simplify here because of variables from different states....
+        result = self.rs.simplify(result)
+        #_LOGGER.warning(f'AFTER= {self.rs.kprint.kore_to_pretty(result)}')
         return result
 
     def equals(self, a1: IAbstractPattern, a2: IAbstractPattern) -> bool:
