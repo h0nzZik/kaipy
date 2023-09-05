@@ -1,7 +1,7 @@
 {
   description = "An abstract interpreter based on the K framework";
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/master";
     flake-utils.url = "github:numtide/flake-utils";
     pyk.url = "github:runtimeverification/pyk/v0.1.431";
     k-framework.url = "github:runtimeverification/k/v6.0.82";
