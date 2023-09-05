@@ -79,13 +79,21 @@ class PatternMatchDomain(IAbstractPatternDomain):
         # TODO we should assert that ChainMap didn't lose / shadow anything.
         renamings_joined = dict(collections.ChainMap(*renamings_reversed))
         # Now renamings_joined is `{SV1: A}`
-        cps: T.List[IAbstractConstraint] = [
-            self.underlying_domains[i].abstract(
+        cps: T.List[IAbstractConstraint] = list()
+
+        for i,constraints in enumerate(constraints_renamed):
+            ctx.broadcast_channel.reset()
+            d = self.underlying_domains[i]
+            a1 = d.abstract(
                 ctx=ctx,
                 c=constraints,
             )
-            for i,constraints in enumerate(constraints_renamed)
-        ]
+            if len(ctx.broadcast_channel.constraints) == 0:
+                cps.append(a1)
+            else:
+                a2: IAbstractConstraint = d.refine(ctx=ctx, a=a1, c=ctx.broadcast_channel.constraints)
+                ctx.broadcast_channel.reset()
+                cps.append(a2)
         return PatternMatchDomainElement(constraint_per_state=cps, reversed_renaming=renamings_joined)
 
     def refine(self, ctx: AbstractionContext, a: IAbstractPattern, c: Kore.Pattern) -> PatternMatchDomainElement:

@@ -8,12 +8,12 @@ from .kore_utils import (
     existentially_quantify_free_variables,
     extract_equalities_and_rest_from_witness,
     extract_equalities_from_witness,
-    filter_out_predicates,
     free_evars_of_pattern,
     mapping_to_pattern,
     rename_vars,
 )
 import kaipy.kore_utils as KoreUtils
+import kaipy.predicate_filter as PredicateFilter
 from .ReachabilitySystem import ReachabilitySystem
 
 
@@ -24,7 +24,7 @@ def make_disjunction(rs: ReachabilitySystem, l: T.Sequence[Kore.Pattern]) -> Kor
     return KoreUtils.make_disjunction(rs.top_sort, l)
 
 def cleanup_pattern(rs: ReachabilitySystem, phi: Kore.Pattern) -> Kore.Pattern:
-    main_part, _ = filter_out_predicates(phi)
+    main_part, _ = PredicateFilter.filter_out_predicates(phi)
     assert main_part is not None
     fvphi = free_evars_of_pattern(phi)
     eqs, rest = extract_equalities_and_rest_from_witness({v.name for v in fvphi}, phi)

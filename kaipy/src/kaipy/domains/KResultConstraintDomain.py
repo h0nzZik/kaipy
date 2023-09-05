@@ -15,20 +15,16 @@ _LOGGER: T.Final = logging.getLogger(__name__)
 
 @dataclasses.dataclass
 class KResultConstraint(IAbstractConstraint):
-    monitored_evars: T.List[Kore.EVar]
-    not_necessary_kresults: T.List[Kore.EVar] | None
+    kresult_vars: T.List[Kore.EVar]
 
 class KResultConstraintDomain(IAbstractConstraintDomain):
     rs: ReachabilitySystem
-    limit: int
 
     def __init__(
         self,
         rs: ReachabilitySystem,
-        limit: int,
     ):
         self.rs = rs
-        self.limit = limit
     
     def _mk_isKResult_pattern(self, e: Kore.EVar, sort: Kore.Sort) -> Kore.MLPred:
         pe = Kore.App('kseq', (), (
@@ -40,17 +36,12 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
         return iskr_true
 
     def abstract(self, ctx: AbstractionContext, c: T.List[Kore.MLPred]) -> KResultConstraint:
-        a = KResultConstraint(monitored_evars=[], not_necessary_kresults=[])
-        return self.refine(ctx, a, c)
-    
-    def _kresults_of(self, a: KResultConstraint):
-        if a.not_necessary_kresults is None:
-            return []
-        return [e for e in a.monitored_evars if e not in a.not_necessary_kresults]
+        a = KResultConstraint(kresult_vars=[])
+        return a
 
     def is_top(self, a: IAbstractConstraint) -> bool:
         assert type(a) is KResultConstraint
-        return len(self._kresults_of(a)) == 0
+        return len(a.kresult_vars) == 0
 
     def is_bottom(self, a: IAbstractConstraint) -> bool:
         assert type(a) is KResultConstraint
@@ -71,86 +62,62 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
 
     def refine(self, ctx: AbstractionContext, a: IAbstractConstraint, c: T.List[Kore.MLPred]) -> KResultConstraint:
         assert type(a) is KResultConstraint
-        if a.not_necessary_kresults is None:
-            return a
-        
-        monitored_evars: T.List[Kore.EVar] = a.monitored_evars.copy()
-        not_necessary_kresults: T.List[Kore.EVar] = a.not_necessary_kresults.copy()
+
+        monitored_evars: T.Dict[Kore.EVar, Kore.MLPred] = dict()
         for p in c:
             match p:
                 case Kore.Equals(_, _, Kore.EVar(_, _), Kore.EVar(_, _)):
                     continue
                 case Kore.Equals(_, _, Kore.EVar(n, s), right):
-                    if self._monitor_evar(Kore.EVar(n,s)):
-                        monitored_evars.append(Kore.EVar(n, s))
-                        if not self._test_necessary_kresult(e=Kore.EVar(n, s), phi=p):
-                            not_necessary_kresults.append(Kore.EVar(n, s))
+                    monitored_evars[Kore.EVar(n, s)] = p
                 case Kore.Equals(_, _, left, Kore.EVar(n, s)):
-                    if self._monitor_evar(Kore.EVar(n,s)):
-                        monitored_evars.append(Kore.EVar(n, s))
-                        if not self._test_necessary_kresult(e=Kore.EVar(n, s), phi=p):
-                            not_necessary_kresults.append(Kore.EVar(n, s))
-        
-        if len(not_necessary_kresults) > self.limit:
-            _LOGGER.warning(f"Limit ({self.limit}) reached.")
-            not_necessary_kresults = not_necessary_kresults[0:self.limit]
+                    monitored_evars[Kore.EVar(n, s)] = p
 
-        return KResultConstraint(
-            monitored_evars=monitored_evars,
-            not_necessary_kresults=not_necessary_kresults,
-        )
+        _LOGGER.warning(f"refining with monitored {monitored_evars}")
+        kresult_vars: T.List[Kore.EVar] = a.kresult_vars.copy()
+        for e,phi in monitored_evars.items():
+            if not self._monitor_evar(e):
+                continue
+            if self._test_necessary_kresult(e=e, phi=phi):
+                kresult_vars.append(e)
+
+        return KResultConstraint(kresult_vars=kresult_vars)
     
     def concretize(self, a: IAbstractConstraint) -> T.List[Kore.MLPred]:
         assert type(a) is KResultConstraint
-        if a.not_necessary_kresults is None:
-            return []
 
+        _LOGGER.warning(f"Concretizing {self.to_str(a)}")
         return [
             self._mk_isKResult_pattern(ev, self.rs.top_sort)
-            for ev in self._kresults_of(a)
+            for ev in a.kresult_vars
         ]
 
     def disjunction(self, ctx: AbstractionContext, a1: IAbstractConstraint, a2: IAbstractConstraint) -> KResultConstraint:
         assert type(a1) is KResultConstraint
         assert type(a2) is KResultConstraint
-
-        if a1.not_necessary_kresults is None:
-            return a1
-        if a2.not_necessary_kresults is None:
-            return a2
-
-        not_necessary_kresults = list(set(a1.not_necessary_kresults).union(set(a2.not_necessary_kresults)))
-        if len(not_necessary_kresults) > self.limit:
-            not_necessary_kresults = not_necessary_kresults[0:self.limit]
-        
-        return KResultConstraint(
-            monitored_evars=list(set(a1.monitored_evars).union(set(a2.monitored_evars))), 
-            not_necessary_kresults=not_necessary_kresults,
-        )
+        return KResultConstraint(kresult_vars=list(set(a1.kresult_vars).intersection(set(a2.kresult_vars))))
 
     def equals(self, a1: IAbstractConstraint, a2: IAbstractConstraint) -> bool:
         assert type(a1) is KResultConstraint
         assert type(a2) is KResultConstraint
-        return set(self.concretize(a1)) == set(self.concretize(a2))
+        return set(a1.kresult_vars) == set(a2.kresult_vars)
 
     def subsumes(self, a1: IAbstractConstraint, a2: IAbstractConstraint) -> bool:
         assert type(a1) is KResultConstraint
         assert type(a2) is KResultConstraint
-        return set(self.concretize(a1)) <= set(self.concretize(a2))
+        return set(a1.kresult_vars) <= set(a2.kresult_vars)
     
     def to_str(self, a: IAbstractConstraint) -> str:
         assert type(a) is KResultConstraint
-        return str(self._kresults_of(a))
+        return str(a.kresult_vars)
 
 
 class KResultConstraintDomainBuilder(IAbstractConstraintDomainBuilder):
     rs: ReachabilitySystem
-    limit: int
 
-    def __init__(self, rs: ReachabilitySystem, limit: int):
+    def __init__(self, rs: ReachabilitySystem):
         self.rs = rs
-        self.limit = limit
     
     def build_abstract_constraint_domain(self, over_variables: T.Set[Kore.EVar]) -> KResultConstraintDomain:
         # ignore over_variables
-        return KResultConstraintDomain(self.rs, self.limit)
+        return KResultConstraintDomain(self.rs)

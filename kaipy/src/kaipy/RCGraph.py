@@ -10,12 +10,12 @@ from .kore_utils import (
     extract_equalities_from_witness,
     free_evars_of_pattern,
     get_lhs,
-    get_predicates,
     get_rhs,
     is_bottom,
     mapping_to_pattern,
     rename_vars,
 )
+import kaipy.predicate_filter as PredicateFilter
 from .ReachabilitySystem import ReachabilitySystem
 from .rs_utils import cleanup_eqs, cleanup_pattern, make_conjunction
 
@@ -42,7 +42,7 @@ def compose_rules(
         Kore.And(
             rs.top_sort,
             Kore.And(
-                rs.top_sort, curr_rhs, make_conjunction(rs, get_predicates(curr_lhs))
+                rs.top_sort, curr_rhs, make_conjunction(rs, PredicateFilter.get_predicates(curr_lhs))
             ),
             other_lhs_renamed,
         )
@@ -57,7 +57,7 @@ def compose_rules(
     eqs1, rest1 = extract_equalities_and_rest_from_witness(
         {v.name for v in free_evars_of_pattern(curr_lhs)}, simplified_conj
     )
-    preds1 = get_predicates(rest1) if rest1 is not None else []
+    preds1 = PredicateFilter.get_predicates(rest1) if rest1 is not None else []
     # print(f"lhs1 equalities: {eqs1}")
     eqs2 = extract_equalities_from_witness(
         {v.name for v in free_evars_of_pattern(other_rhs_renamed)}, simplified_conj

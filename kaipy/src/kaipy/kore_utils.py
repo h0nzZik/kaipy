@@ -502,30 +502,6 @@ def compute_renaming(
         vars_to_avoid=vars_to_avoid, vars_to_rename=list(free_evars_of_pattern(patt))
     )
 
-
-def filter_out_predicates(
-    phi: Kore.Pattern,
-) -> T.Tuple[T.Optional[Kore.Pattern], T.List[Kore.MLPred]]:
-    if issubclass(type(phi), Kore.MLPred):
-        return None, [phi] # type: ignore
-    match phi:
-        case Kore.And(sort, left, right):
-            lf, ps1 = filter_out_predicates(left)
-            rf, ps2 = filter_out_predicates(right)
-            if lf is None:
-                return rf, (ps1 + ps2)
-            if rf is None:
-                return lf, (ps1 + ps2)
-            return Kore.And(sort, lf, rf), (ps1 + ps2)
-        case _:
-            return phi, []
-
-
-def get_predicates(phi: Kore.Pattern) -> T.List[Kore.MLPred]:
-    _, preds = filter_out_predicates(phi)
-    return preds
-
-
 def is_bottom(pattern: Kore.Pattern) -> bool:
     match pattern:
         case Kore.Bottom(_):

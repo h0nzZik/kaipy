@@ -53,19 +53,14 @@ def build_abstract_pattern_domain(
         finite_pattern_domain
     ])
     
-    #pattern_domain: IAbstractPatternDomain = FinitePatternDomain(finite_set_of_patterns, rs)
     subst_domain: IAbstractSubstitutionDomain = CartesianAbstractSubstitutionDomain(combined_domain)
     subst_list_domain: IAbstractSubstitutionsDomain = SubstitutionListDomain(subst_domain)
     subst_domain_builder: IAbstractConstraintDomainBuilder = SubstitutionsConstraintDomainBuilder(rs=rs, nested=subst_list_domain)
 
-    #return subst_domain
-    #kresult_domain: IAbstractSubstitutionDomain = KResultSubstDomainWrapper(rs=rs, underlying_subst_domain=subst_domain, limit=1)
-    
-    #Temporarily disable KResult domain
-    #kresult_domain_builder: IAbstractConstraintDomainBuilder = KResultConstraintDomainBuilder(rs=rs, limit=2)
-    #product_domain_builder = ProductConstraintDomainBuilder(subst_domain_builder, kresult_domain_builder)
-    #pattern_match_domain = build_pattern_match_domain(rs, underlying_domain_builder=product_domain_builder)
+    kresult_domain_builder: IAbstractConstraintDomainBuilder = KResultConstraintDomainBuilder(rs=rs)
+    product_domain_builder = ProductConstraintDomainBuilder(subst_domain_builder, kresult_domain_builder)
+    pattern_match_domain = build_pattern_match_domain(rs, underlying_domain_builder=product_domain_builder)
 
-    pattern_match_domain = build_pattern_match_domain(rs, underlying_domain_builder=subst_domain_builder)
+    #pattern_match_domain = build_pattern_match_domain(rs, underlying_domain_builder=subst_domain_builder)
 
     return pattern_match_domain

@@ -16,7 +16,7 @@ from pyk.ktool.kprint import KPrint
 import kaipy.rs_utils as RSUtils
 import kaipy.kore_utils as KoreUtils
 
-from kaipy.IBroadcastChannel import IBroadcastChannel
+from kaipy.BroadcastChannel import BroadcastChannel
 from kaipy.VariableManager import VariableManager
 from kaipy.AbstractionContext import AbstractionContext
 from kaipy.interfaces.IAbstractConstraintDomainBuilder import IAbstractConstraintDomainBuilder
@@ -66,20 +66,27 @@ def analyze(
         #_LOGGER.warning(f"current_abstract: {pattern_domain.to_str(current_abstract)}")
         current_concretized = pattern_domain.concretize(current_abstract)
         #_LOGGER.warning(f"current_concretized: {rs.kprint.kore_to_pretty(current_concretized)}")
-        current_concretized_list: T.List[Kore.Pattern] = KoreUtils.or_to_list(current_concretized)
-        current_concretized_list_normalized = [ KoreUtils.normalize_pattern(c) for c in current_concretized_list ]
+        current_concretized_list: T.List[Kore.Pattern] = KoreUtils.or_to_list(rs.simplify(current_concretized))
+        current_concretized_list_normalized = [ KoreUtils.normalize_pattern(RSUtils.cleanup_pattern(rs, c)) for c in current_concretized_list ]
         diff = [c for c in current_concretized_list_normalized if c not in cfgs_below_current.keys()]
         if len(diff) <= 0:
             break
+        _LOGGER.warning(f'diff: {rs.kprint.kore_to_pretty(RSUtils.make_disjunction(rs, diff))}')
         diff_step = { c:get_successors(rs, c) for c in diff }
         diff_step_norm = { c:[ KoreUtils.normalize_pattern(s) for s in succs] for c,succs in diff_step.items() }
+        if len(list(set(itertools.chain(*diff_step_norm.values())))) > 1:
+            _LOGGER.warning("More than 1 successor")
+            _LOGGER.warning(f'of: {rs.kprint.kore_to_pretty(RSUtils.make_disjunction(rs, diff))}')
+            _LOGGER.warning(f"succs: {rs.kprint.kore_to_pretty(RSUtils.make_disjunction(rs, list(set(itertools.chain(*diff_step_norm.values())))))}")
         unified = cfgs_below_current.copy()
         unified.update(diff_step_norm)
         phi = RSUtils.make_disjunction(rs, list(itertools.chain(*unified.values())))
+        new_abstract = pattern_domain.abstract(ctx, phi)
+        #refined_abstract = pattern_domain.refine(ctx, new_abstract)
         current_abstract = pattern_domain.disjunction(
             ctx,
             current_abstract,
-            pattern_domain.abstract(ctx, phi)
+            new_abstract,
         )
         cfgs_below_current = unified
  

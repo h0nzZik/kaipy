@@ -11,7 +11,7 @@ from kaipy.VariableManager import VariableManager
 from kaipy.ParallelMatcher import parallel_match, MatchResult
 from kaipy.ReachabilitySystem import ReachabilitySystem, KoreClientServer, get_global_kcs
 from kaipy.interfaces.IAbstractPatternDomain import IAbstractPattern, IAbstractPatternDomain
-from kaipy.IBroadcastChannel import IBroadcastChannel
+from kaipy.BroadcastChannel import BroadcastChannel
 from kaipy.VariableManager import VariableManager
 
 _LOGGER: T.Final = logging.getLogger(__name__)
@@ -123,6 +123,9 @@ class FinitePatternDomain(IAbstractPatternDomain):
             KoreUtils.rename_vars(renaming_2, c) for c in mrs[fp1.idx].constraints # type: ignore
         ]
 
+        if len(constraints_renamed) > 0:
+            _LOGGER.warning(f"Constraints: {constraints_renamed}")
+            ctx.broadcast_channel.broadcast(constraints_renamed)
         # TODO emit the constraints through the channel
         #for c in constraints_renamed:
         #    _LOGGER.warning(f'TODO emit: {self.rs.kprint.kore_to_pretty(c)}')
