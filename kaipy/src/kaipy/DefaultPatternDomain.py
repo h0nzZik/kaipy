@@ -58,7 +58,9 @@ def build_abstract_pattern_domain(
     subst_domain_builder: IAbstractConstraintDomainBuilder = SubstitutionsConstraintDomainBuilder(rs=rs, nested=subst_list_domain)
 
     kresult_domain_builder: IAbstractConstraintDomainBuilder = KResultConstraintDomainBuilder(rs=rs)
-    product_domain_builder = ProductConstraintDomainBuilder(subst_domain_builder, kresult_domain_builder)
+    # Kresult has to be before Subst, otherwise Subst will not refine it (I think)
+    product_domain_builder = ProductConstraintDomainBuilder(kresult_domain_builder, subst_domain_builder)
+    #product_domain_builder = ProductConstraintDomainBuilder(subst_domain_builder, kresult_domain_builder)
     pattern_match_domain = build_pattern_match_domain(rs, underlying_domain_builder=product_domain_builder)
 
     #pattern_match_domain = build_pattern_match_domain(rs, underlying_domain_builder=subst_domain_builder)

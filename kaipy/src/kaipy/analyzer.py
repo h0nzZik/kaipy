@@ -4,6 +4,7 @@ import itertools
 import functools
 import logging
 import pprint
+import sys
 import typing as T
 
 from immutabledict import immutabledict
@@ -51,7 +52,9 @@ def analyze(
     initial_configuration: Kore.Pattern,
     max_depth: int|None = None
 ) -> AnalysisResult:
-    #states: States = build_states(rs, KoreUtils.free_evars_of_pattern(initial_configuration))
+    sys.setrecursionlimit(4*10**3)
+    #sys.setrecursionlimit(10**4)
+    #sys.setrecursionlimit(10**7)
 
     cfgs_below_current: T.Dict[Kore.Pattern,T.List[Kore.Pattern]] = dict()
     ctx = make_ctx()
@@ -73,14 +76,21 @@ def analyze(
             break
         _LOGGER.warning(f'diff: {rs.kprint.kore_to_pretty(RSUtils.make_disjunction(rs, diff))}')
         diff_step = { c:get_successors(rs, c) for c in diff }
+        
         diff_step_norm = { c:[ KoreUtils.normalize_pattern(s) for s in succs] for c,succs in diff_step.items() }
+        # Should we clean up the pattern? I am not sure.
+        #diff_step_norm = { c:[ KoreUtils.normalize_pattern(RSUtils.cleanup_pattern(rs,s)) for s in succs] for c,succs in diff_step.items() }
         if len(list(set(itertools.chain(*diff_step_norm.values())))) > 1:
             _LOGGER.warning("More than 1 successor")
-            _LOGGER.warning(f'of: {rs.kprint.kore_to_pretty(RSUtils.make_disjunction(rs, diff))}')
+            #_LOGGER.warning(f'of: {rs.kprint.kore_to_pretty(RSUtils.make_disjunction(rs, diff))}')
+            #_LOGGER.warning(f"succs_raw: {rs.kprint.kore_to_pretty(RSUtils.make_disjunction(rs, list(set(itertools.chain(*diff_step.values())))))}")
             _LOGGER.warning(f"succs: {rs.kprint.kore_to_pretty(RSUtils.make_disjunction(rs, list(set(itertools.chain(*diff_step_norm.values())))))}")
         unified = cfgs_below_current.copy()
         unified.update(diff_step_norm)
-        phi = RSUtils.make_disjunction(rs, list(itertools.chain(*unified.values())))
+        # We need to make sure that variables in different components have different names
+        dl = list(itertools.chain(*unified.values()))
+        dl2 = [ KoreUtils.normalize_pattern(x, prefix=f"C{i}V") for i,x in enumerate(dl)]
+        phi = RSUtils.make_disjunction(rs, dl2)
         new_abstract = pattern_domain.abstract(ctx, phi)
         #refined_abstract = pattern_domain.refine(ctx, new_abstract)
         current_abstract = pattern_domain.disjunction(

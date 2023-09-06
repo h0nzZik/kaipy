@@ -124,7 +124,7 @@ class FinitePatternDomain(IAbstractPatternDomain):
         ]
 
         if len(constraints_renamed) > 0:
-            _LOGGER.warning(f"Constraints: {constraints_renamed}")
+            #_LOGGER.warning(f"Constraints: {constraints_renamed}")
             ctx.broadcast_channel.broadcast(constraints_renamed)
         # TODO emit the constraints through the channel
         #for c in constraints_renamed:
