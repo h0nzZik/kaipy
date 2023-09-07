@@ -120,5 +120,5 @@ class BigsumPatternDomain(IAbstractPatternDomain):
             return indent*' ' f'<bigsum Top>'
         s = indent*' ' + f"<bigsum {a.idx}\n"
         s = s + self.domains[a.idx].to_str(a.ap, indent=indent+1) + "\n"
-        s = s + ">"
+        s = s + indent*' ' + ">"
         return s

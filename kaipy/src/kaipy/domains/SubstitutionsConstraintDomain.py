@@ -130,8 +130,8 @@ class SubstitutionsConstraintDomain(IAbstractConstraintDomain):
         if a.nested is None:
             return indent*' ' + '<Bot>'
         s = indent*' ' + "<sc\n"
-        s = s + self.nested.to_str(a.nested, indent=indent+1)
-        s = s + ">"
+        s = s + self.nested.to_str(a.nested, indent=indent+1) + '\n'
+        s = s + indent*' ' + ">"
         return s
     
 
