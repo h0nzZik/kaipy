@@ -46,7 +46,9 @@ class PatternMatchDomain(IAbstractPatternDomain):
 
     def abstract(self, ctx: AbstractionContext, c: Kore.Pattern) -> PatternMatchDomainElement:
         cpsl: T.List[T.List[IAbstractConstraint|None]] = list()
-        for q in KoreUtils.or_to_list(self.rs.simplify(c)):
+        for q0 in KoreUtils.or_to_list(self.rs.simplify(c)):
+            #q = KoreUtils.normalize_pattern(q0)
+            q = q0
             # Suppose states=[foo(A)] and c=foo(bar(A)). 
             mrs: T.List[MatchResult] = parallel_match(rs=self.rs, cfg=q, states=self.states)
             # We get [{constraints: A = bar(A'), renaming: {A: A'}}]

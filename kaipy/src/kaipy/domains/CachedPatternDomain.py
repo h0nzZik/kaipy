@@ -3,6 +3,7 @@ import typing as T
 
 import pyk.kore.syntax as Kore
 
+import kaipy.kore_utils as KoreUtils
 from kaipy.AbstractionContext import AbstractionContext
 from kaipy.interfaces.IAbstractPatternDomain import IAbstractPattern, IAbstractPatternDomain
 
@@ -17,11 +18,12 @@ class CachedPatternDomain(IAbstractPatternDomain):
         self.cache = dict()
 
     def abstract(self, ctx: AbstractionContext, c: Kore.Pattern) -> IAbstractPattern:
-        if c in self.cache:
-            return self.cache[c]
+        c2 = KoreUtils.normalize_pattern(c)
+        if c2 in self.cache:
+            return self.cache[c2]
 
-        a = self.underlying.abstract(ctx, c)
-        self.cache[c] = a
+        a = self.underlying.abstract(ctx, c2)
+        self.cache[c2] = a
         return a
 
     def refine(self, ctx: AbstractionContext, a: IAbstractPattern, c: Kore.Pattern) -> IAbstractPattern:
