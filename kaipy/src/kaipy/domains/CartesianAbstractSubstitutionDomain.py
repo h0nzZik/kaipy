@@ -166,5 +166,5 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
         for k,v in a.mapping.items():
             s = s + ((indent+1)*' ') + k.text + ":\n"
             s = s + self.pattern_domain.to_str(v, indent=indent+2) + '\n'
-        s = (indent*' ') + s + ">"
+        s = s + (indent*' ') + ">"
         return s
