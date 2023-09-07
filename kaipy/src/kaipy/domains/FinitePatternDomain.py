@@ -223,7 +223,11 @@ class FinitePatternDomain(IAbstractPatternDomain):
 
     def to_str(self, a: IAbstractPattern, indent: int) -> str:
         assert type(a) is FinitePattern
-        return (indent*' ') + f'<fpd {a.idx}>'
+        s = (indent*' ') + '<fpd \n'
+        s = s + ((indent+1)*' ') + f'idx={a.idx}\n'
+        s = s + ((indent+1)*' ') + 'renaming=' + (str({k : v for k,v in a.renaming.items()}) if a.renaming else "<None>")
+        s = s + (indent*' ') + '>'
+        return s
         #return str(a.idx)
         #c = self.concretize(a)
         #assert not KoreUtils.is_top(c) ?????
