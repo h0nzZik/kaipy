@@ -198,13 +198,13 @@ class PatternMatchDomain(IAbstractPatternDomain):
 
     def to_str(self, a: IAbstractPattern, indent: int) -> str:
         assert type(a) is PatternMatchDomainElement
-        s: str = indent*' ' + "pmd[\n"
+        s: str = (indent*' ') + "pmd[\n"
         for i,(ud,b) in enumerate(zip(self.underlying_domains, a.constraint_per_state)):
             if b is None:
                 continue
             if ud.is_bottom(b):
                 continue
-            bs = ud.to_str(b, indent=indent+1)
-            s = s + f'{i} => \n{bs}\n'
-        s = s + "]"
+            s = s + (indent+1)*' ' + f'{i} => \n'
+            s = s + f'{ud.to_str(b, indent=indent+2)}\n'
+        s = s + (indent*' ') + "]"
         return s

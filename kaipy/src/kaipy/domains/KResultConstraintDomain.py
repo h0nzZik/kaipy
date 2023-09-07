@@ -144,7 +144,7 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
     
     def to_str(self, a: IAbstractConstraint, indent: int) -> str:
         assert type(a) is KResultConstraint
-        return indent*' ' + f"<kresults {str(a.kresult_vars)}>"
+        return (indent*' ') + f"<kresults {str(a.kresult_vars)}>"
 
 
 class KResultConstraintDomainBuilder(IAbstractConstraintDomainBuilder):

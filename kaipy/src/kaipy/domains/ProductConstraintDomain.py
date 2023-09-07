@@ -65,10 +65,10 @@ class ProductConstraintDomain(IAbstractConstraintDomain):
 
     def to_str(self, a: IAbstractConstraint, indent: int) -> str:
         assert type(a) is ProductConstraint
-        s = indent*' ' + '<prod\n'
+        s = (indent*' ') + '<prod\n'
         s = s + self.left_domain.to_str(a.left, indent=indent+1) + ",\n"
         s = s + self.right_domain.to_str(a.right, indent=indent+1) + ",\n"
-        s = s + ">"
+        s = s + (indent*' ') + ">"
         return s
 
 

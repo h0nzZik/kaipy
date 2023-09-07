@@ -81,4 +81,4 @@ class ExactPatternDomain(IAbstractPatternDomain):
 
     def to_str(self, a: IAbstractPattern, indent: int) -> str:
         assert type(a) is ExactPattern
-        return indent*' ' + f'<idx={a.idx},sort={a.sort}>'
+        return (indent*' ') + f'<idx={a.idx},sort={a.sort}>'

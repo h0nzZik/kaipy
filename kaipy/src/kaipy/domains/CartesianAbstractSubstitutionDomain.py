@@ -162,9 +162,9 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
 
     def to_str(self, a: IAbstractSubstitution, indent: int) -> str:
         assert type(a) is CartesianAbstractSubstitution
-        s = indent*' ' + '<cast\n'
+        s = (indent*' ') + '<cast\n'
         for k,v in a.mapping.items():
-            s = s + (indent+1)*' ' + k.text + ":\n"
+            s = s + ((indent+1)*' ') + k.text + ":\n"
             s = s + self.pattern_domain.to_str(v, indent=indent+2) + '\n'
-        s = s + ">"
+        s = (indent*' ') + s + ">"
         return s
