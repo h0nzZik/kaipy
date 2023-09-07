@@ -73,6 +73,9 @@ class FinitePatternDomain(IAbstractPatternDomain):
         self.pl = pl
         self.rs = rs
 
+        #2for x in self.pl:
+        #    _LOGGER.warning(f'{self.rs.kprint.kore_to_pretty(x)}')
+
         self.subsumption_matrix = set()
         for i,p in enumerate(pl):
             for j,q in enumerate(pl):
@@ -164,6 +167,12 @@ class FinitePatternDomain(IAbstractPatternDomain):
         # }
 
         constraints_all = mrs[fp1.idx].constraints
+        _LOGGER.warning(f"Constraints_all: {[x.text for x in constraints_all]}")
+        _LOGGER.warning(f"Pattern free variables = {KoreUtils.free_evars_of_pattern(c)}")
+        _LOGGER.warning(f"State free variables = {KoreUtils.free_evars_of_pattern(self.pl[fp1.idx])}")
+        _LOGGER.warning(f"fp1.renaming = {fp1.renaming}")
+        _LOGGER.warning(f"renaming2 = {renaming_2}")
+
         constraints: T.List[Kore.MLPred] = list()
         fvc = set((fp1.renaming or dict()).values())
         renaming_back = KoreUtils.reverse_renaming(fp1.renaming or dict())
@@ -177,13 +186,8 @@ class FinitePatternDomain(IAbstractPatternDomain):
                 case Kore.Equals(os, s, left, Kore.EVar(n2, s2)):
                     if n2 in fvc:
                         constraints.append(Kore.Equals(os, s, Kore.EVar(renaming_2[renaming_back[n2]], s2), left))
-        # _LOGGER.warning(f"Constraints_all: {constraints_all}")
-        # _LOGGER.warning(f"Constraints: {constraints}")
-        # _LOGGER.warning(f"Pattern free variables = {KoreUtils.free_evars_of_pattern(c)}")
-        # _LOGGER.warning(f"State free variables = {KoreUtils.free_evars_of_pattern(self.pl[fp1.idx])}")
-        # _LOGGER.warning(f"fp1.renaming = {fp1.renaming}")
-        # _LOGGER.warning(f"renaming2 = {renaming_2}")
-
+        _LOGGER.warning(f"Constraints: {[x.text for x in constraints]}")
+        
         if len(constraints) > 0:
             ctx.broadcast_channel.broadcast(constraints)
 

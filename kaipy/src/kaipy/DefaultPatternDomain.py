@@ -19,6 +19,7 @@ from kaipy.domains.CartesianAbstractSubstitutionDomain import CartesianAbstractS
 from kaipy.domains.ProductConstraintDomain import ProductConstraintDomainBuilder
 from kaipy.domains.KResultConstraintDomain import KResultConstraintDomain, KResultConstraintDomainBuilder
 from kaipy.domains.PatternMatchDomain import PatternMatchDomain
+from kaipy.domains.CachedPatternDomain import CachedPatternDomain
 from kaipy.PatternMatchDomainBuilder import build_pattern_match_domain
 
 from kaipy.ReachabilitySystem import ReachabilitySystem
@@ -52,8 +53,10 @@ def build_abstract_pattern_domain(
         exact_pattern_domain,
         finite_pattern_domain
     ])
+
+    cached_combined_domain: IAbstractPatternDomain = CachedPatternDomain(combined_domain)
     
-    subst_domain: IAbstractSubstitutionDomain = CartesianAbstractSubstitutionDomain(combined_domain)
+    subst_domain: IAbstractSubstitutionDomain = CartesianAbstractSubstitutionDomain(cached_combined_domain)
     subst_list_domain: IAbstractSubstitutionsDomain = SubstitutionListDomain(subst_domain)
     subst_domain_builder: IAbstractConstraintDomainBuilder = SubstitutionsConstraintDomainBuilder(rs=rs, nested=subst_list_domain)
 
