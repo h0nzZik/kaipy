@@ -46,7 +46,8 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
             for e in KoreUtils.free_evars_of_pattern(x):
                 monitored_evars[e] = p
         a2 = self._refine_monitored(ctx, a, monitored_evars=monitored_evars)
-        #_LOGGER.warning(f"Abstract: {self.to_str(a2)}")
+        if len(a2.kresult_vars) > 0:
+            _LOGGER.warning(f"Abstracted {[x.text for x in c]} into {self.to_str(a2, indent=0)}")
         return a2
 
     def is_top(self, a: IAbstractConstraint) -> bool:
@@ -59,6 +60,8 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
 
     def _monitor_evar(self, e: Kore.EVar):
         if e.sort.name == 'SortK':
+            return False
+        if e.sort not in self.rs.kdw.declared_sorts:
             return False
         return True
 

@@ -35,11 +35,21 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
                 for (v,p) in subst.mapping.items()
                 #if not KoreUtils.is_evar(p)
             }
+        for k,v in m.items():
+            if self.pattern_domain.is_top(v):
+                # TODO let us 
+                pass
         #m_filtered = {k:v for k,v in m.items() if not self.pattern_domain.is_top(v)}
         return CartesianAbstractSubstitution(m)
         #return CartesianAbstractSubstitution(m_filtered)
 
     def refine(self, ctx: AbstractionContext, a: IAbstractSubstitution, c: T.List[Kore.MLPred]) -> CartesianAbstractSubstitution:
+        assert type(a) is CartesianAbstractSubstitution
+        return a
+        #return self.do_refine(ctx, a, c)
+
+    # I am not sure if this is useful
+    def do_refine(self, ctx: AbstractionContext, a: IAbstractSubstitution, c: T.List[Kore.MLPred]) -> CartesianAbstractSubstitution:
         assert type(a) is CartesianAbstractSubstitution
         d = dict(a.mapping)
         for p in c:

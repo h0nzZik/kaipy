@@ -115,54 +115,82 @@ class FinitePatternDomain(IAbstractPatternDomain):
                 fp1 = fp2
         #_LOGGER.warning(f"Choosing {fp1.idx}")
 
+        #renaming_2: T.Mapping[str, str] = {
+        #    v: ctx.variable_manager.get_fresh_evar_name() for k,v in (fp1.renaming or dict()).items()
+        #}
+
         renaming_2: T.Mapping[str, str] = {
-            v: ctx.variable_manager.get_fresh_evar_name() for k,v in (fp1.renaming or dict()).items()
+            v.name: ctx.variable_manager.get_fresh_evar_name() for v in KoreUtils.free_evars_of_pattern(self.pl[fp1.idx])
         }
 
         ## These might contain both renamed and non-renamed variables.
         ## We need to rename all of them.
-        renaming_2_ext: T.Dict[str, str] = {
-            v:renaming_2[v]
-            for k,v in (fp1.renaming or dict()).items()
-        }
-        renaming_2_ext.update({
-            k:renaming_2[v]
-            for k,v in (fp1.renaming or dict()).items()
-        })
+        # renaming_2_ext: T.Dict[str, str] = {
+        #     v:renaming_2[v]
+        #     for k,v in (fp1.renaming or dict()).items()
+        # }
+        # renaming_2_ext.update({
+        #     k:renaming_2[v]
+        #     for k,v in (fp1.renaming or dict()).items()
+        # })
+        # constraints_all = mrs[fp1.idx].constraints
+        # # Keep only equalities where one side is a variable from the input pattern (and the other side is not a variable)
+        # constraints: T.List[Kore.MLPred] = list()
+        # #fvc = KoreUtils.free_evars_of_pattern(c).union()
+        # fvc = set((fp1.renaming or dict()).values())
+        # for x in constraints_all:
+        #     match x:
+        #         case Kore.Equals(_, _, Kore.EVar(n1, s1), Kore.EVar(n2, s2)):
+        #             continue
+        #         case Kore.Equals(_, _, Kore.EVar(n1, s1), _):
+        #             if Kore.EVar(n1, s1) in fvc:
+        #                 constraints.append(x)
+        #         case Kore.Equals(_, _, _, Kore.EVar(n2, s2)):
+        #             if Kore.EVar(n2, s2) in fvc:
+        #                 constraints.append(x)
+        # 
+        # constraints_renamed: T.List[Kore.MLPred] = [
+        #     KoreUtils.rename_vars(renaming_2_ext, c) for c in constraints # type: ignore
+        # ]
+        # 
+        # if len(constraints_renamed) > 0:
+        #     _LOGGER.warning(f"Free evars of c: {fvc}")
+        #     _LOGGER.warning(f"Constraints: {[x.text for x in constraints]}")
+        #     _LOGGER.warning(f"Constraints_renamed: {[x.text for x in constraints_renamed]}")
+        #     ctx.broadcast_channel.broadcast(constraints_renamed)
+
+        # renaming_composed: T.Mapping[str, str] = {
+        #     k:renaming_2[v] for k,v in (fp1.renaming or dict()).items()
+        # }
+
         constraints_all = mrs[fp1.idx].constraints
-        # Keep only equalities where one side is a variable from the input pattern (and the other side is not a variable)
         constraints: T.List[Kore.MLPred] = list()
-        #fvc = KoreUtils.free_evars_of_pattern(c).union()
         fvc = set((fp1.renaming or dict()).values())
+        renaming_back = KoreUtils.reverse_renaming(fp1.renaming or dict())
         for x in constraints_all:
             match x:
                 case Kore.Equals(_, _, Kore.EVar(n1, s1), Kore.EVar(n2, s2)):
                     continue
-                case Kore.Equals(_, _, Kore.EVar(n1, s1), _):
-                    if Kore.EVar(n1, s1) in fvc:
-                        constraints.append(x)
-                case Kore.Equals(_, _, _, Kore.EVar(n2, s2)):
-                    if Kore.EVar(n2, s2) in fvc:
-                        constraints.append(x)
-                
-        constraints_renamed: T.List[Kore.MLPred] = [
-            KoreUtils.rename_vars(renaming_2_ext, c) for c in constraints # type: ignore
-        ]
+                case Kore.Equals(os, s, Kore.EVar(n1, s1), right):
+                    if n1 in fvc:
+                        constraints.append(Kore.Equals(os, s, Kore.EVar(renaming_2[renaming_back[n1]], s1), right))
+                case Kore.Equals(os, s, left, Kore.EVar(n2, s2)):
+                    if n2 in fvc:
+                        constraints.append(Kore.Equals(os, s, Kore.EVar(renaming_2[renaming_back[n2]], s2), left))
+        # _LOGGER.warning(f"Constraints_all: {constraints_all}")
+        # _LOGGER.warning(f"Constraints: {constraints}")
+        # _LOGGER.warning(f"Pattern free variables = {KoreUtils.free_evars_of_pattern(c)}")
+        # _LOGGER.warning(f"State free variables = {KoreUtils.free_evars_of_pattern(self.pl[fp1.idx])}")
+        # _LOGGER.warning(f"fp1.renaming = {fp1.renaming}")
+        # _LOGGER.warning(f"renaming2 = {renaming_2}")
 
-        if len(constraints_renamed) > 0:
-            _LOGGER.warning(f"Free evars of c: {fvc}")
-            _LOGGER.warning(f"Constraints: {[x.text for x in constraints]}")
-            _LOGGER.warning(f"Constraints_renamed: {[x.text for x in constraints_renamed]}")
-            ctx.broadcast_channel.broadcast(constraints_renamed)
-
-        renaming_composed: T.Mapping[str, str] = {
-            k:renaming_2[v] for k,v in (fp1.renaming or dict()).items()
-        }
+        if len(constraints) > 0:
+            ctx.broadcast_channel.broadcast(constraints)
 
         return FinitePattern(
             idx=fp1.idx,
             sort=fp1.sort,
-            renaming=dict(renaming_composed)
+            renaming=dict(renaming_2)
         )
     
     def refine(self, ctx: AbstractionContext, a: IAbstractPattern, c: Kore.Pattern) -> FinitePattern:
