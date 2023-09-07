@@ -125,11 +125,14 @@ class SubstitutionsConstraintDomain(IAbstractConstraintDomain):
             return True
         return self.nested.is_bottom(a.nested)
     
-    def to_str(self, a: IAbstractConstraint) -> str:
+    def to_str(self, a: IAbstractConstraint, indent: int) -> str:
         assert type(a) is SubstitutionsConstraint
         if a.nested is None:
-            return '<Bot'
-        return f'<sc: {self.nested.to_str(a.nested)}>'
+            return indent*' ' + '<Bot>'
+        s = indent*' ' + "<sc\n"
+        s = s + self.nested.to_str(a.nested, indent=indent+1)
+        s = s + ">"
+        return s
     
 
 

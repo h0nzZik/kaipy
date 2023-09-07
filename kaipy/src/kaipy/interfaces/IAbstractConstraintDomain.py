@@ -47,5 +47,5 @@ class IAbstractConstraintDomain(abc.ABC):
         ...
 
     @abc.abstractmethod
-    def to_str(self, a: IAbstractConstraint) -> str:
+    def to_str(self, a: IAbstractConstraint, indent: int) -> str:
         ...

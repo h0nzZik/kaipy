@@ -63,9 +63,13 @@ class ProductConstraintDomain(IAbstractConstraintDomain):
         assert type(a2) is ProductConstraint
         return self.left_domain.equals(a1.left, a2.left) and self.right_domain.equals(a1.right, a2.right)
 
-    def to_str(self, a: IAbstractConstraint) -> str:
+    def to_str(self, a: IAbstractConstraint, indent: int) -> str:
         assert type(a) is ProductConstraint
-        return f'<prod {self.left_domain.to_str(a.left)}, {self.right_domain.to_str(a.right)}>'
+        s = indent*' ' + '<prod\n'
+        s = s + self.left_domain.to_str(a.left, indent=indent+1) + ",\n"
+        s = s + self.right_domain.to_str(a.right, indent=indent+1) + ",\n"
+        s = s + ">"
+        return s
 
 
 class ProductConstraintDomainBuilder(IAbstractConstraintDomainBuilder):

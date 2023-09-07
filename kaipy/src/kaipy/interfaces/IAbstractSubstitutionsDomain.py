@@ -45,5 +45,5 @@ class IAbstractSubstitutionsDomain(abc.ABC):
         ...
 
     @abc.abstractmethod
-    def to_str(self, a: IAbstractSubstitutions) -> str:
+    def to_str(self, a: IAbstractSubstitutions, indent: int) -> str:
         ...

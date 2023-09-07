@@ -44,5 +44,5 @@ class IAbstractPatternDomain(abc.ABC):
         ...
     
     @abc.abstractmethod
-    def to_str(self, a: IAbstractPattern) -> str:
+    def to_str(self, a: IAbstractPattern, indent: int) -> str:
         ...

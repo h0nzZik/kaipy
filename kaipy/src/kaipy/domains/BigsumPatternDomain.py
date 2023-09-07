@@ -114,8 +114,11 @@ class BigsumPatternDomain(IAbstractPatternDomain):
 
         
 
-    def to_str(self, a: IAbstractPattern) -> str:
+    def to_str(self, a: IAbstractPattern, indent: int) -> str:
         assert type(a) is BigsumPattern
         if (a.idx < 0) or (a.ap is None):
-            return f'<bigsum Top>'
-        return f'<bigsum idx={a.idx}, a={self.domains[a.idx].to_str(a.ap)}>'
+            return indent*' ' f'<bigsum Top>'
+        s = indent*' ' + f"<bigsum {a.idx}\n"
+        s = s + self.domains[a.idx].to_str(a.ap, indent=indent+1) + "\n"
+        s = s + ">"
+        return s

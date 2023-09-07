@@ -119,16 +119,41 @@ class FinitePatternDomain(IAbstractPatternDomain):
             v: ctx.variable_manager.get_fresh_evar_name() for k,v in (fp1.renaming or dict()).items()
         }
 
+        ## These might contain both renamed and non-renamed variables.
+        ## We need to rename all of them.
+        renaming_2_ext: T.Dict[str, str] = {
+            v:renaming_2[v]
+            for k,v in (fp1.renaming or dict()).items()
+        }
+        renaming_2_ext.update({
+            k:renaming_2[v]
+            for k,v in (fp1.renaming or dict()).items()
+        })
+        constraints_all = mrs[fp1.idx].constraints
+        # Keep only equalities where one side is a variable from the input pattern (and the other side is not a variable)
+        constraints: T.List[Kore.MLPred] = list()
+        #fvc = KoreUtils.free_evars_of_pattern(c).union()
+        fvc = set((fp1.renaming or dict()).values())
+        for x in constraints_all:
+            match x:
+                case Kore.Equals(_, _, Kore.EVar(n1, s1), Kore.EVar(n2, s2)):
+                    continue
+                case Kore.Equals(_, _, Kore.EVar(n1, s1), _):
+                    if Kore.EVar(n1, s1) in fvc:
+                        constraints.append(x)
+                case Kore.Equals(_, _, _, Kore.EVar(n2, s2)):
+                    if Kore.EVar(n2, s2) in fvc:
+                        constraints.append(x)
+                
         constraints_renamed: T.List[Kore.MLPred] = [
-            KoreUtils.rename_vars(renaming_2, c) for c in mrs[fp1.idx].constraints # type: ignore
+            KoreUtils.rename_vars(renaming_2_ext, c) for c in constraints # type: ignore
         ]
 
         if len(constraints_renamed) > 0:
-            #_LOGGER.warning(f"Constraints: {constraints_renamed}")
+            _LOGGER.warning(f"Free evars of c: {fvc}")
+            _LOGGER.warning(f"Constraints: {[x.text for x in constraints]}")
+            _LOGGER.warning(f"Constraints_renamed: {[x.text for x in constraints_renamed]}")
             ctx.broadcast_channel.broadcast(constraints_renamed)
-        # TODO emit the constraints through the channel
-        #for c in constraints_renamed:
-        #    _LOGGER.warning(f'TODO emit: {self.rs.kprint.kore_to_pretty(c)}')
 
         renaming_composed: T.Mapping[str, str] = {
             k:renaming_2[v] for k,v in (fp1.renaming or dict()).items()
@@ -196,7 +221,10 @@ class FinitePatternDomain(IAbstractPatternDomain):
         return False
         #return self.rs.subsumes(self.concretize(a1), self.concretize(a2))[0]
 
-    def to_str(self, a: IAbstractPattern) -> str:
-        c = self.concretize(a)
+    def to_str(self, a: IAbstractPattern, indent: int) -> str:
+        assert type(a) is FinitePattern
+        return indent*' ' + f'<fpd {a.idx}>'
+        #return str(a.idx)
+        #c = self.concretize(a)
         #assert not KoreUtils.is_top(c) ?????
-        return self.rs.kprint.kore_to_pretty(c)
+        #return self.rs.kprint.kore_to_pretty(c)

@@ -79,11 +79,11 @@ class SubstitutionListDomain(IAbstractSubstitutionsDomain):
         assert type(a) is SubstitutionList
         return len(a.elements) <= 0
 
-    def to_str(self, a: IAbstractSubstitutions) -> str:
+    def to_str(self, a: IAbstractSubstitutions, indent: int) -> str:
         assert type(a) is SubstitutionList
-        s: str = "<sl "
+        s: str = indent*' ' + "<sl\n"
         for e in a.elements:
-            s = s + f"{self.underlying.to_str(e)},"
-        s = s + ">"
+            s = f"{self.underlying.to_str(e, indent=indent+1)},\n"
+        s = s + indent*' ' + ">"
         return s
         
