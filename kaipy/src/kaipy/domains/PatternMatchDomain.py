@@ -21,7 +21,6 @@ _LOGGER: T.Final = logging.getLogger(__name__)
 @dataclasses.dataclass
 class PatternMatchDomainElement(IAbstractPattern):
     constraint_per_state: T.List[IAbstractConstraint|None] # The None is here because not every abstract domain can effectively abstract Bottom
-    reversed_renaming: T.Mapping[str, str]
 
 class PatternMatchDomain(IAbstractPatternDomain):
     rs: ReachabilitySystem
@@ -49,42 +48,17 @@ class PatternMatchDomain(IAbstractPatternDomain):
     def abstract(self, ctx: AbstractionContext, c: Kore.Pattern) -> PatternMatchDomainElement:
         cpsl: T.List[T.List[IAbstractConstraint|None]] = list()
         for q0 in KoreUtils.or_to_list(self.rs.simplify(c)):
-            #q = KoreUtils.normalize_pattern(q0)
-            q = q0
+            q = KoreUtils.normalize_pattern(q0)
+            #q = q0
             # Suppose states=[foo(A)] and c=foo(bar(A)). 
             mrs: T.List[MatchResult] = parallel_match(rs=self.rs, cfg=q, states=self.states)
-            # We get [{constraints: A = bar(A'), renaming: {A: A'}}]
-            # We need to rename all free variables in the `constraints` of the parallel match
-            # to some globally recognized variables. We need to do that anyway,
-            # but one special reason for that is that we want different calls of `abstract`
-            # to result in patterns with different variables being fed to the underlying domains.
-            # Then, when we have concretized two abstract values through an underlying domain,
-            # they will have different variables, and therefore we can simply join the two reversed renamings.
-            renamings_2: T.List[T.Mapping[str, str]] = [
-                { v: ctx.variable_manager.get_fresh_evar_name() for k,v in mr.renaming.items() }
+            constraintss: T.List[T.List[Kore.MLPred]] = [
+                mr.constraints # type: ignore
                 for mr in mrs
             ]
-
-            # Now, `renamings_2` will be [{A': SV1}]
-            constraints_renamed: T.List[T.List[Kore.MLPred]] = [
-                [ KoreUtils.rename_vars(r2, c) for c in mr.constraints ] # type: ignore
-                for mr,r2 in zip(mrs, renamings_2)
-            ]
-            # Now, constraints_renamed will refer to SV1, SV2 and SV3.
-            # We need to create a renaming that does both the old and new renamings in one step.
-            renamings_composed: T.List[T.Mapping[str, str]] = [
-                { k:r2[v] for k,v in mr.renaming.items()}
-                for mr,r2 in zip(mrs, renamings_2)
-            ]
-            # Now, renamings_composed is `[{A: SV1}].`
-            # We need to create a way back SV1 to A.
-            renamings_reversed = [KoreUtils.reverse_renaming(r) for r in renamings_composed]
-            # TODO we should assert that ChainMap didn't lose / shadow anything.
-            renamings_joined = dict(collections.ChainMap(*renamings_reversed))
-            # Now renamings_joined is `{SV1: A}`
             cps: T.List[IAbstractConstraint|None] = list()
 
-            for i,constraints in enumerate(constraints_renamed):
+            for i,constraints in enumerate(constraintss):
                 if KoreUtils.any_is_bottom(constraints):
                     #_LOGGER.warning(f"Skipping bottom at {i}")
                     cps.append(None)
@@ -116,7 +90,7 @@ class PatternMatchDomain(IAbstractPatternDomain):
                 fci = final_cps[i]
                 assert fci is not None
                 final_cps[i] = self.underlying_domains[i].disjunction(ctx, fci, cci)
-        return PatternMatchDomainElement(constraint_per_state=final_cps, reversed_renaming=renamings_joined)
+        return PatternMatchDomainElement(constraint_per_state=final_cps)
 
     def refine(self, ctx: AbstractionContext, a: IAbstractPattern, c: Kore.Pattern) -> PatternMatchDomainElement:
         assert type(a) is PatternMatchDomainElement
@@ -126,18 +100,12 @@ class PatternMatchDomain(IAbstractPatternDomain):
     def disjunction(self, ctx: AbstractionContext, a1: IAbstractPattern, a2: IAbstractPattern) -> IAbstractPattern:
         assert type(a1) is PatternMatchDomainElement
         assert type(a2) is PatternMatchDomainElement
-        #if self.equals(a1, a2):
-        #    return a1
-        assert len(set.intersection(set(a1.reversed_renaming.keys()), set(a2.reversed_renaming.keys()))) == 0
         cps = [ 
             ud.disjunction(ctx, b1, b2) if (b1 is not None and b2 is not None) else (b1 if b2 is None else b2)
             for ud,b1,b2 in zip(self.underlying_domains, a1.constraint_per_state,a2.constraint_per_state)
         ]
-        rr = dict(a1.reversed_renaming)
-        rr.update(a2.reversed_renaming)
         return PatternMatchDomainElement(
             constraint_per_state=cps,
-            reversed_renaming=rr
         )
 
     def is_top(self, a: IAbstractPattern) -> bool:
@@ -155,14 +123,10 @@ class PatternMatchDomain(IAbstractPatternDomain):
             (ud.concretize(b) if b is not None else [bot])
             for ud,b in zip(self.underlying_domains, a.constraint_per_state)
         ]
-        #_LOGGER.warning(f'concretized_constraitns: {[[y.text for y in x] for x in concretized_constraints]}')
-        concretized_constraints_renamed = [
-            [ KoreUtils.rename_vars(dict(a.reversed_renaming), c) for c in cc]
-            for cc in concretized_constraints
-        ]
+
         ccr_conjs = [
             self.rs.simplify(RSUtils.make_conjunction(self.rs, ccr))
-            for ccr in concretized_constraints_renamed
+            for ccr in concretized_constraints
         ]
 
         #_LOGGER.warning(f'ccr_conjs: {ccr_conjs}')
