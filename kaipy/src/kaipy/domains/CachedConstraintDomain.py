@@ -9,7 +9,7 @@ from kaipy.interfaces.IAbstractConstraintDomainBuilder import IAbstractConstrain
 
 
 class CachedConstraintDomain(IAbstractConstraintDomain):
-    cache: T.Dict[T.Set[Kore.MLPred], IAbstractConstraint]
+    cache: T.Dict[T.FrozenSet[Kore.MLPred], IAbstractConstraint]
     underlying: IAbstractConstraintDomain
 
     def __init__(self, underlying: IAbstractConstraintDomain):
@@ -17,7 +17,7 @@ class CachedConstraintDomain(IAbstractConstraintDomain):
         self.underlying = underlying
 
     def abstract(self, ctx: AbstractionContext, c: T.List[Kore.MLPred]) -> IAbstractConstraint:
-        sc = set(c)
+        sc = frozenset(c)
         if sc in self.cache.keys():
             return self.cache[sc]
         a = self.underlying.abstract(ctx, c)
