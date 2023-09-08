@@ -71,15 +71,24 @@ class PatternMatchDomain(IAbstractPatternDomain):
         #_LOGGER.warning(f"c_simpl: {[x.text for x in c_simpl_list]}")
         c_simpl_list_norm = [KoreUtils.normalize_pattern(x) for x in c_simpl_list]
 
-        renaming = KoreUtils.compute_renaming0(
-            vars_to_avoid=list(self._all_state_evars),
-            vars_to_rename=list(itertools.chain(*[KoreUtils.free_evars_of_pattern(x) for x in c_simpl_list_norm])),
-        )
+        # We cannot compute one single 'global' renaming, beause then the names of the new variables
+        # for a particular pattern from the disjunction depend on all the other patterns that are in the disjunction.
+        #renaming = KoreUtils.compute_renaming0(
+        #    vars_to_avoid=list(self._all_state_evars),
+        #    vars_to_rename=list(itertools.chain(*[KoreUtils.free_evars_of_pattern(x) for x in c_simpl_list_norm])),
+        #)
+        renamings = [
+            KoreUtils.compute_renaming0(
+                vars_to_avoid=list(self._all_state_evars),
+                vars_to_rename=list(KoreUtils.free_evars_of_pattern(x)),
+            )
+            for x in c_simpl_list_norm
+        ]
 
         cpsl: T.List[T.List[IAbstractConstraint|None]] = list()
-        for q in c_simpl_list_norm:
+        for idx,q in enumerate(c_simpl_list_norm):
             #_LOGGER.warning(f"q: {q}")
-            mrs: T.List[MatchResult] = parallel_match(rs=self.rs, cfg=q, states=self.states, renaming=renaming)
+            mrs: T.List[MatchResult] = parallel_match(rs=self.rs, cfg=q, states=self.states, renaming=renamings[idx])
             constraintss: T.List[T.List[Kore.MLPred]] = [
                 mr.constraints # type: ignore
                 for mr in mrs
@@ -168,8 +177,7 @@ class PatternMatchDomain(IAbstractPatternDomain):
 
         # We normalize such that different states in the disjunction have different variables
         constrained_states: T.List[Kore.Pattern] = [
-            # The simplification here is mainly for debugging purposes
-            #KoreUtils.normalize_pattern(
+            KoreUtils.normalize_pattern(
                 KoreUtils.cleanup_pattern(
                     self._top_sort,
                     self.rs.simplify(
@@ -179,7 +187,7 @@ class PatternMatchDomain(IAbstractPatternDomain):
                             ccr_conj, #KoreUtils.rename_vars(a.renaming, ccr_conj)
                         )
                     )
-            #    ), prefix=f"Z{i}"
+                ), prefix=f"Z{i}"
             ) 
             for i,(state,ccr_conj) in enumerate(zip(self.states, ccr_conjs))
         ]
