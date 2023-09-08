@@ -47,11 +47,19 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
         monitored_evars: T.Dict[Kore.EVar, Kore.Pattern] = dict()
         for x in c:
             for e in KoreUtils.free_evars_of_pattern(x):
-                if e in self.over_variables:
+                # If we monitor only 'over_variables' - that is, variables that belong to the particular rule LHS,
+                # we will lose information about all other variables. For example, consider the rule LHS
+                # <k> X = I:Int ; ~> _DotVar2 ~> . </k>
+                # (corresponding to the `IMP.assignment` rule).
+                # What if there is an equality `_DotVar2 = #somefreezer(S:Stmt)` ?
+                # We want to track the KResult information about S.
+                # (We also want to track the equality itself, but that is the business of another component.)
+                # The ideal solution would be to track only `over_variables` plus whatever variables has been created dynamically.
+                if e in self.over_variables or True:
                     monitored_evars[e] = p
         #_LOGGER.warning(f"Monitoring: {[e.text for e in monitored_evars.keys()]}")
         a2 = self._refine_monitored(ctx, a, monitored_evars=monitored_evars)
-        if len(a2.kresult_vars) > 0:
+        if len(a2.kresult_vars) > 0 or True:
             _LOGGER.warning(f"Abstracted {[x.text for x in c]} into {self.to_str(a2, indent=0)}")
         return a2
 

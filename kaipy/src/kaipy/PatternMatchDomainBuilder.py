@@ -17,6 +17,7 @@ def build_states(rs: ReachabilitySystem) -> T.List[T.Tuple[Kore.Pattern, str]]:
                 # Ideally we would want all states to have different variables, because these states will be joined using Or.
                 # But for now it is enough if same-named variables have same sorts, which is guaranteed by `normalize_pattern`.
                 l.append((KoreUtils.normalize_pattern(lhs, prefix='W'), original_rule_label))
+                #l.append((KoreUtils.normalize_pattern(lhs, prefix='W'), original_rule_label + ": " + rs.kprint.kore_to_pretty(lhs)))
     return l
        
 def build_pattern_match_domain(
