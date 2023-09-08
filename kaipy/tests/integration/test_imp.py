@@ -200,9 +200,10 @@ class TestImp(MyTest):
         #print(f"a: {pm_domain.to_str(a1, indent=0)}")
         #print(f"renaming: {a1.renaming}")
         c1 = pm_domain.concretize(a1)
-        _LOGGER.warning(c1.text)
+        #_LOGGER.warning(c1.text)
         match c1:
-            case Kore.And(_, Kore.App('kseq', _, (Kore.EVar(_, _), Kore.EVar(_, _))), Kore.And(_, _, Kore.Not(_, Kore.Equals(_, _, _, _)))):
+            #case Kore.And(_, Kore.App('kseq', _, (Kore.EVar(_, _), Kore.EVar(_, _))), Kore.And(_, _, Kore.Not(_, Kore.Equals(_, _, _, _)))):
+            case Kore.And(_, Kore.App('kseq', _, (Kore.EVar(_, _), Kore.EVar(_, _))), Kore.Not(_, Kore.Equals(_, _, _, _))):
                 assert True
             case _:
                 assert False

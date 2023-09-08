@@ -23,7 +23,7 @@ _LOGGER: T.Final = logging.getLogger(__name__)
 @dataclasses.dataclass
 class PatternMatchDomainElement(IAbstractPattern):
     constraint_per_state: T.List[IAbstractConstraint|None] # The None is here because not every abstract domain can effectively abstract Bottom
-    renaming: T.Mapping[str, str]
+    #renaming: T.Mapping[str, str]
 
 class PatternMatchDomain(IAbstractPatternDomain):
     rs: ReachabilitySystem
@@ -119,7 +119,7 @@ class PatternMatchDomain(IAbstractPatternDomain):
                 fci = final_cps[i]
                 assert fci is not None
                 final_cps[i] = self.underlying_domains[i].disjunction(ctx, fci, cci)
-        return PatternMatchDomainElement(constraint_per_state=final_cps, renaming= KoreUtils.reverse_renaming(renaming))
+        return PatternMatchDomainElement(constraint_per_state=final_cps)#, renaming= KoreUtils.reverse_renaming(renaming))
 
     def refine(self, ctx: AbstractionContext, a: IAbstractPattern, c: Kore.Pattern) -> PatternMatchDomainElement:
         assert type(a) is PatternMatchDomainElement
@@ -134,11 +134,11 @@ class PatternMatchDomain(IAbstractPatternDomain):
             for ud,b1,b2 in zip(self.underlying_domains, a1.constraint_per_state,a2.constraint_per_state)
         ]
         # Here we assume that all states have different variables.
-        renaming = dict(a1.renaming)
-        renaming.update(a2.renaming)
+        #renaming = dict(a1.renaming)
+        #renaming.update(a2.renaming)
         return PatternMatchDomainElement(
             constraint_per_state=cps,
-            renaming=renaming,
+        #    renaming=renaming,
         )
 
     def is_top(self, a: IAbstractPattern) -> bool:
@@ -172,13 +172,13 @@ class PatternMatchDomain(IAbstractPatternDomain):
             #KoreUtils.normalize_pattern(
                 KoreUtils.cleanup_pattern(
                     self._top_sort,
-                    #self.rs.simplify(
+                    self.rs.simplify(
                         Kore.And(
                             self.rs.sortof(state),
                             state,
-                            KoreUtils.rename_vars(a.renaming, ccr_conj)
+                            ccr_conj, #KoreUtils.rename_vars(a.renaming, ccr_conj)
                         )
-                    #)
+                    )
             #    ), prefix=f"Z{i}"
             ) 
             for i,(state,ccr_conj) in enumerate(zip(self.states, ccr_conjs))

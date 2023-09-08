@@ -1,12 +1,15 @@
 import functools
 import typing as T
 from itertools import chain, product
+import logging
 
 import pyk.kore.syntax as Kore
 from pyk.kore.manip import free_occs
 
 import kaipy.predicate_filter as PredicateFilter
 import kaipy.BasicKoreUtils as BasicKoreUtils
+
+_LOGGER: T.Final = logging.getLogger(__name__)
 
 def make_conjunction(sort, l: T.Sequence[Kore.Pattern]) -> Kore.Pattern:
     return BasicKoreUtils.make_conjunction(sort, l)
@@ -589,6 +592,20 @@ def cleanup_pattern(top_sort: Kore.Sort, phi: Kore.Pattern) -> Kore.Pattern:
         return evs2_p
     return Kore.And(top_sort, rest, evs2_p)
 
+def cleanup_pattern_new(top_sort: Kore.Sort, phi: Kore.Pattern) -> Kore.Pattern:
+    main_part, preds = PredicateFilter.filter_out_predicates(phi)
+    assert main_part is not None
+    fvmain = free_evars_of_pattern(main_part)
+    preds_filtered: T.List[Kore.Pattern] = [
+        p
+        for p in preds
+        if len(free_evars_of_pattern(p).intersection(fvmain)) >= 1
+    ]
+    _LOGGER.warning(f"main_part: {main_part}")
+    _LOGGER.warning(f"preds: {preds}")
+    _LOGGER.warning(f"preds_filtered: {preds_filtered}")
+    return make_conjunction(top_sort, [main_part]+preds_filtered)
+    
 
 def cleanup_eqs(
     top_sort: Kore.Sort,
