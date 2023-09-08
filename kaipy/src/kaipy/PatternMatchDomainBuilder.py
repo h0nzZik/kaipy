@@ -7,8 +7,8 @@ from kaipy.ReachabilitySystem import ReachabilitySystem
 from kaipy.interfaces.IAbstractConstraintDomainBuilder import IAbstractConstraintDomainBuilder
 from kaipy.domains.PatternMatchDomain import PatternMatchDomain
 
-def build_states(rs: ReachabilitySystem) -> T.List[Kore.Pattern]:
-    l: T.List[Kore.Pattern] = list()
+def build_states(rs: ReachabilitySystem) -> T.List[T.Tuple[Kore.Pattern, str]]:
+    l: T.List[T.Tuple[Kore.Pattern, str]] = list()
 
     for axiom in rs.kdw.rewrite_rules:
         match axiom:
@@ -16,7 +16,7 @@ def build_states(rs: ReachabilitySystem) -> T.List[Kore.Pattern]:
                 original_rule_label: str = KoreUtils.axiom_label(axiom)
                 # Ideally we would want all states to have different variables, because these states will be joined using Or.
                 # But for now it is enough if same-named variables have same sorts, which is guaranteed by `normalize_pattern`.
-                l.append(KoreUtils.normalize_pattern(lhs, prefix='W'))
+                l.append((KoreUtils.normalize_pattern(lhs, prefix='W'), original_rule_label))
     return l
        
 def build_pattern_match_domain(

@@ -26,6 +26,7 @@ class PatternMatchDomainElement(IAbstractPattern):
 class PatternMatchDomain(IAbstractPatternDomain):
     rs: ReachabilitySystem
     states: T.List[Kore.Pattern]
+    comments: T.Mapping[Kore.Pattern, str]
     underlying_domains: T.List[IAbstractConstraintDomain]
     # invariant: len(states) == len(underlying_domains)
 
@@ -33,15 +34,16 @@ class PatternMatchDomain(IAbstractPatternDomain):
     # precondition: `states` must cover all possible configurations; that is, a big disjunction over `states` is Top.
     def __init__(self,
         rs: ReachabilitySystem,
-        states: T.List[Kore.Pattern],
+        states: T.List[T.Tuple[Kore.Pattern, str]],
         underlying_domain_builder: IAbstractConstraintDomainBuilder
     ):
         self.rs = rs
-        self.states = states
+        self.states = [x for (x, y) in states]
+        self.comments = {x:y for (x,y) in states}
         #_LOGGER.warning(f"States: {len(states)}")
         self.underlying_domains = [
             underlying_domain_builder.build_abstract_constraint_domain(KoreUtils.free_evars_of_pattern(st))
-            for st in states
+            for st in self.states
         ]
 
     def abstract(self, ctx: AbstractionContext, c: Kore.Pattern) -> PatternMatchDomainElement:
@@ -62,9 +64,6 @@ class PatternMatchDomain(IAbstractPatternDomain):
                 { v: ctx.variable_manager.get_fresh_evar_name() for k,v in mr.renaming.items() }
                 for mr in mrs
             ]
-
-            # Well, I am only measuring the length of the list of bools here
-            #_LOGGER.warning(f"bottoms: {len([KoreUtils.any_is_bottom(mr.constraints) for mr in mrs])}")
 
             # Now, `renamings_2` will be [{A': SV1}]
             constraints_renamed: T.List[T.List[Kore.MLPred]] = [
@@ -206,7 +205,7 @@ class PatternMatchDomain(IAbstractPatternDomain):
                 continue
             if ud.is_bottom(b):
                 continue
-            s = s + (indent+1)*' ' + f'{i} => \n'
+            s = s + (indent+1)*' ' + f'{i} ({self.comments[self.states[i]]}) => \n'
             s = s + f'{ud.to_str(b, indent=indent+2)}\n'
         s = s + (indent*' ') + "]"
         return s

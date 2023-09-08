@@ -167,29 +167,35 @@ class FinitePatternDomain(IAbstractPatternDomain):
         # }
 
         constraints_all = mrs[fp1.idx].constraints
+        _LOGGER.warning(f"Pattern: {c.text}")
+        _LOGGER.warning(f"State: {self.pl[fp1.idx].text}")
         _LOGGER.warning(f"Constraints_all: {[x.text for x in constraints_all]}")
         _LOGGER.warning(f"Pattern free variables = {KoreUtils.free_evars_of_pattern(c)}")
         _LOGGER.warning(f"State free variables = {KoreUtils.free_evars_of_pattern(self.pl[fp1.idx])}")
         _LOGGER.warning(f"fp1.renaming = {fp1.renaming}")
         _LOGGER.warning(f"renaming2 = {renaming_2}")
 
-        constraints: T.List[Kore.MLPred] = list()
+        #constraints: T.List[Kore.MLPred] = list()
         fvc = set((fp1.renaming or dict()).values())
         renaming_back = KoreUtils.reverse_renaming(fp1.renaming or dict())
-        for x in constraints_all:
-            match x:
-                case Kore.Equals(_, _, Kore.EVar(n1, s1), Kore.EVar(n2, s2)):
-                    continue
-                case Kore.Equals(os, s, Kore.EVar(n1, s1), right):
-                    if n1 in fvc:
-                        constraints.append(Kore.Equals(os, s, Kore.EVar(renaming_2[renaming_back[n1]], s1), right))
-                case Kore.Equals(os, s, left, Kore.EVar(n2, s2)):
-                    if n2 in fvc:
-                        constraints.append(Kore.Equals(os, s, Kore.EVar(renaming_2[renaming_back[n2]], s2), left))
+        # for x in constraints_all:
+        #     match x:
+        #         case Kore.Equals(_, _, Kore.EVar(n1, s1), Kore.EVar(n2, s2)):
+        #             continue
+        #         case Kore.Equals(os, s, Kore.EVar(n1, s1), right):
+        #             if n1 in fvc:
+        #                 constraints.append(Kore.Equals(os, s, Kore.EVar(renaming_2[renaming_back[n1]], s1), right))
+        #         case Kore.Equals(os, s, left, Kore.EVar(n2, s2)):
+        #             if n2 in fvc:
+        #                 constraints.append(Kore.Equals(os, s, Kore.EVar(renaming_2[renaming_back[n2]], s2), left))
+        constraints = [
+            KoreUtils.rename_vars(renaming_2, KoreUtils.rename_vars(renaming_back, x))
+            for x in constraints_all
+        ]
         _LOGGER.warning(f"Constraints: {[x.text for x in constraints]}")
         
         if len(constraints) > 0:
-            ctx.broadcast_channel.broadcast(constraints)
+            ctx.broadcast_channel.broadcast(constraints) # type: ignore
 
         return FinitePattern(
             idx=fp1.idx,
@@ -257,7 +263,7 @@ class FinitePatternDomain(IAbstractPatternDomain):
         assert type(a) is FinitePattern
         s = (indent*' ') + '<fpd \n'
         s = s + ((indent+1)*' ') + f'idx={a.idx}\n'
-        s = s + ((indent+1)*' ') + 'renaming=' + (str({k : v for k,v in a.renaming.items()}) if a.renaming else "<None>")
+        s = s + ((indent+1)*' ') + 'renaming=' + (str({k : v for k,v in a.renaming.items()}) if a.renaming else "<None>") + "\n"
         s = s + (indent*' ') + '>'
         return s
         #return str(a.idx)

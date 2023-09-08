@@ -17,10 +17,13 @@ import kaipy.rs_utils as RSUtils
 from kaipy.interfaces.IAbstractSubstitutionDomain import IAbstractSubstitutionDomain
 from kaipy.interfaces.IAbstractPatternDomain import IAbstractPatternDomain
 
+from kaipy.AbstractionContext import AbstractionContext
+from kaipy.DefaultAbstractionContext import make_ctx
 from kaipy.HeatPreAnalysis import ContextAlias, ContextAliases, pre_analyze
 from kaipy.ReachabilitySystem import ReachabilitySystem
 from kaipy.domains.BigsumPatternDomain import BigsumPattern, BigsumPatternDomain
 from kaipy.domains.ExactPatternDomain import ExactPattern, ExactPatternDomain
+from kaipy.domains.KResultConstraintDomain import KResultConstraint, KResultConstraintDomain
 from kaipy.testing.testingbase import RSTestBase
 from kaipy.DefaultAbstractionContext import make_ctx
 from kaipy.DefaultPatternDomain import build_abstract_pattern_domain
@@ -148,6 +151,26 @@ class TestImp(MyTest):
         concrete_reachable_configurations = pattern_domain.concretize(result.reachable_configurations)
         _LOGGER.warning(reachability_system.kprint.kore_to_pretty(concrete_reachable_configurations))
         return result
+
+    def test_kresult_constraint_domain(
+        self,
+        reachability_system: ReachabilitySystem,
+        context_aliases : ContextAliases
+    ):
+        sortInt = Kore.SortApp("SortInt", ())
+        x1 = Kore.EVar("x1", sortInt)
+        domain = KResultConstraintDomain(rs=reachability_system, over_variables={x1})
+        ctx = make_ctx()
+        concrete_constraint = domain._mk_isKResult_pattern(x1, reachability_system.top_sort)
+        a = domain.abstract(ctx=ctx, c=[concrete_constraint])
+        assert x1 in a.kresult_vars
+        c = domain.concretize(a=a)
+        assert c == [concrete_constraint]
+        x2 = Kore.EVar("x2", sortInt)
+        x1_eq_x2 = Kore.Equals(sortInt, sortInt, x1, x2)
+        a2 = domain.refine(ctx=ctx, a=a, c=[x1_eq_x2])
+        assert x1 in a2.kresult_vars
+        assert x2 in a2.kresult_vars
 
     def test_analyze_very_simple(
         self,

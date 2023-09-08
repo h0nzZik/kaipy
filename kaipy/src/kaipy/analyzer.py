@@ -82,8 +82,8 @@ def analyze(
         diff_step_norm = { c:[ KoreUtils.normalize_pattern(s) for s in succs] for c,succs in diff_step.items() }
         # Should we clean up the pattern? I am not sure.
         #diff_step_norm = { c:[ KoreUtils.normalize_pattern(RSUtils.cleanup_pattern(rs,s)) for s in succs] for c,succs in diff_step.items() }
-        if len(list(set(itertools.chain(*diff_step_norm.values())))) > 1:
-            _LOGGER.warning("More than 1 successor")
+        if len(list(set(itertools.chain(*diff_step_norm.values())))) > 1 or True:
+            #_LOGGER.warning("More than 1 successor")
             #_LOGGER.warning(f'of: {rs.kprint.kore_to_pretty(RSUtils.make_disjunction(rs, diff))}')
             #_LOGGER.warning(f"succs_raw: {rs.kprint.kore_to_pretty(RSUtils.make_disjunction(rs, list(set(itertools.chain(*diff_step.values())))))}")
             _LOGGER.warning(f"succs: {rs.kprint.kore_to_pretty(RSUtils.make_disjunction(rs, list(set(itertools.chain(*diff_step_norm.values())))))}")

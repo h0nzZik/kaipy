@@ -179,7 +179,7 @@ def get_top_cell_initializer(definition: Kore.Definition) -> str:
     raise DefinitionError("topCellInitializer not found")
 
 
-def rename_vars(renaming: T.Dict[str, str], phi: Kore.Pattern, total: bool = False) -> Kore.Pattern:
+def rename_vars(renaming: T.Mapping[str, str], phi: Kore.Pattern, total: bool = False) -> Kore.Pattern:
     match phi:
         # The main case
         case Kore.EVar(name, sort):
