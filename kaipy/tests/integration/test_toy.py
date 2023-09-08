@@ -10,10 +10,10 @@ from pyk.ktool.kprint import KPrint
 from pyk.testing._kompiler import KompiledTest
 
 import kaipy.rs_utils as RSUtils
+import kaipy.kore_utils as KoreUtils
 from kaipy.HeatPreAnalysis import ContextAlias, ContextAliases, collect_rests
 from kaipy.KompiledDefinitionWrapper import KompiledDefinitionWrapper
 from kaipy.ReachabilitySystem import ReachabilitySystem
-from kaipy.rs_utils import cleanup_pattern
 from kaipy.testing.testingbase import RSTestBase
 
 

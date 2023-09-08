@@ -97,8 +97,6 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
             match p:
                 case Kore.Equals(_, _, Kore.EVar(n1, s1), Kore.EVar(n2, s2)):
                     equality_pairs.append((Kore.EVar(n1, s1), Kore.EVar(n2, s2)))
-                    #monitored_evars[Kore.EVar(n1, s1)] = p
-                    #monitored_evars[Kore.EVar(n2, s2)] = p
                     continue
                 case Kore.Equals(_, _, Kore.EVar(n, s), right):
                     monitored_evars[Kore.EVar(n, s)] = p

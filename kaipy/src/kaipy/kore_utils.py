@@ -5,20 +5,14 @@ from itertools import chain, product
 import pyk.kore.syntax as Kore
 from pyk.kore.manip import free_occs
 
-
+import kaipy.predicate_filter as PredicateFilter
+import kaipy.BasicKoreUtils as BasicKoreUtils
 
 def make_conjunction(sort, l: T.Sequence[Kore.Pattern]) -> Kore.Pattern:
-    result: Kore.Pattern = Kore.Top(sort)
-    for x in l:
-        result = Kore.And(sort, result, x)
-    return result
+    return BasicKoreUtils.make_conjunction(sort, l)
 
 def make_disjunction(sort, l: T.Sequence[Kore.Pattern]) -> Kore.Pattern:
-    result: Kore.Pattern = Kore.Bottom(sort)
-    for x in l:
-        result = Kore.Or(sort, result, x)
-    return result
-
+    return BasicKoreUtils.make_disjunction(sort, l)
 
 class DefinitionError(Exception):
     pass
@@ -583,4 +577,25 @@ def let_sort_rec(sort: Kore.Sort, phi: Kore.Pattern) -> Kore.Pattern:
         case Kore.Ceil(os, _, phi):
             return Kore.Ceil(os, sort, phi)
     return phi.with_sort(sort) # type: ignore
-    
+
+
+def cleanup_pattern(top_sort: Kore.Sort, phi: Kore.Pattern) -> Kore.Pattern:
+    main_part, _ = PredicateFilter.filter_out_predicates(phi)
+    assert main_part is not None
+    fvphi = free_evars_of_pattern(phi)
+    eqs, rest = extract_equalities_and_rest_from_witness({v.name for v in fvphi}, phi)
+    evs2_p = cleanup_eqs(top_sort, main_part, eqs)
+    if rest is None:
+        return evs2_p
+    return Kore.And(top_sort, rest, evs2_p)
+
+
+def cleanup_eqs(
+    top_sort: Kore.Sort,
+    main_part: Kore.Pattern,
+    eqs: T.Dict[Kore.EVar, Kore.Pattern],
+) -> Kore.Pattern:
+    fvs = free_evars_of_pattern(main_part)
+    evs2 = {k: v for k, v in eqs.items() if (k in fvs)}
+    evs2_p = mapping_to_pattern(top_sort, evs2)
+    return evs2_p

@@ -21,9 +21,11 @@ from kaipy.AbstractionContext import AbstractionContext
 from kaipy.DefaultAbstractionContext import make_ctx
 from kaipy.HeatPreAnalysis import ContextAlias, ContextAliases, pre_analyze
 from kaipy.ReachabilitySystem import ReachabilitySystem
+from kaipy.domains.PatternMatchDomain import PatternMatchDomain, PatternMatchDomainElement
 from kaipy.domains.BigsumPatternDomain import BigsumPattern, BigsumPatternDomain
 from kaipy.domains.ExactPatternDomain import ExactPattern, ExactPatternDomain
 from kaipy.domains.KResultConstraintDomain import KResultConstraint, KResultConstraintDomain
+from kaipy.domains.KeepEverythingConstraintDomain import KeepEverything, KeepEverythingConstraintDomain, KeepEverythingConstraintDomainBuilder
 from kaipy.testing.testingbase import RSTestBase
 from kaipy.DefaultAbstractionContext import make_ctx
 from kaipy.DefaultPatternDomain import build_abstract_pattern_domain
@@ -171,6 +173,30 @@ class TestImp(MyTest):
         a2 = domain.refine(ctx=ctx, a=a, c=[x1_eq_x2])
         assert x1 in a2.kresult_vars
         assert x2 in a2.kresult_vars
+
+
+    def test_patternmatch_constraint_domain(
+        self,
+        reachability_system: ReachabilitySystem,
+        context_aliases : ContextAliases
+    ):
+        sortKItem = Kore.SortApp("SortKItem", ())
+        x1_kitem = Kore.EVar("x1", sortKItem)
+        y1_k = Kore.EVar("y1", KorePrelude.SORT_K)
+
+        underlying_domain_builder = KeepEverythingConstraintDomainBuilder()
+        st1 = Kore.App('kseq', (), (x1_kitem,y1_k))
+        pm_domain = PatternMatchDomain(
+            rs=reachability_system,
+            underlying_domain_builder=underlying_domain_builder,
+            states=[(st1,"only")])
+        ctx = make_ctx()
+        a1 = pm_domain.abstract(ctx=ctx, c=st1)
+        print(a1)
+        print(pm_domain.to_str(a1, indent=0))
+        c1 = pm_domain.concretize(a1)
+        print(c1.text)
+        assert False
 
     def test_analyze_very_simple(
         self,

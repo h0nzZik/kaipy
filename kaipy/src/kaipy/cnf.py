@@ -7,7 +7,7 @@ import sympy.logic as SympyLogic
 from sympy.logic.boolalg import Boolean
 from sympy import And, Or, Symbol, symbols
 
-import kaipy.kore_utils as KoreUtils
+import kaipy.BasicKoreUtils as BasicKoreUtils
 
 def _to_sympy(phi: Kore.Pattern):
     d: T.Dict[Kore.Pattern, sympy.Symbol] = dict()
@@ -37,10 +37,10 @@ def _from_sympy(phi, dback, sort: Kore.Sort) -> Kore.Pattern:
     
     if type(phi) is And:
         args = [_from_sympy(a, dback, sort) for a in phi.args]
-        return KoreUtils.make_conjunction(sort, l=args)
+        return BasicKoreUtils.make_conjunction(sort, l=args)
     if type(phi) is Or:
         args = [_from_sympy(a, dback, sort) for a in phi.args]
-        return KoreUtils.make_disjunction(sort, l=args)
+        return BasicKoreUtils.make_disjunction(sort, l=args)
     if type(phi) is False:
         return Kore.Bottom(sort)
     if type(phi) is True:

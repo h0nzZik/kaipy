@@ -1,5 +1,6 @@
 import abc
 import typing as T
+import logging
 
 import pyk.kore.syntax as Kore
 
@@ -7,6 +8,8 @@ from kaipy.AbstractionContext import AbstractionContext
 from kaipy.interfaces.IAbstractConstraintDomain import IAbstractConstraint, IAbstractConstraintDomain
 from kaipy.interfaces.IAbstractConstraintDomainBuilder import IAbstractConstraintDomainBuilder
 
+
+_LOGGER: T.Final = logging.getLogger(__name__)
 
 class CachedConstraintDomain(IAbstractConstraintDomain):
     cache: T.Dict[T.FrozenSet[Kore.MLPred], IAbstractConstraint]
@@ -20,6 +23,8 @@ class CachedConstraintDomain(IAbstractConstraintDomain):
         sc = frozenset(c)
         if sc in self.cache.keys():
             return self.cache[sc]
+
+        #_LOGGER.warning(f"**** CACHE MISS: {[x.text for x in sc]}")        
         a = self.underlying.abstract(ctx, c)
         self.cache[sc] = a
         return a

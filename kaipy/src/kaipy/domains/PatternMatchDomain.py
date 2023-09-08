@@ -1,6 +1,8 @@
 import abc
 import collections
 import dataclasses
+import functools as F
+import itertools
 import typing as T
 import logging
 
@@ -21,6 +23,7 @@ _LOGGER: T.Final = logging.getLogger(__name__)
 @dataclasses.dataclass
 class PatternMatchDomainElement(IAbstractPattern):
     constraint_per_state: T.List[IAbstractConstraint|None] # The None is here because not every abstract domain can effectively abstract Bottom
+    renaming: T.Mapping[str, str]
 
 class PatternMatchDomain(IAbstractPatternDomain):
     rs: ReachabilitySystem
@@ -37,21 +40,42 @@ class PatternMatchDomain(IAbstractPatternDomain):
         underlying_domain_builder: IAbstractConstraintDomainBuilder
     ):
         self.rs = rs
-        self.states = [x for (x, y) in states]
-        self.comments = {x:y for (x,y) in states}
+        states2 = [(KoreUtils.normalize_pattern(x, prefix=f"St{i}V"), y) for i,(x, y) in enumerate(states)]
+        # We need all states to use different variables.
+        self.states = [x for (x, y) in states2]
+        self.comments = {x:y for (x,y) in states2}
         #_LOGGER.warning(f"States: {len(states)}")
         self.underlying_domains = [
             underlying_domain_builder.build_abstract_constraint_domain(KoreUtils.free_evars_of_pattern(st))
             for st in self.states
         ]
 
+    @F.cached_property
+    def _top_sort(self):
+        if len(self.states) <= 0:
+            return self.rs.top_sort
+        return self.rs.sortof(self.states[0])
+
+    @F.cached_property
+    def _all_state_evars(self) -> T.Set[Kore.EVar]:
+        evs: T.Set[Kore.EVar] = set()
+        for st in self.states:
+            evs.update(KoreUtils.free_evars_of_pattern(st))
+        return evs
+
     def abstract(self, ctx: AbstractionContext, c: Kore.Pattern) -> PatternMatchDomainElement:
+        c_simpl = self.rs.simplify(c)
+        c_simpl_list = KoreUtils.or_to_list(c_simpl)
+        c_simpl_list_norm = [KoreUtils.normalize_pattern(x) for x in c_simpl_list]
+
+        renaming = KoreUtils.compute_renaming0(
+            vars_to_avoid=list(itertools.chain(*[KoreUtils.free_evars_of_pattern(x) for x in c_simpl_list_norm])),
+            vars_to_rename=list(self._all_state_evars),
+        )
+
         cpsl: T.List[T.List[IAbstractConstraint|None]] = list()
-        for q0 in KoreUtils.or_to_list(self.rs.simplify(c)):
-            q = KoreUtils.normalize_pattern(q0)
-            #q = q0
-            # Suppose states=[foo(A)] and c=foo(bar(A)). 
-            mrs: T.List[MatchResult] = parallel_match(rs=self.rs, cfg=q, states=self.states)
+        for q in c_simpl_list_norm:
+            mrs: T.List[MatchResult] = parallel_match(rs=self.rs, cfg=q, states=self.states, renaming=renaming)
             constraintss: T.List[T.List[Kore.MLPred]] = [
                 mr.constraints # type: ignore
                 for mr in mrs
@@ -90,7 +114,7 @@ class PatternMatchDomain(IAbstractPatternDomain):
                 fci = final_cps[i]
                 assert fci is not None
                 final_cps[i] = self.underlying_domains[i].disjunction(ctx, fci, cci)
-        return PatternMatchDomainElement(constraint_per_state=final_cps)
+        return PatternMatchDomainElement(constraint_per_state=final_cps, renaming=renaming)
 
     def refine(self, ctx: AbstractionContext, a: IAbstractPattern, c: Kore.Pattern) -> PatternMatchDomainElement:
         assert type(a) is PatternMatchDomainElement
@@ -104,8 +128,12 @@ class PatternMatchDomain(IAbstractPatternDomain):
             ud.disjunction(ctx, b1, b2) if (b1 is not None and b2 is not None) else (b1 if b2 is None else b2)
             for ud,b1,b2 in zip(self.underlying_domains, a1.constraint_per_state,a2.constraint_per_state)
         ]
+        # Here we assume that all states have different variables.
+        renaming = dict(a1.renaming)
+        renaming.update(a2.renaming)
         return PatternMatchDomainElement(
             constraint_per_state=cps,
+            renaming=renaming,
         )
 
     def is_top(self, a: IAbstractPattern) -> bool:
@@ -118,14 +146,14 @@ class PatternMatchDomain(IAbstractPatternDomain):
 
     def concretize(self, a: IAbstractPattern) -> Kore.Pattern:
         assert type(a) is PatternMatchDomainElement
-        bot : Kore.MLPred = Kore.Bottom(self.rs.top_sort) # type: ignore
+        bot : Kore.MLPred = Kore.Bottom(self._top_sort) # type: ignore
         concretized_constraints: T.List[T.List[Kore.MLPred]] = [
             (ud.concretize(b) if b is not None else [bot])
             for ud,b in zip(self.underlying_domains, a.constraint_per_state)
         ]
 
         ccr_conjs = [
-            self.rs.simplify(RSUtils.make_conjunction(self.rs, ccr))
+            self.rs.simplify(KoreUtils.make_conjunction(self._top_sort, ccr))
             for ccr in concretized_constraints
         ]
 
@@ -134,10 +162,21 @@ class PatternMatchDomain(IAbstractPatternDomain):
         # We normalize such that different states in the disjunction have different variables
         constrained_states: T.List[Kore.Pattern] = [
             # The simplification here is mainly for debugging purposes
-            KoreUtils.normalize_pattern(RSUtils.cleanup_pattern(self.rs, self.rs.simplify(Kore.And(self.rs.sortof(state), state, ccr_conj))), prefix=f"Z{i}") 
+            #KoreUtils.normalize_pattern(
+                KoreUtils.cleanup_pattern(
+                    self._top_sort,
+                    self.rs.simplify(
+                        Kore.And(
+                            self.rs.sortof(state),
+                            KoreUtils.rename_vars(a.renaming, state),
+                            ccr_conj
+                        )
+                    )
+            #    ), prefix=f"Z{i}"
+            ) 
             for i,(state,ccr_conj) in enumerate(zip(self.states, ccr_conjs))
         ]
-        result = RSUtils.make_disjunction(self.rs, constrained_states)
+        result = KoreUtils.make_disjunction(self._top_sort, constrained_states)
         #_LOGGER.warning(f'BEFORE= {self.rs.kprint.kore_to_pretty(result)}')
         #.warning(f'BEFORE= {result.text}')
 

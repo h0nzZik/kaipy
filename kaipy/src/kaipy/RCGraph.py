@@ -16,8 +16,9 @@ from .kore_utils import (
     rename_vars,
 )
 import kaipy.predicate_filter as PredicateFilter
+import kaipy.kore_utils as KoreUtils
 from .ReachabilitySystem import ReachabilitySystem
-from .rs_utils import cleanup_eqs, cleanup_pattern, make_conjunction
+from .rs_utils import make_conjunction
 
 
 def compose_rules(
@@ -86,9 +87,9 @@ def compose_rules(
     # After the simplification, the intermediate variables (from 'other_renaming') should disappear
     # print(f"New lhs {rs.kprint.kore_to_pretty(new_lhs)}")
     # print(f"New rhs {rs.kprint.kore_to_pretty(new_rhs)}")
-    new_lhs_clean = cleanup_pattern(rs, new_lhs)
+    new_lhs_clean = KoreUtils.cleanup_pattern(rs.top_sort, new_lhs)
 
-    new_rhs_clean = cleanup_pattern(rs, new_rhs)
+    new_rhs_clean = KoreUtils.cleanup_pattern(rs.top_sort, new_rhs)
     # print(f"New lhs clean {rs.kprint.kore_to_pretty(new_lhs_clean)}")
     # print(f"New rhs clean {rs.kprint.kore_to_pretty(new_rhs_clean)}")
     rewrite = Kore.Rewrites(rs.top_sort, new_lhs_clean, new_rhs_clean)
