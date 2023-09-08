@@ -181,22 +181,31 @@ class TestImp(MyTest):
         context_aliases : ContextAliases
     ):
         sortKItem = Kore.SortApp("SortKItem", ())
+        sortInt = Kore.SortApp("SortInt", ())
         x1_kitem = Kore.EVar("x1", sortKItem)
+        x2_int = Kore.EVar("x2", sortInt)
         y1_k = Kore.EVar("y1", KorePrelude.SORT_K)
 
         underlying_domain_builder = KeepEverythingConstraintDomainBuilder()
         st1 = Kore.App('kseq', (), (x1_kitem,y1_k))
+        st1_constrained = Kore.And(KorePrelude.SORT_K, st1, Kore.Not(KorePrelude.SORT_K, Kore.Equals(sortKItem, KorePrelude.SORT_K, x1_kitem, KorePrelude.inj(sortInt, sortKItem, x2_int))))
         pm_domain = PatternMatchDomain(
             rs=reachability_system,
             underlying_domain_builder=underlying_domain_builder,
             states=[(st1,"only")])
+        #print(pm_domain)
         ctx = make_ctx()
-        a1 = pm_domain.abstract(ctx=ctx, c=st1)
-        print(a1)
-        print(pm_domain.to_str(a1, indent=0))
+        a1 = pm_domain.abstract(ctx=ctx, c=st1_constrained)
+        #print(a1)
+        #print(f"a: {pm_domain.to_str(a1, indent=0)}")
+        #print(f"renaming: {a1.renaming}")
         c1 = pm_domain.concretize(a1)
-        print(c1.text)
-        assert False
+        _LOGGER.warning(c1.text)
+        match c1:
+            case Kore.And(_, Kore.App('kseq', _, (Kore.EVar(_, _), Kore.EVar(_, _))), Kore.And(_, _, Kore.Not(_, Kore.Equals(_, _, _, _)))):
+                assert True
+            case _:
+                assert False
 
     def test_analyze_very_simple(
         self,

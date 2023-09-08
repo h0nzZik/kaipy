@@ -11,6 +11,12 @@ def filter_out_predicates(
     if issubclass(type(phi), Kore.MLPred):
         return None, [phi] # type: ignore
     match phi:
+        case Kore.Not(sort, phi2):
+            a,b = filter_out_predicates(phi2)
+            if a: # it was not a predicate
+                return Kore.Not(sort, phi2)
+            # it was a predicate
+            return None, [Kore.Not(sort, phi2)]
         case Kore.And(sort, left, right):
             lf, ps1 = filter_out_predicates(left)
             rf, ps2 = filter_out_predicates(right)
