@@ -196,7 +196,7 @@ class TestImp(MyTest):
         )
 
         rests = pre_analyze(reachability_system, context_aliases, input_pattern)
-        pattern_domain: IAbstractPatternDomain = build_abstract_pattern_domain(
+        pattern_domain = build_abstract_pattern_domain(
             reachability_system,
             rests,
             input_pattern
@@ -205,12 +205,14 @@ class TestImp(MyTest):
         concrete_text = r'''\and{SortGeneratedTopCell{}}(Lbl'-LT-'generatedTop'-GT-'{}(Lbl'-LT-'T'-GT-'{}(Lbl'-LT-'k'-GT-'{}(kseq{}(inj{SortStmt{}, SortKItem{}}(Lbl'UndsEqlsUndsSClnUnds'IMP-SYNTAX'Unds'Stmt'Unds'Id'Unds'AExp{}(\dv{SortId{}}("x"), inj{SortInt{}, SortAExp{}}(\dv{SortInt{}}("3")))), kseq{}(Lbl'Hash'freezer'UndsUndsUnds'IMP-SYNTAX'Unds'Stmt'Unds'Stmt'Unds'Stmt1'Unds'{}(kseq{}(inj{SortStmt{}, SortKItem{}}(VARVSortStmtX0 : SortStmt{}), dotk{}())), VARVSortKX1 : SortK{}))), VARVSortStateCellX2 : SortStateCell{}, Lbl'-LT-'args'-GT-'{}(VARVSortListX3 : SortList{})), Lbl'-LT-'generatedCounter'-GT-'{}(\dv{SortInt{}}("0"))), \equals{SortBool{}, SortGeneratedTopCell{}}(\dv{SortBool{}}("true"), LblisKResult{}(kseq{}(inj{SortStmt{}, SortKItem{}}(VARVSortStmtX0 : SortStmt{}), dotk{}()))))'''
         parser = KoreParser(concrete_text)
         concrete = parser.pattern()
-        _LOGGER.warning(f"concretized: {reachability_system.kprint.kore_to_pretty(concrete)}")
+        #_LOGGER.warning(f"concrete: {reachability_system.kprint.kore_to_pretty(concrete)}")
         a = pattern_domain.abstract(ctx=ctx, c=concrete)
         _LOGGER.warning(f"a: {pattern_domain.to_str(a, indent=0)}")
+        #assert a.
         concretized = pattern_domain.concretize(a)
-        _LOGGER.warning(f"concretized: {reachability_system.kprint.kore_to_pretty(concretized)}")
-        assert False
+        #_LOGGER.warning(f"concretized_text: {concretized.text}")
+        assert concretized.text == r'''\and{SortGeneratedTopCell{}}(Lbl'-LT-'generatedTop'-GT-'{}(Lbl'-LT-'T'-GT-'{}(Lbl'-LT-'k'-GT-'{}(kseq{}(inj{SortStmt{}, SortKItem{}}(Lbl'UndsEqlsUndsSClnUnds'IMP-SYNTAX'Unds'Stmt'Unds'Id'Unds'AExp{}(\dv{SortId{}}("x"), inj{SortInt{}, SortAExp{}}(\dv{SortInt{}}("3")))), kseq{}(Lbl'Hash'freezer'UndsUndsUnds'IMP-SYNTAX'Unds'Stmt'Unds'Stmt'Unds'Stmt1'Unds'{}(kseq{}(inj{SortStmt{}, SortKItem{}}(VARZ33SortStmtX0 : SortStmt{}), dotk{}())), VARZ33SortKX1 : SortK{}))), Lbl'-LT-'state'-GT-'{}(VARZ33SortMapX2 : SortMap{}), Lbl'-LT-'args'-GT-'{}(VARZ33SortListX3 : SortList{})), Lbl'-LT-'generatedCounter'-GT-'{}(\dv{SortInt{}}("0"))), \equals{SortBool{}, SortGeneratedTopCell{}}(\dv{SortBool{}}("true"), LblisKResult{}(kseq{}(inj{SortStmt{}, SortKItem{}}(VARZ33SortStmtX0 : SortStmt{}), dotk{}()))))'''
+        #_LOGGER.warning(f"concretized: {reachability_system.kprint.kore_to_pretty(concretized)}")
 
     def test_kresult_constraint_domain(
         self,

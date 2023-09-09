@@ -135,7 +135,7 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
             # This way we can have some duplicated variables... but maybe better than losing information?
             #if self._equals_to_some(kresult_vars, e):
             #    continue
-            #_LOGGER.warning(f'testing {e.text} with {phi.text}')
+            #_LOGGER.warning(f'testing {e.text} with {self.rs.kprint.kore_to_pretty(phi)}')
             if self._test_necessary_kresult(e=e, phi=phi):
                 kresult_vars.append(e)
                 #_LOGGER.warning(f'appending {e} because of {phi.text}')

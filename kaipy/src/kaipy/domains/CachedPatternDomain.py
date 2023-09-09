@@ -18,7 +18,9 @@ class CachedPatternDomain(IAbstractPatternDomain):
         self.cache = dict()
 
     def abstract(self, ctx: AbstractionContext, c: Kore.Pattern) -> IAbstractPattern:
-        c2 = KoreUtils.normalize_pattern(c)
+        # This breaks stuff
+        #c2 = KoreUtils.normalize_pattern(c)
+        c2 = c
         if c2 in self.cache:
             return self.cache[c2]
 
