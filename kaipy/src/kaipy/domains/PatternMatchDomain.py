@@ -103,15 +103,17 @@ class PatternMatchDomain(IAbstractPatternDomain):
                 d = self.underlying_domains[i]
                 a1 = d.abstract(
                     ctx=ctx,
-                    over_variables=self.state_vars[i],
+                    # This has to be constant, otherwise there might be infinitely many abstract substitutions, as the number of variables of a term grows during execution
+                    over_variables=self.state_vars[i], #.union({Kore.EVar(renamings[idx][v.name], v.sort) for v in KoreUtils.free_evars_of_pattern(q)}),
                     constraints=constraints,
                 )
-                if len(ctx.broadcast_channel.constraints) == 0:
-                    cps.append(a1)
-                else:
-                    a2: IAbstractConstraint = d.refine(ctx=ctx, a=a1, constraints=ctx.broadcast_channel.constraints)
-                    ctx.broadcast_channel.reset()
-                    cps.append(a2)
+                cps.append(a1)
+                #if len(ctx.broadcast_channel.constraints) == 0:
+                #    cps.append(a1)
+                #else:
+                #    a2: IAbstractConstraint = d.refine(ctx=ctx, a=a1, constraints=ctx.broadcast_channel.constraints)
+                #    ctx.broadcast_channel.reset()
+                #    cps.append(a2)
             cpsl.append(cps)
         
         # Now compute all the disjunctions

@@ -35,30 +35,6 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
         iskr_true = Kore.Equals(KorePrelude.BOOL, sort, iskr, KorePrelude.TRUE)
         return iskr_true
 
-    def abstract(self, ctx: AbstractionContext, over_variables: T.Set[Kore.EVar], constraints: T.List[Kore.Pattern]) -> KResultConstraint:
-        a = KResultConstraint(kresult_vars=[])
-        if len(constraints) <= 0:
-            return a
-        p = KoreUtils.make_conjunction(self.rs.sortof(constraints[0]), constraints)
-        monitored_evars: T.Dict[Kore.EVar, Kore.Pattern] = dict()
-        for x in constraints:
-            for e in KoreUtils.free_evars_of_pattern(x):
-                # If we monitor only 'over_variables' - that is, variables that belong to the particular rule LHS,
-                # we will lose information about all other variables. For example, consider the rule LHS
-                # <k> X = I:Int ; ~> _DotVar2 ~> . </k>
-                # (corresponding to the `IMP.assignment` rule).
-                # What if there is an equality `_DotVar2 = #somefreezer(S:Stmt)` ?
-                # We want to track the KResult information about S.
-                # (We also want to track the equality itself, but that is the business of another component.)
-                # The ideal solution would be to track only `over_variables` plus whatever variables has been created dynamically.
-                if e in over_variables: # or e in ctx.variable_manager.generated or True:
-                    monitored_evars[e] = p
-        _LOGGER.warning(f"Monitoring: {[e.text for e in monitored_evars.keys()]}")
-        a2 = self._refine_monitored(ctx, a, monitored_evars=monitored_evars)
-        if len(a2.kresult_vars) > 0 or True:
-            _LOGGER.warning(f"Abstracted {[x.text for x in constraints]} into {self.to_str(a2, indent=0)}")
-        return a2
-
     def free_variables_of(self, a: IAbstractConstraint) -> T.Set[Kore.EVar]:
         assert type(a) is KResultConstraint
         return set(a.kresult_vars)
@@ -89,26 +65,49 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
         conj_simp = self.rs.simplify(conj)
         return KoreUtils.is_bottom(conj_simp)
 
+    def abstract(self, ctx: AbstractionContext, over_variables: T.Set[Kore.EVar], constraints: T.List[Kore.Pattern]) -> KResultConstraint:
+        a = KResultConstraint(kresult_vars=[])
+        if len(constraints) <= 0:
+            return a
+        #return self.do_refine(ctx, a, constraints)
+        p = KoreUtils.make_conjunction(self.rs.sortof(constraints[0]), constraints)
+        monitored_evars: T.Dict[Kore.EVar, Kore.Pattern] = dict()
+        for x in constraints:
+            for e in KoreUtils.free_evars_of_pattern(x):
+                if e in over_variables: # or e in ctx.variable_manager.generated or True:
+                    monitored_evars[e] = p
+        _LOGGER.warning(f"Monitoring: {[e.text for e in monitored_evars.keys()]}")
+        a2 = self._refine_monitored(ctx, a, monitored_evars=monitored_evars)
+        if len(a2.kresult_vars) > 0 or True:
+            _LOGGER.warning(f"Abstracted {[x.text for x in constraints]} into {self.to_str(a2, indent=0)}")
+        return a2
+
     def refine(self, ctx: AbstractionContext, a: IAbstractConstraint, constraints: T.List[Kore.Pattern]) -> KResultConstraint:
         assert type(a) is KResultConstraint
+        return a
+        #return self.do_refine(ctx, a, constraints)
 
-        monitored_evars: T.Dict[Kore.EVar, Kore.MLPred] = dict()
-        equality_pairs: T.List[T.Tuple[Kore.EVar, Kore.EVar]] = list()
-        for p in constraints:
-            match p:
-                case Kore.Equals(_, _, Kore.EVar(n1, s1), Kore.EVar(n2, s2)):
-                    equality_pairs.append((Kore.EVar(n1, s1), Kore.EVar(n2, s2)))
-                    continue
-                case Kore.Equals(_, _, Kore.EVar(n, s), right):
-                    monitored_evars[Kore.EVar(n, s)] = p
-                case Kore.Equals(_, _, left, Kore.EVar(n, s)):
-                    monitored_evars[Kore.EVar(n, s)] = p
+    # def do_refine(self, ctx: AbstractionContext, a: IAbstractConstraint, constraints: T.List[Kore.Pattern]) -> KResultConstraint:
+    #     assert type(a) is KResultConstraint
 
-        _LOGGER.warning(f"refine: equality_pars: {equality_pairs}, a: {self.to_str(a, indent=0)}")
-        a2 = self._refine_monitored(ctx, a, monitored_evars)
-        a3 = self._refine_by_equalities(a2, equality_pairs)
-        #_LOGGER.warning(f"refined {self.to_str(a2)}")
-        return a3
+    #     monitored_evars: T.Dict[Kore.EVar, Kore.MLPred] = dict()
+    #     equality_pairs: T.List[T.Tuple[Kore.EVar, Kore.EVar]] = list()
+    #     for p in constraints:
+    #         match p:
+    #             case Kore.Equals(_, _, Kore.EVar(n1, s1), Kore.EVar(n2, s2)):
+    #                 equality_pairs.append((Kore.EVar(n1, s1), Kore.EVar(n2, s2)))
+    #                 continue
+    #             case Kore.Equals(_, _, Kore.EVar(n, s), right):
+    #                 monitored_evars[Kore.EVar(n, s)] = p
+    #             case Kore.Equals(_, _, left, Kore.EVar(n, s)):
+    #                 monitored_evars[Kore.EVar(n, s)] = p
+
+    #     _LOGGER.warning(f"refine: equality_pars: {equality_pairs}, a: {self.to_str(a, indent=0)}")
+    #     _LOGGER.warning(f"refine: monitored evars: {set(monitored_evars.keys())}")
+    #     a2 = self._refine_monitored(ctx, a, monitored_evars)
+    #     a3 = self._refine_by_equalities(a2, equality_pairs)
+    #     #_LOGGER.warning(f"refined {self.to_str(a2)}")
+    #     return a3
 
     def _refine_by_equalities(self, a: KResultConstraint, equality_pairs: T.List[T.Tuple[Kore.EVar, Kore.EVar]]) -> KResultConstraint:
         # We ignore transitivity of equality for now, because

@@ -1,11 +1,14 @@
 import dataclasses
 import itertools
+import logging
 import typing as T
 
 import pyk.kore.syntax as Kore
 
 from kaipy.AbstractionContext import AbstractionContext
 from kaipy.interfaces.IAbstractConstraintDomain import IAbstractConstraint, IAbstractConstraintDomain
+
+_LOGGER: T.Final = logging.getLogger(__name__)
 
 @dataclasses.dataclass
 class ProductConstraint(IAbstractConstraint):
@@ -21,7 +24,8 @@ class ProductConstraintDomain(IAbstractConstraintDomain):
         ovs = over_variables.copy()
         underlying: T.List[IAbstractConstraint] = list()
         for ud in self.underlying_domains:
-            a = ud.abstract(ctx, over_variables=ovs, constraints=constraints)
+            _LOGGER.warning(f"ovs: {ovs}")
+            a = ud.abstract(ctx, over_variables=ovs, constraints=constraints+ctx.broadcast_channel.constraints)
             ovs.update(ud.free_variables_of(a))
             underlying.append(a)
         
@@ -29,7 +33,7 @@ class ProductConstraintDomain(IAbstractConstraintDomain):
     
     def free_variables_of(self, a: IAbstractConstraint) -> T.Set[Kore.EVar]:
         assert type(a) is ProductConstraint
-        return set(*itertools.chain(ud.free_variables_of(ua) for ud,ua in zip(self.underlying_domains, a.underlying)))
+        return set(itertools.chain(*[ud.free_variables_of(ua) for ud,ua in zip(self.underlying_domains, a.underlying)]))
     
     def refine(self, ctx: AbstractionContext, a: IAbstractConstraint, constraints: T.List[Kore.Pattern]) -> IAbstractConstraint:
         assert type(a) is ProductConstraint
@@ -56,7 +60,7 @@ class ProductConstraintDomain(IAbstractConstraintDomain):
 
     def concretize(self, a: IAbstractConstraint) -> T.List[Kore.Pattern]:
         assert type(a) is ProductConstraint
-        return list(*itertools.chain(ud.concretize(ua) for ud,ua in zip(self.underlying_domains, a.underlying)))
+        return list(itertools.chain(*[ud.concretize(ua) for ud,ua in zip(self.underlying_domains, a.underlying)]))
 
     def subsumes(self, a1: IAbstractConstraint, a2: IAbstractConstraint) -> bool:
         assert type(a1) is ProductConstraint

@@ -175,24 +175,24 @@ class FinitePatternDomain(IAbstractPatternDomain):
         _LOGGER.warning(f"fp1.renaming = {fp1.renaming}")
         _LOGGER.warning(f"renaming2 = {renaming_2}")
 
-        #constraints: T.List[Kore.MLPred] = list()
+        constraints: T.List[Kore.MLPred] = list()
         fvc = set((fp1.renaming or dict()).values())
         #renaming_back = KoreUtils.reverse_renaming(fp1.renaming or dict())
         renaming_back: T.Dict[str,str] = dict()
-        # for x in constraints_all:
-        #     match x:
-        #         case Kore.Equals(_, _, Kore.EVar(n1, s1), Kore.EVar(n2, s2)):
-        #             continue
-        #         case Kore.Equals(os, s, Kore.EVar(n1, s1), right):
-        #             if n1 in fvc:
-        #                 constraints.append(Kore.Equals(os, s, Kore.EVar(renaming_2[renaming_back[n1]], s1), right))
-        #         case Kore.Equals(os, s, left, Kore.EVar(n2, s2)):
-        #             if n2 in fvc:
-        #                 constraints.append(Kore.Equals(os, s, Kore.EVar(renaming_2[renaming_back[n2]], s2), left))
-        constraints = [
-            KoreUtils.rename_vars(renaming_2, KoreUtils.rename_vars(renaming_back, x))
-            for x in constraints_all
-        ]
+        for x in constraints_all:
+            match x:
+                #case Kore.Equals(_, _, Kore.EVar(n1, s1), Kore.EVar(n2, s2)):
+                #    continue
+                case Kore.Equals(os, s, Kore.EVar(n1, s1), right):
+                    if n1 in fvc:
+                        constraints.append(Kore.Equals(os, s, Kore.EVar(renaming_2[renaming_back[n1]], s1), right))
+                case Kore.Equals(os, s, left, Kore.EVar(n2, s2)):
+                    if n2 in fvc:
+                        constraints.append(Kore.Equals(os, s, Kore.EVar(renaming_2[renaming_back[n2]], s2), left))
+        # constraints = [
+        #     KoreUtils.rename_vars(renaming_2, KoreUtils.rename_vars(renaming_back, x))
+        #     for x in constraints_all
+        # ]
         _LOGGER.warning(f"Constraints: {[x.text for x in constraints]}")
         
         if len(constraints) > 0:

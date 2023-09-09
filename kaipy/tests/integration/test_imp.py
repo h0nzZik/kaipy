@@ -173,6 +173,7 @@ class TestImp(MyTest):
         concrete_text = r'''\and{SortGeneratedTopCell{}}(Lbl'-LT-'generatedTop'-GT-'{}(Lbl'-LT-'T'-GT-'{}(Lbl'-LT-'k'-GT-'{}(kseq{}(inj{SortStmt{}, SortKItem{}}(Lbl'UndsEqlsUndsSClnUnds'IMP-SYNTAX'Unds'Stmt'Unds'Id'Unds'AExp{}(\dv{SortId{}}("x"), inj{SortInt{}, SortAExp{}}(\dv{SortInt{}}("3")))), kseq{}(Lbl'Hash'freezer'UndsUndsUnds'IMP-SYNTAX'Unds'Stmt'Unds'Stmt'Unds'Stmt1'Unds'{}(kseq{}(inj{SortStmt{}, SortKItem{}}(VARVSortStmtX0 : SortStmt{}), dotk{}())), VARVSortKX1 : SortK{}))), VARVSortStateCellX2 : SortStateCell{}, Lbl'-LT-'args'-GT-'{}(VARVSortListX3 : SortList{})), Lbl'-LT-'generatedCounter'-GT-'{}(\dv{SortInt{}}("0"))), \equals{SortBool{}, SortGeneratedTopCell{}}(\dv{SortBool{}}("true"), LblisKResult{}(kseq{}(inj{SortStmt{}, SortKItem{}}(VARVSortStmtX0 : SortStmt{}), dotk{}()))))'''
         parser = KoreParser(concrete_text)
         concrete = parser.pattern()
+        _LOGGER.warning(f"concretized: {reachability_system.kprint.kore_to_pretty(concrete)}")
         a = pattern_domain.abstract(ctx=ctx, c=concrete)
         _LOGGER.warning(f"a: {pattern_domain.to_str(a, indent=0)}")
         concretized = pattern_domain.concretize(a)
