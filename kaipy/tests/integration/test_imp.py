@@ -160,12 +160,13 @@ class TestImp(MyTest):
         reachability_system: ReachabilitySystem,
         context_aliases : ContextAliases
     ):
-        pat = Kore.App(symbol="Lbl'Hash'freezer'UndsPlusUndsUnds'IMP-SYNTAX'Unds'AExp'Unds'AExp'Unds'AExp1'Unds'", sorts=(), args=(Kore.App('kseq', (), (Kore.EVar('HOLE', Kore.SortApp('SortKItem', ())),KorePrelude.DOTK)),))
+        pat1 = Kore.App(symbol="Lbl'Hash'freezer'UndsPlusUndsUnds'IMP-SYNTAX'Unds'AExp'Unds'AExp'Unds'AExp1'Unds'", sorts=(), args=(Kore.App('kseq', (), (Kore.EVar('HOLE', Kore.SortApp('SortKItem', ())),KorePrelude.DOTK)),))
+        pat2 = Kore.App(symbol="Lbl'Hash'freezer'UndsPlusUndsUnds'IMP-SYNTAX'Unds'AExp'Unds'AExp'Unds'AExp1'Unds'", sorts=(), args=(Kore.App('kseq', (), (Kore.EVar('XYZ', Kore.SortApp('SortKItem', ())),KorePrelude.DOTK)),))
         ctx = make_ctx()
         fpd: IAbstractPatternDomain = FinitePatternDomain(rs=reachability_system, pl=[
-            pat,
+            pat1,
         ])
-        a = fpd.abstract(ctx=ctx, c=pat)
+        a = fpd.abstract(ctx=ctx, c=pat2)
         concretized = fpd.concretize(a)
         #print(a)
         #print(concretized)
@@ -174,7 +175,9 @@ class TestImp(MyTest):
             case Kore.App("Lbl'Hash'freezer'UndsPlusUndsUnds'IMP-SYNTAX'Unds'AExp'Unds'AExp'Unds'AExp1'Unds'", (), (Kore.App('kseq', (), (ev1, KorePrelude.DOTK)),)):
                 #print(ev1)
                 match ctx.broadcast_channel.constraints:
-                    case [Kore.Equals(_, _, ev1, Kore.EVar('HOLE', Kore.SortApp('SortKItem', ())))]:
+                    case [Kore.Equals(_, _, ev1, Kore.EVar('XYZ', Kore.SortApp('SortKItem', ())))]:
+                        assert True
+                    case [Kore.Equals(_, _, Kore.EVar('XYZ', Kore.SortApp('SortKItem', ())), ev1)]:
                         assert True
                     case _:
                         assert False
