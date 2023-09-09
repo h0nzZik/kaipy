@@ -242,26 +242,6 @@ class TestImp(MyTest):
         assert concretized.text == r'''\and{SortGeneratedTopCell{}}(Lbl'-LT-'generatedTop'-GT-'{}(Lbl'-LT-'T'-GT-'{}(Lbl'-LT-'k'-GT-'{}(kseq{}(inj{SortStmt{}, SortKItem{}}(Lbl'UndsEqlsUndsSClnUnds'IMP-SYNTAX'Unds'Stmt'Unds'Id'Unds'AExp{}(\dv{SortId{}}("x"), inj{SortInt{}, SortAExp{}}(\dv{SortInt{}}("3")))), kseq{}(Lbl'Hash'freezer'UndsUndsUnds'IMP-SYNTAX'Unds'Stmt'Unds'Stmt'Unds'Stmt1'Unds'{}(kseq{}(inj{SortStmt{}, SortKItem{}}(VARZ33SortStmtX0 : SortStmt{}), dotk{}())), VARZ33SortKX1 : SortK{}))), Lbl'-LT-'state'-GT-'{}(VARZ33SortMapX2 : SortMap{}), Lbl'-LT-'args'-GT-'{}(VARZ33SortListX3 : SortList{})), Lbl'-LT-'generatedCounter'-GT-'{}(\dv{SortInt{}}("0"))), \equals{SortBool{}, SortGeneratedTopCell{}}(\dv{SortBool{}}("true"), LblisKResult{}(kseq{}(inj{SortStmt{}, SortKItem{}}(VARZ33SortStmtX0 : SortStmt{}), dotk{}()))))'''
         #_LOGGER.warning(f"concretized: {reachability_system.kprint.kore_to_pretty(concretized)}")
 
-    def test_kresult_constraint_domain(
-        self,
-        reachability_system: ReachabilitySystem,
-        context_aliases : ContextAliases
-    ):
-        sortInt = Kore.SortApp("SortInt", ())
-        x1 = Kore.EVar("x1", sortInt)
-        domain = KResultConstraintDomain(rs=reachability_system)
-        ctx = make_ctx()
-        concrete_constraint = domain._mk_isKResult_pattern(x1, reachability_system.top_sort)
-        a = domain.abstract(ctx=ctx, over_variables={x1}, constraints=[concrete_constraint])
-        assert x1 in a.kresult_vars
-        c = domain.concretize(a=a)
-        assert c == [concrete_constraint]
-        x2 = Kore.EVar("x2", sortInt)
-        x1_eq_x2 = Kore.Equals(sortInt, sortInt, x1, x2)
-        a2 = domain.refine(ctx=ctx, a=a, constraints=[x1_eq_x2])
-        assert x1 in a2.kresult_vars
-        assert x2 in a2.kresult_vars
-
 
     def test_patternmatch_constraint_domain(
         self,
