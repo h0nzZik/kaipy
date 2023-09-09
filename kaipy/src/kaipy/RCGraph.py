@@ -10,14 +10,15 @@ from .kore_utils import (
     extract_equalities_from_witness,
     free_evars_of_pattern,
     get_lhs,
-    get_predicates,
     get_rhs,
     is_bottom,
     mapping_to_pattern,
     rename_vars,
 )
+import kaipy.predicate_filter as PredicateFilter
+import kaipy.kore_utils as KoreUtils
 from .ReachabilitySystem import ReachabilitySystem
-from .rs_utils import cleanup_eqs, cleanup_pattern, make_conjunction
+from .rs_utils import make_conjunction
 
 
 def compose_rules(
@@ -42,7 +43,7 @@ def compose_rules(
         Kore.And(
             rs.top_sort,
             Kore.And(
-                rs.top_sort, curr_rhs, make_conjunction(rs, get_predicates(curr_lhs))
+                rs.top_sort, curr_rhs, make_conjunction(rs, PredicateFilter.get_predicates(curr_lhs))
             ),
             other_lhs_renamed,
         )
@@ -57,7 +58,7 @@ def compose_rules(
     eqs1, rest1 = extract_equalities_and_rest_from_witness(
         {v.name for v in free_evars_of_pattern(curr_lhs)}, simplified_conj
     )
-    preds1 = get_predicates(rest1) if rest1 is not None else []
+    preds1 = PredicateFilter.get_predicates(rest1) if rest1 is not None else []
     # print(f"lhs1 equalities: {eqs1}")
     eqs2 = extract_equalities_from_witness(
         {v.name for v in free_evars_of_pattern(other_rhs_renamed)}, simplified_conj
@@ -86,9 +87,9 @@ def compose_rules(
     # After the simplification, the intermediate variables (from 'other_renaming') should disappear
     # print(f"New lhs {rs.kprint.kore_to_pretty(new_lhs)}")
     # print(f"New rhs {rs.kprint.kore_to_pretty(new_rhs)}")
-    new_lhs_clean = cleanup_pattern(rs, new_lhs)
+    new_lhs_clean = KoreUtils.cleanup_pattern(rs.top_sort, new_lhs)
 
-    new_rhs_clean = cleanup_pattern(rs, new_rhs)
+    new_rhs_clean = KoreUtils.cleanup_pattern(rs.top_sort, new_rhs)
     # print(f"New lhs clean {rs.kprint.kore_to_pretty(new_lhs_clean)}")
     # print(f"New rhs clean {rs.kprint.kore_to_pretty(new_rhs_clean)}")
     rewrite = Kore.Rewrites(rs.top_sort, new_lhs_clean, new_rhs_clean)

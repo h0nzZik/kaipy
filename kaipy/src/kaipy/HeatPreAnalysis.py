@@ -10,13 +10,8 @@ import pyk.kore.syntax as Kore
 import kaipy.rs_utils as RSUtils
 from kaipy.KompiledDefinitionWrapper import KompiledDefinitionWrapper
 
-from .kore_utils import (
-    extract_equalities_from_witness,
-    free_evars_of_pattern,
-    some_subpatterns_of,
-)
+import kaipy.kore_utils as KoreUtils
 from .ReachabilitySystem import ReachabilitySystem
-from .rs_utils import cleanup_pattern
 
 _LOGGER: T.Final = logging.getLogger(__name__)
 
@@ -121,7 +116,7 @@ def collect_rests(
         # _LOGGER.info(
         #    f"input_pattern_simplified0: {rs.kprint.kore_to_pretty(input_pattern_simplified0)}"
         # )
-        input_pattern_simplified = cleanup_pattern(rs, input_pattern_simplified0)
+        input_pattern_simplified = KoreUtils.cleanup_pattern(rs.top_sort, input_pattern_simplified0)
         # input_pattern_simplified = input_pattern_simplified0
         # _LOGGER.info(
         #    f"input_pattern_simplified: {rs.kprint.kore_to_pretty(input_pattern_simplified)}"
@@ -145,8 +140,8 @@ def collect_rests(
                 names = [
                     v.name
                     for v in (
-                        free_evars_of_pattern(side_condition).union(
-                            free_evars_of_pattern(input_pattern_simplified)
+                        KoreUtils.free_evars_of_pattern(side_condition).union(
+                            KoreUtils.free_evars_of_pattern(input_pattern_simplified)
                         )
                     )
                 ]
@@ -243,7 +238,7 @@ def get_direct_subterms(t: Kore.Pattern) -> T.List[Kore.Pattern]:
 def collect_rests_recursively(
     rs: ReachabilitySystem, ca: ContextAlias, term: Kore.Pattern
 ) -> T.List[Kore.Pattern]:
-    subs = some_subpatterns_of(term)
+    subs = KoreUtils.some_subpatterns_of(term)
     to_reduce = {term}
     rests: T.List[Kore.Pattern] = []
     iteration = 0

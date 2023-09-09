@@ -17,10 +17,16 @@ import kaipy.rs_utils as RSUtils
 from kaipy.interfaces.IAbstractSubstitutionDomain import IAbstractSubstitutionDomain
 from kaipy.interfaces.IAbstractPatternDomain import IAbstractPatternDomain
 
+from kaipy.AbstractionContext import AbstractionContext
+from kaipy.DefaultAbstractionContext import make_ctx
 from kaipy.HeatPreAnalysis import ContextAlias, ContextAliases, pre_analyze
 from kaipy.ReachabilitySystem import ReachabilitySystem
+from kaipy.domains.FinitePatternDomain import FinitePattern, FinitePatternDomain
+from kaipy.domains.PatternMatchDomain import PatternMatchDomain, PatternMatchDomainElement
 from kaipy.domains.BigsumPatternDomain import BigsumPattern, BigsumPatternDomain
 from kaipy.domains.ExactPatternDomain import ExactPattern, ExactPatternDomain
+from kaipy.domains.KResultConstraintDomain import KResultConstraint, KResultConstraintDomain
+from kaipy.domains.KeepEverythingConstraintDomain import KeepEverything, KeepEverythingConstraintDomain
 from kaipy.testing.testingbase import RSTestBase
 from kaipy.DefaultAbstractionContext import make_ctx
 from kaipy.DefaultPatternDomain import build_abstract_pattern_domain
@@ -144,10 +150,131 @@ class TestImp(MyTest):
             pattern_domain=pattern_domain,
             initial_configuration=input_pattern,
         )
-        _LOGGER.warning(f"abstract: {pattern_domain.to_str(result.reachable_configurations)}")
+        _LOGGER.warning(f"abstract: {pattern_domain.to_str(result.reachable_configurations, indent=0)}")
         concrete_reachable_configurations = pattern_domain.concretize(result.reachable_configurations)
         _LOGGER.warning(reachability_system.kprint.kore_to_pretty(concrete_reachable_configurations))
         return result
+    
+    def test_finitepd_cooperation(
+        self,
+        reachability_system: ReachabilitySystem,
+        context_aliases : ContextAliases
+    ):
+        pat1 = Kore.App(symbol="Lbl'Hash'freezer'UndsPlusUndsUnds'IMP-SYNTAX'Unds'AExp'Unds'AExp'Unds'AExp1'Unds'", sorts=(), args=(Kore.App('kseq', (), (Kore.EVar('HOLE', Kore.SortApp('SortKItem', ())),KorePrelude.DOTK)),))
+        pat2 = Kore.App(symbol="Lbl'Hash'freezer'UndsPlusUndsUnds'IMP-SYNTAX'Unds'AExp'Unds'AExp'Unds'AExp1'Unds'", sorts=(), args=(Kore.App('kseq', (), (Kore.EVar('XYZ', Kore.SortApp('SortKItem', ())),KorePrelude.DOTK)),))
+        ctx = make_ctx()
+        fpd: IAbstractPatternDomain = FinitePatternDomain(rs=reachability_system, pl=[
+            pat1,
+        ])
+        a = fpd.abstract(ctx=ctx, c=pat2)
+        concretized = fpd.concretize(a)
+        #print(a)
+        #print(concretized)
+        #print(ctx.broadcast_channel.constraints)
+        match concretized:
+            case Kore.App("Lbl'Hash'freezer'UndsPlusUndsUnds'IMP-SYNTAX'Unds'AExp'Unds'AExp'Unds'AExp1'Unds'", (), (Kore.App('kseq', (), (ev1, KorePrelude.DOTK)),)):
+                #print(ev1)
+                match ctx.broadcast_channel.constraints:
+                    case [Kore.Equals(_, _, ev1, Kore.EVar('XYZ', Kore.SortApp('SortKItem', ())))]:
+                        assert True
+                    case [Kore.Equals(_, _, Kore.EVar('XYZ', Kore.SortApp('SortKItem', ())), ev1)]:
+                        assert True
+                    case _:
+                        assert False
+                assert True
+            case _:
+                assert False
+        assert True
+
+    def test_dotk(
+        self,
+        reachability_system: ReachabilitySystem,
+        context_aliases : ContextAliases
+    ):
+        input_pattern: Kore.Pattern = reachability_system.kdw.get_input_kore(
+            RSTestBase.LANGUAGES / "imp/very-simple.imp"
+        )
+
+        rests = pre_analyze(reachability_system, context_aliases, input_pattern)
+        pattern_domain = build_abstract_pattern_domain(
+            reachability_system,
+            rests,
+            input_pattern
+        )
+        ctx = make_ctx()
+        #concrete_text = r'''Lbl'-LT-'generatedTop'-GT-'{}(Lbl'-LT-'T'-GT-'{}(Lbl'-LT-'k'-GT-'{}(kseq{}(inj{SortStmt{}, SortKItem{}}(Lblint'UndsSClnUnds'IMP-SYNTAX'Unds'Stmt'Unds'Ids{}(Lbl'Stop'List'LBraQuotUndsCommUndsUnds'IMP-SYNTAX'Unds'Ids'Unds'Id'Unds'Ids'QuotRBraUnds'Ids{}())), kseq{}(Lbl'Hash'freezer'UndsUndsUnds'IMP-SYNTAX'Unds'Stmt'Unds'Stmt'Unds'Stmt0'Unds'{}(kseq{}(inj{SortStmt{}, SortKItem{}}(Lbl'UndsEqlsUndsSClnUnds'IMP-SYNTAX'Unds'Stmt'Unds'Id'Unds'AExp{}(\dv{SortId{}}("x"), inj{SortInt{}, SortAExp{}}(\dv{SortInt{}}("3")))), dotk{}())), dotk{}()))), Lbl'-LT-'state'-GT-'{}(Lbl'UndsPipe'-'-GT-Unds'{}(inj{SortId{}, SortKItem{}}(\dv{SortId{}}("x")), inj{SortInt{}, SortKItem{}}(\dv{SortInt{}}("0")))), Lbl'-LT-'args'-GT-'{}(VARVSortListX0 : SortList{})), Lbl'-LT-'generatedCounter'-GT-'{}(\dv{SortInt{}}("0")))'''
+        concrete_text = r'''Lbl'-LT-'generatedTop'-GT-'{}(Lbl'-LT-'T'-GT-'{}(Lbl'-LT-'k'-GT-'{}(kseq{}(inj{SortStmt{}, SortKItem{}}(Lblint'UndsSClnUnds'IMP-SYNTAX'Unds'Stmt'Unds'Ids{}(Lbl'Stop'List'LBraQuotUndsCommUndsUnds'IMP-SYNTAX'Unds'Ids'Unds'Id'Unds'Ids'QuotRBraUnds'Ids{}())), kseq{}(Lbl'Hash'freezer'UndsUndsUnds'IMP-SYNTAX'Unds'Stmt'Unds'Stmt'Unds'Stmt0'Unds'{}(kseq{}(inj{SortStmt{}, SortKItem{}}(Lbl'UndsEqlsUndsSClnUnds'IMP-SYNTAX'Unds'Stmt'Unds'Id'Unds'AExp{}(\dv{SortId{}}("x"), inj{SortInt{}, SortAExp{}}(\dv{SortInt{}}("3")))), dotk{}())), dotk{}()))), Lbl'-LT-'state'-GT-'{}(Lbl'UndsPipe'-'-GT-Unds'{}(inj{SortId{}, SortKItem{}}(\dv{SortId{}}("x")), inj{SortInt{}, SortKItem{}}(\dv{SortInt{}}("0")))), Lbl'-LT-'args'-GT-'{}(VARVSortListX0 : SortList{})), Lbl'-LT-'generatedCounter'-GT-'{}(\dv{SortInt{}}("0")))'''
+        parser = KoreParser(concrete_text)
+        concrete = parser.pattern()
+        #_LOGGER.warning(f"concrete: {reachability_system.kprint.kore_to_pretty(concrete)}")
+        a = pattern_domain.abstract(ctx=ctx, c=concrete)
+        _LOGGER.warning(f"a: {pattern_domain.to_str(a, indent=0)}")
+        #assert a.
+        concretized = pattern_domain.concretize(a)
+        _LOGGER.warning(f"concretized: {reachability_system.kprint.kore_to_pretty(concretized)}")
+        
+
+    def test_kresult_cooperation(
+        self,
+        reachability_system: ReachabilitySystem,
+        context_aliases : ContextAliases
+    ):
+        input_pattern: Kore.Pattern = reachability_system.kdw.get_input_kore(
+            RSTestBase.LANGUAGES / "imp/very-simple.imp"
+        )
+
+        rests = pre_analyze(reachability_system, context_aliases, input_pattern)
+        pattern_domain = build_abstract_pattern_domain(
+            reachability_system,
+            rests,
+            input_pattern
+        )
+        ctx = make_ctx()
+        concrete_text = r'''\and{SortGeneratedTopCell{}}(Lbl'-LT-'generatedTop'-GT-'{}(Lbl'-LT-'T'-GT-'{}(Lbl'-LT-'k'-GT-'{}(kseq{}(inj{SortStmt{}, SortKItem{}}(Lbl'UndsEqlsUndsSClnUnds'IMP-SYNTAX'Unds'Stmt'Unds'Id'Unds'AExp{}(\dv{SortId{}}("x"), inj{SortInt{}, SortAExp{}}(\dv{SortInt{}}("3")))), kseq{}(Lbl'Hash'freezer'UndsUndsUnds'IMP-SYNTAX'Unds'Stmt'Unds'Stmt'Unds'Stmt1'Unds'{}(kseq{}(inj{SortStmt{}, SortKItem{}}(VARVSortStmtX0 : SortStmt{}), dotk{}())), VARVSortKX1 : SortK{}))), VARVSortStateCellX2 : SortStateCell{}, Lbl'-LT-'args'-GT-'{}(VARVSortListX3 : SortList{})), Lbl'-LT-'generatedCounter'-GT-'{}(\dv{SortInt{}}("0"))), \equals{SortBool{}, SortGeneratedTopCell{}}(\dv{SortBool{}}("true"), LblisKResult{}(kseq{}(inj{SortStmt{}, SortKItem{}}(VARVSortStmtX0 : SortStmt{}), dotk{}()))))'''
+        parser = KoreParser(concrete_text)
+        concrete = parser.pattern()
+        #_LOGGER.warning(f"concrete: {reachability_system.kprint.kore_to_pretty(concrete)}")
+        a = pattern_domain.abstract(ctx=ctx, c=concrete)
+        _LOGGER.warning(f"a: {pattern_domain.to_str(a, indent=0)}")
+        #assert a.
+        concretized = pattern_domain.concretize(a)
+        #_LOGGER.warning(f"concretized_text: {concretized.text}")
+        assert concretized.text == r'''\and{SortGeneratedTopCell{}}(Lbl'-LT-'generatedTop'-GT-'{}(Lbl'-LT-'T'-GT-'{}(Lbl'-LT-'k'-GT-'{}(kseq{}(inj{SortStmt{}, SortKItem{}}(Lbl'UndsEqlsUndsSClnUnds'IMP-SYNTAX'Unds'Stmt'Unds'Id'Unds'AExp{}(\dv{SortId{}}("x"), inj{SortInt{}, SortAExp{}}(\dv{SortInt{}}("3")))), kseq{}(Lbl'Hash'freezer'UndsUndsUnds'IMP-SYNTAX'Unds'Stmt'Unds'Stmt'Unds'Stmt1'Unds'{}(kseq{}(inj{SortStmt{}, SortKItem{}}(VARZ33SortStmtX0 : SortStmt{}), dotk{}())), VARZ33SortKX1 : SortK{}))), Lbl'-LT-'state'-GT-'{}(VARZ33SortMapX2 : SortMap{}), Lbl'-LT-'args'-GT-'{}(VARZ33SortListX3 : SortList{})), Lbl'-LT-'generatedCounter'-GT-'{}(\dv{SortInt{}}("0"))), \equals{SortBool{}, SortGeneratedTopCell{}}(\dv{SortBool{}}("true"), LblisKResult{}(kseq{}(inj{SortStmt{}, SortKItem{}}(VARZ33SortStmtX0 : SortStmt{}), dotk{}()))))'''
+        #_LOGGER.warning(f"concretized: {reachability_system.kprint.kore_to_pretty(concretized)}")
+
+
+    def test_patternmatch_constraint_domain(
+        self,
+        reachability_system: ReachabilitySystem,
+        context_aliases : ContextAliases
+    ):
+        sortKItem = Kore.SortApp("SortKItem", ())
+        sortInt = Kore.SortApp("SortInt", ())
+        x1_kitem = Kore.EVar("x1", sortKItem)
+        x2_int = Kore.EVar("x2", sortInt)
+        y1_k = Kore.EVar("y1", KorePrelude.SORT_K)
+
+        underlying_domain = KeepEverythingConstraintDomain()
+        st1 = Kore.App('kseq', (), (x1_kitem,y1_k))
+        st1_constrained = Kore.And(KorePrelude.SORT_K, st1, Kore.Not(KorePrelude.SORT_K, Kore.Equals(sortKItem, KorePrelude.SORT_K, x1_kitem, KorePrelude.inj(sortInt, sortKItem, x2_int))))
+        pm_domain = PatternMatchDomain(
+            rs=reachability_system,
+            underlying_domains=[underlying_domain],
+            states=[(st1,"only")])
+        #print(pm_domain)
+        ctx = make_ctx()
+        a1 = pm_domain.abstract(ctx=ctx, c=st1_constrained)
+        #print(a1)
+        #print(f"a: {pm_domain.to_str(a1, indent=0)}")
+        #print(f"renaming: {a1.renaming}")
+        c1 = pm_domain.concretize(a1)
+        #_LOGGER.warning(c1.text)
+        match c1:
+            #case Kore.And(_, Kore.App('kseq', _, (Kore.EVar(_, _), Kore.EVar(_, _))), Kore.And(_, _, Kore.Not(_, Kore.Equals(_, _, _, _)))):
+            case Kore.And(_, Kore.App('kseq', _, (Kore.EVar(_, _), Kore.EVar(_, _))), Kore.Not(_, Kore.Equals(_, _, _, _))):
+                assert True
+            case _:
+                assert False
 
     def test_analyze_very_simple(
         self,

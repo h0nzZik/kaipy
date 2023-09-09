@@ -3,14 +3,11 @@ import pyk.kore.syntax as Kore
 
 from kaipy.AbstractionContext import AbstractionContext
 from kaipy.VariableManager import VariableManager
-from kaipy.IBroadcastChannel import IBroadcastChannel
+from kaipy.BroadcastChannel import BroadcastChannel
 
 
 def make_ctx() -> AbstractionContext:
-    class BC(IBroadcastChannel):
-        def broadcast(self, m: T.List[Kore.MLPred]):
-            pass
-    bc = BC()
+    bc = BroadcastChannel()
     vm = VariableManager(5) # TODO generate high-enough number
     ctx = AbstractionContext(broadcast_channel=bc, variable_manager=vm)
     return ctx

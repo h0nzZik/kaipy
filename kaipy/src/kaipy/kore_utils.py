@@ -1,24 +1,21 @@
 import functools
 import typing as T
 from itertools import chain, product
+import logging
 
 import pyk.kore.syntax as Kore
 from pyk.kore.manip import free_occs
 
+import kaipy.predicate_filter as PredicateFilter
+import kaipy.BasicKoreUtils as BasicKoreUtils
 
+_LOGGER: T.Final = logging.getLogger(__name__)
 
 def make_conjunction(sort, l: T.Sequence[Kore.Pattern]) -> Kore.Pattern:
-    result: Kore.Pattern = Kore.Top(sort)
-    for x in l:
-        result = Kore.And(sort, result, x)
-    return result
+    return BasicKoreUtils.make_conjunction(sort, l)
 
 def make_disjunction(sort, l: T.Sequence[Kore.Pattern]) -> Kore.Pattern:
-    result: Kore.Pattern = Kore.Bottom(sort)
-    for x in l:
-        result = Kore.Or(sort, result, x)
-    return result
-
+    return BasicKoreUtils.make_disjunction(sort, l)
 
 class DefinitionError(Exception):
     pass
@@ -179,53 +176,54 @@ def get_top_cell_initializer(definition: Kore.Definition) -> str:
     raise DefinitionError("topCellInitializer not found")
 
 
-def rename_vars(renaming: T.Dict[str, str], phi: Kore.Pattern) -> Kore.Pattern:
+def rename_vars(renaming: T.Mapping[str, str], phi: Kore.Pattern, total: bool = False) -> Kore.Pattern:
     match phi:
         # The main case
         case Kore.EVar(name, sort):
             if name in renaming:
                 return Kore.EVar(renaming[name], sort)
+            assert not total
             return Kore.EVar(name, sort)
 
         # The recursive cases
         case Kore.App(symbol_name, sorts, args):
             return Kore.App(
-                symbol_name, sorts, tuple(map(lambda p: rename_vars(renaming, p), args))
+                symbol_name, sorts, tuple(map(lambda p: rename_vars(renaming, p, total=total), args))
             )
         case Kore.Not(sort, pattern):
-            return Kore.Not(sort, rename_vars(renaming, pattern))
+            return Kore.Not(sort, rename_vars(renaming, pattern, total=total))
         case Kore.And(sort, left, right):
             return Kore.And(
-                sort, rename_vars(renaming, left), rename_vars(renaming, right)
+                sort, rename_vars(renaming, left, total=total), rename_vars(renaming, right, total=total)
             )
         case Kore.Or(sort, left, right):
             return Kore.Or(
-                sort, rename_vars(renaming, left), rename_vars(renaming, right)
+                sort, rename_vars(renaming, left, total=total), rename_vars(renaming, right, total=total)
             )
         case Kore.Implies(sort, left, right):
             return Kore.Implies(
-                sort, rename_vars(renaming, left), rename_vars(renaming, right)
+                sort, rename_vars(renaming, left, total=total), rename_vars(renaming, right, total=total)
             )
         case Kore.Iff(sort, left, right):
             return Kore.Iff(
-                sort, rename_vars(renaming, left), rename_vars(renaming, right)
+                sort, rename_vars(renaming, left, total=total), rename_vars(renaming, right, total=total)
             )
         case Kore.Exists(sort, var, pattern):
             new_dict = dict(renaming)
             new_dict.update({var.name: var.name})
-            return Kore.Exists(sort, var, rename_vars(new_dict, pattern))
+            return Kore.Exists(sort, var, rename_vars(new_dict, pattern, total=total))
         case Kore.Forall(sort, var, pattern):
             new_dict = dict(renaming)
             new_dict.update({var.name: var.name})
-            return Kore.Forall(sort, var, rename_vars(new_dict, pattern))
+            return Kore.Forall(sort, var, rename_vars(new_dict, pattern, total=total))
         # Base cases
         case Kore.Equals(op_sort, sort, left, right):
             return Kore.Equals(
-                op_sort, sort, rename_vars(renaming, left), rename_vars(renaming, right)
+                op_sort, sort, rename_vars(renaming, left, total=total), rename_vars(renaming, right, total=total)
             )
         case Kore.In(op_sort, sort, left, right):
             return Kore.In(
-                op_sort, sort, rename_vars(renaming, left), rename_vars(renaming, right)
+                op_sort, sort, rename_vars(renaming, left, total=total), rename_vars(renaming, right, total=total)
             )
         case Kore.DV(_, _):
             return phi
@@ -238,9 +236,9 @@ def rename_vars(renaming: T.Dict[str, str], phi: Kore.Pattern) -> Kore.Pattern:
         case Kore.Bottom(_):
             return phi
         case Kore.Ceil(op_sort, sort, pattern):
-            return Kore.Ceil(op_sort, sort, rename_vars(renaming, pattern))
+            return Kore.Ceil(op_sort, sort, rename_vars(renaming, pattern, total=total))
         case Kore.Floor(op_sort, sort, pattern):
-            return Kore.Floor(op_sort, sort, rename_vars(renaming, pattern))
+            return Kore.Floor(op_sort, sort, rename_vars(renaming, pattern, total=total))
         case _:
             print(f"renaming not implemented for {phi}")
             raise NotImplementedError()
@@ -502,30 +500,6 @@ def compute_renaming(
         vars_to_avoid=vars_to_avoid, vars_to_rename=list(free_evars_of_pattern(patt))
     )
 
-
-def filter_out_predicates(
-    phi: Kore.Pattern,
-) -> T.Tuple[T.Optional[Kore.Pattern], T.List[Kore.MLPred]]:
-    if issubclass(type(phi), Kore.MLPred):
-        return None, [phi] # type: ignore
-    match phi:
-        case Kore.And(sort, left, right):
-            lf, ps1 = filter_out_predicates(left)
-            rf, ps2 = filter_out_predicates(right)
-            if lf is None:
-                return rf, (ps1 + ps2)
-            if rf is None:
-                return lf, (ps1 + ps2)
-            return Kore.And(sort, lf, rf), (ps1 + ps2)
-        case _:
-            return phi, []
-
-
-def get_predicates(phi: Kore.Pattern) -> T.List[Kore.MLPred]:
-    _, preds = filter_out_predicates(phi)
-    return preds
-
-
 def is_bottom(pattern: Kore.Pattern) -> bool:
     match pattern:
         case Kore.Bottom(_):
@@ -578,10 +552,67 @@ def and_to_list(phi: Kore.Pattern) -> T.List[Kore.Pattern]:
             return [phi]
 
 
-def normalize_pattern(cfg: Kore.Pattern) -> Kore.Pattern:
-    vs = free_occs_det(cfg)
+def normalize_pattern(cfg: Kore.Pattern, prefix="V") -> Kore.Pattern:
+    vs = list(dict.fromkeys(free_occs_det(cfg))) # We need to eliminate duplicates, https://stackoverflow.com/a/7961390/6209703
     # Different sorts will have different namespaces.
     # This way we avoid clashes of names like `X:SortInt` with `X:SortList`
     #renaming = { v.name : (f"VAR'V{v.sort.name}'{str(i)}") for i,v in enumerate(vs)}
-    renaming = { v.name : (f"VARV{v.sort.name}X{str(i)}") for i,v in enumerate(vs)}
-    return rename_vars(renaming, cfg)
+    renaming = { v.name : (f"VAR{prefix}{v.sort.name}X{str(i)}") for i,v in enumerate(vs)}
+    return rename_vars(renaming, cfg, total=True)
+
+
+def let_sort_rec(sort: Kore.Sort, phi: Kore.Pattern) -> Kore.Pattern:
+    match phi:
+        case Kore.And(_, left, right):
+            return Kore.And(sort, let_sort_rec(sort, left), let_sort_rec(sort, right))
+        case Kore.Or(_, left, right):
+            return Kore.Or(sort, let_sort_rec(sort, left), let_sort_rec(sort, right))
+        case Kore.Top(_):
+            return Kore.Top(sort)
+        case Kore.Bottom(_):
+            return Kore.Bottom(sort)
+        case Kore.Equals(os, _, left, right):
+            return Kore.Equals(os, sort, left, right)
+        case Kore.In(os, _, left, right):
+            return Kore.In(os, sort, left, right)
+        case Kore.Floor(os, _, phi):
+            return Kore.Floor(os, sort, phi)
+        case Kore.Ceil(os, _, phi):
+            return Kore.Ceil(os, sort, phi)
+    return phi.with_sort(sort) # type: ignore
+
+
+def cleanup_pattern(top_sort: Kore.Sort, phi: Kore.Pattern) -> Kore.Pattern:
+    main_part, _ = PredicateFilter.filter_out_predicates(phi)
+    assert main_part is not None
+    fvphi = free_evars_of_pattern(phi)
+    eqs, rest = extract_equalities_and_rest_from_witness({v.name for v in fvphi}, phi)
+    evs2_p = cleanup_eqs(top_sort, main_part, eqs)
+    if rest is None:
+        return evs2_p
+    return Kore.And(top_sort, rest, evs2_p)
+
+def cleanup_pattern_new(top_sort: Kore.Sort, phi: Kore.Pattern) -> Kore.Pattern:
+    main_part, preds = PredicateFilter.filter_out_predicates(phi)
+    assert main_part is not None
+    fvmain = free_evars_of_pattern(main_part)
+    preds_filtered: T.List[Kore.Pattern] = [
+        p
+        for p in preds
+        if len(free_evars_of_pattern(p).intersection(fvmain)) >= 1
+    ]
+    _LOGGER.warning(f"main_part: {main_part}")
+    _LOGGER.warning(f"preds: {preds}")
+    _LOGGER.warning(f"preds_filtered: {preds_filtered}")
+    return make_conjunction(top_sort, [main_part]+preds_filtered)
+    
+
+def cleanup_eqs(
+    top_sort: Kore.Sort,
+    main_part: Kore.Pattern,
+    eqs: T.Dict[Kore.EVar, Kore.Pattern],
+) -> Kore.Pattern:
+    fvs = free_evars_of_pattern(main_part)
+    evs2 = {k: v for k, v in eqs.items() if (k in fvs)}
+    evs2_p = mapping_to_pattern(top_sort, evs2)
+    return evs2_p

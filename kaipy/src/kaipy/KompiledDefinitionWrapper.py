@@ -138,7 +138,7 @@ class KompiledDefinitionWrapper:
             cmap={"ARGS": (args_name + r":SortList{}")},
             pmap={"ARGS": "cat"},
         )
-        krun.KRun._check_return_code(result.returncode, 0)
+        result.check_returncode()
         parser = KoreParser(result.stdout)
         res = parser.pattern()
         assert parser.eof

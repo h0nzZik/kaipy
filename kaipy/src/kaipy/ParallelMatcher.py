@@ -3,6 +3,7 @@ import dataclasses
 
 import pyk.kore.syntax as Kore
 
+import kaipy.predicate_filter as PredicateFilter
 import kaipy.kore_utils as KoreUtils
 from kaipy.ReachabilitySystem import ReachabilitySystem
 
@@ -30,12 +31,14 @@ class _RawPatternProjection:
 
 def _rename_to_avoid(
     pattern_to_rename: Kore.Pattern,
-    pattern_to_avoid: Kore.Pattern
+    pattern_to_avoid: Kore.Pattern,
+    renaming: T.Dict[str, str]|None
 ) -> T.Tuple[Kore.Pattern, T.Dict[str, str]]:
-    renaming = KoreUtils.compute_renaming0(
-        vars_to_avoid=list(KoreUtils.free_evars_of_pattern(pattern_to_avoid)),
-        vars_to_rename=list(KoreUtils.free_evars_of_pattern(pattern_to_rename))
-    )
+    if renaming is None:
+        renaming = KoreUtils.compute_renaming0(
+            vars_to_avoid=list(KoreUtils.free_evars_of_pattern(pattern_to_avoid)),
+            vars_to_rename=list(KoreUtils.free_evars_of_pattern(pattern_to_rename))
+        )
     renamed = KoreUtils.rename_vars(
         renaming,
         pattern_to_rename
@@ -47,8 +50,9 @@ def _compute_raw_pattern_projection(
     rs: ReachabilitySystem,
     what: Kore.Pattern,
     to: Kore.Pattern,
+    renaming: T.Dict[str, str]|None,
 ) -> _RawPatternProjection:
-    what_renamed,renaming = _rename_to_avoid(what, to)
+    what_renamed,renaming = _rename_to_avoid(what, to, renaming=renaming)
     conj = Kore.And(rs.sortof(what_renamed), what_renamed, to)
     return _RawPatternProjection(
         cfg=what,
@@ -64,6 +68,7 @@ def _compute_list_of_raw_pattern_projections(
     rs: ReachabilitySystem,
     states: T.List[Kore.Pattern],
     cfg: Kore.Pattern,
+    renaming: T.Dict[str, str]|None,
 ) -> T.List[_RawPatternProjection]:
     conjinfos: T.List[_RawPatternProjection] = list()
     for st in states:
@@ -72,6 +77,7 @@ def _compute_list_of_raw_pattern_projections(
                 rs,
                 cfg,
                 st,
+                renaming=renaming,
             )
         )
     return conjinfos
@@ -81,12 +87,12 @@ class MatchResult:
     cfg: Kore.Pattern                # what is being matched
     state: Kore.Pattern              # against which the match goes
     renaming: T.Dict[str, str]       # how we renamed the variables of `.state`
-    constraints: T.List[Kore.MLPred]
+    constraints: T.List[Kore.Pattern]
 
 # Guarantees that the i-th position of the result corresponds to the i-th position of `states`
-def parallel_match(rs: ReachabilitySystem, cfg: Kore.Pattern, states: T.List[Kore.Pattern]) -> T.List[MatchResult]:
+def parallel_match(rs: ReachabilitySystem, cfg: Kore.Pattern, states: T.List[Kore.Pattern], renaming: T.Dict[str, str]|None=None) -> T.List[MatchResult]:
     # list of conjunctions of `cfgs` and renamed `states`
-    conjinfos: T.List[_RawPatternProjection] = _compute_list_of_raw_pattern_projections(rs=rs, states=states, cfg=cfg)
+    conjinfos: T.List[_RawPatternProjection] = _compute_list_of_raw_pattern_projections(rs=rs, states=states, cfg=cfg, renaming=renaming)
     #_LOGGER.warning(f'Simplifying {len(conjinfos)} items at once')
     #for ci in conjinfos:
     #    _LOGGER.warning(f"Simplifying {}")
@@ -111,7 +117,7 @@ def parallel_match(rs: ReachabilitySystem, cfg: Kore.Pattern, states: T.List[Kor
             # but the fact that `isKResult(X ~> .)` is forgotten.
             # Therefore, we have to read the predicates of the state
             # and add them to the list of predicates derived from the conjunction.
-            constraints=([ci.conj] if KoreUtils.is_bottom(ci.conj) else (KoreUtils.get_predicates(ci.conj)+KoreUtils.get_predicates(ci.cfg_renamed))) #type: ignore
+            constraints=([ci.conj] if KoreUtils.is_bottom(ci.conj) else (PredicateFilter.get_predicates(ci.conj)+PredicateFilter.get_predicates(ci.cfg_renamed))) #type: ignore
         )
         for ci in conjinfos2
     ]

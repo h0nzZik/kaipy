@@ -17,6 +17,10 @@ class IAbstractSubstitutionDomain(abc.ABC):
         ...
     
     @abc.abstractmethod
+    def free_variables_of(self, a: IAbstractSubstitution) -> T.Set[Kore.EVar]:
+        ...
+
+    @abc.abstractmethod
     def disjunction(self, ctx: AbstractionContext, a1: IAbstractSubstitution, a2: IAbstractSubstitution) -> IAbstractSubstitution:
         ...
 
@@ -45,5 +49,5 @@ class IAbstractSubstitutionDomain(abc.ABC):
         ...
 
     @abc.abstractmethod
-    def to_str(self, a: IAbstractSubstitution) -> str:
+    def to_str(self, a: IAbstractSubstitution, indent: int) -> str:
         ...

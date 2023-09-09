@@ -15,6 +15,10 @@ class IAbstractPatternDomain(abc.ABC):
         ...
 
     @abc.abstractmethod
+    def free_variables_of(self, a: IAbstractPattern) -> T.Set[Kore.EVar]:
+        ...
+
+    @abc.abstractmethod
     def refine(self, ctx: AbstractionContext, a: IAbstractPattern, c: Kore.Pattern) -> IAbstractPattern:
         ...
 
@@ -44,5 +48,5 @@ class IAbstractPatternDomain(abc.ABC):
         ...
     
     @abc.abstractmethod
-    def to_str(self, a: IAbstractPattern) -> str:
+    def to_str(self, a: IAbstractPattern, indent: int) -> str:
         ...

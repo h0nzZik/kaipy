@@ -1,4 +1,5 @@
 import dataclasses
+import logging
 import typing as T
 
 import pyk.kore.syntax as Kore
@@ -7,6 +8,8 @@ import kaipy.kore_utils as KoreUtils
 from kaipy.AbstractionContext import AbstractionContext
 from kaipy.ReachabilitySystem import ReachabilitySystem
 from kaipy.interfaces.IAbstractPatternDomain import IAbstractPattern, IAbstractPatternDomain
+
+_LOGGER: T.Final = logging.getLogger(__name__)
 
 @dataclasses.dataclass
 class ExactPattern(IAbstractPattern):
@@ -31,7 +34,12 @@ class ExactPatternDomain(IAbstractPatternDomain):
         for i,p in enumerate(self.pl):
             if p == c:
                 return ExactPattern(idx=i, sort=sort)
+        #_LOGGER.warning(f"Exact: not catching {c.text}")
         return ExactPattern(idx=-1, sort=sort)
+    
+    def free_variables_of(self, a: IAbstractPattern) -> T.Set[Kore.EVar]:
+        assert type(a) is ExactPattern
+        return set()
     
     def refine(self, ctx: AbstractionContext, a: IAbstractPattern, c: Kore.Pattern) -> ExactPattern:
         assert type(a) is ExactPattern
@@ -79,6 +87,6 @@ class ExactPatternDomain(IAbstractPatternDomain):
 
         return self.rs.subsumes(self.concretize(a1), self.concretize(a2))[0]
 
-    def to_str(self, a: IAbstractPattern) -> str:
+    def to_str(self, a: IAbstractPattern, indent: int) -> str:
         assert type(a) is ExactPattern
-        return f'<idx={a.idx},sort={a.sort}>'
+        return (indent*' ') + f'<idx={a.idx},sort={a.sort}>'

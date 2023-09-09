@@ -9,14 +9,17 @@ class IAbstractConstraint(abc.ABC):
     ...
 
 class IAbstractConstraintDomain(abc.ABC):
-    # preds is a list of predicates
     # pre: ctx.variable_manager yields only variables not occurring in `c`
     @abc.abstractmethod
-    def abstract(self, ctx: AbstractionContext, c: T.List[Kore.MLPred]) -> IAbstractConstraint:
+    def abstract(self, ctx: AbstractionContext, over_variables: T.Set[Kore.EVar], constraints: T.List[Kore.Pattern]) -> IAbstractConstraint:
         ...
     
     @abc.abstractmethod
-    def refine(self, ctx: AbstractionContext, a: IAbstractConstraint, c: T.List[Kore.MLPred]) -> IAbstractConstraint:
+    def free_variables_of(self, a: IAbstractConstraint) -> T.Set[Kore.EVar]:
+        ...
+
+    @abc.abstractmethod
+    def refine(self, ctx: AbstractionContext, a: IAbstractConstraint, constraints: T.List[Kore.Pattern]) -> IAbstractConstraint:
         ...
 
     # Requirement: FV(concretize(disjunction(ctx, a1, a2))) \subseteq FV(concretize(a1)) \cup FV(concretize(a2)).
@@ -27,7 +30,7 @@ class IAbstractConstraintDomain(abc.ABC):
         ...
 
     @abc.abstractmethod
-    def concretize(self, a: IAbstractConstraint) -> T.List[Kore.MLPred]:
+    def concretize(self, a: IAbstractConstraint) -> T.List[Kore.Pattern]:
         ...
     
     @abc.abstractmethod
@@ -47,5 +50,5 @@ class IAbstractConstraintDomain(abc.ABC):
         ...
 
     @abc.abstractmethod
-    def to_str(self, a: IAbstractConstraint) -> str:
+    def to_str(self, a: IAbstractConstraint, indent: int) -> str:
         ...

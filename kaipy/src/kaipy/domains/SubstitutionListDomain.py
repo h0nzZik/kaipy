@@ -33,6 +33,10 @@ class SubstitutionListDomain(IAbstractSubstitutionsDomain):
         els = [self.underlying.abstract(ctx, subst) for subst in substs]
         return SubstitutionList(elements=els)
     
+    def free_variables_of(self, a: IAbstractSubstitutions) -> T.Set[Kore.EVar]:
+        assert type(a) is SubstitutionList
+        return set(itertools.chain(*[self.underlying.free_variables_of(e) for e in a.elements]))
+
     def disjunction(self, ctx: AbstractionContext, a1: IAbstractSubstitutions, a2: IAbstractSubstitutions) -> SubstitutionList:
         assert type(a1) is SubstitutionList
         assert type(a2) is SubstitutionList
@@ -48,7 +52,7 @@ class SubstitutionListDomain(IAbstractSubstitutionsDomain):
         #_LOGGER.warning(f"disjunction: result_len={len(elements)}")
         return SubstitutionList(elements=elements)
 
-    def refine(self, ctx: AbstractionContext, a: IAbstractSubstitutions, c: T.List[Kore.MLPred]) -> SubstitutionList:
+    def refine(self, ctx: AbstractionContext, a: IAbstractSubstitutions, constraints: T.List[Kore.Pattern]) -> SubstitutionList:
         assert type(a) is SubstitutionList
         return a
 
@@ -79,11 +83,11 @@ class SubstitutionListDomain(IAbstractSubstitutionsDomain):
         assert type(a) is SubstitutionList
         return len(a.elements) <= 0
 
-    def to_str(self, a: IAbstractSubstitutions) -> str:
+    def to_str(self, a: IAbstractSubstitutions, indent: int) -> str:
         assert type(a) is SubstitutionList
-        s: str = "<sl "
+        s: str = (indent*' ') + "<sl\n"
         for e in a.elements:
-            s = s + f"{self.underlying.to_str(e)},"
-        s = s + ">"
+            s = f"{self.underlying.to_str(e, indent=indent+1)},\n"
+        s = s + (indent*' ') + ">"
         return s
         

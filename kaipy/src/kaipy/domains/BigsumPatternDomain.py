@@ -31,7 +31,12 @@ class BigsumPatternDomain(IAbstractPatternDomain):
             if not d.is_top(a):
                 return BigsumPattern(idx=i, sort=sort, ap=a)
         return BigsumPattern(-1, sort=sort, ap=None)            
-    
+
+    def free_variables_of(self, a: IAbstractPattern) -> T.Set[Kore.EVar]:
+        assert type(a) is BigsumPattern
+        if a.ap is None:
+            return set()
+        return self.domains[a.idx].free_variables_of(a.ap)
 
     def disjunction(self, ctx: AbstractionContext, a1: IAbstractPattern, a2: IAbstractPattern) -> BigsumPattern:
         assert type(a1) is BigsumPattern
@@ -114,8 +119,11 @@ class BigsumPatternDomain(IAbstractPatternDomain):
 
         
 
-    def to_str(self, a: IAbstractPattern) -> str:
+    def to_str(self, a: IAbstractPattern, indent: int) -> str:
         assert type(a) is BigsumPattern
         if (a.idx < 0) or (a.ap is None):
-            return f'<bigsum Top>'
-        return f'<bigsum idx={a.idx}, a={self.domains[a.idx].to_str(a.ap)}>'
+            return (indent*' ') + f'<bigsum Top>'
+        s = (indent*' ') + f"<bigsum {a.idx}\n"
+        s = s + self.domains[a.idx].to_str(a.ap, indent=indent+1) + "\n"
+        s = s + indent*' ' + ">"
+        return s
