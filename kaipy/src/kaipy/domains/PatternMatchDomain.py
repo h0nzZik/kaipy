@@ -13,7 +13,6 @@ import kaipy.rs_utils as RSUtils
 from kaipy.VariableManager import VariableManager
 from kaipy.AbstractionContext import AbstractionContext
 from kaipy.ReachabilitySystem import ReachabilitySystem
-from kaipy.interfaces.IAbstractConstraintDomainBuilder import IAbstractConstraintDomainBuilder
 from kaipy.interfaces.IAbstractConstraintDomain import IAbstractConstraint, IAbstractConstraintDomain
 from kaipy.interfaces.IAbstractPatternDomain import IAbstractPattern, IAbstractPatternDomain
 from kaipy.ParallelMatcher import parallel_match, MatchResult
@@ -28,6 +27,7 @@ class PatternMatchDomainElement(IAbstractPattern):
 class PatternMatchDomain(IAbstractPatternDomain):
     rs: ReachabilitySystem
     states: T.List[Kore.Pattern]
+    state_vars: T.List[T.Set[Kore.EVar]]
     comments: T.Mapping[Kore.Pattern, str]
     underlying_domains: T.List[IAbstractConstraintDomain]
     # invariant: len(states) == len(underlying_domains)
@@ -37,18 +37,16 @@ class PatternMatchDomain(IAbstractPatternDomain):
     def __init__(self,
         rs: ReachabilitySystem,
         states: T.List[T.Tuple[Kore.Pattern, str]],
-        underlying_domain_builder: IAbstractConstraintDomainBuilder
+        underlying_domains: T.List[IAbstractConstraintDomain],
     ):
         self.rs = rs
-        states2 = [(KoreUtils.normalize_pattern(x, prefix=f"St{i}V"), y) for i,(x, y) in enumerate(states)]
         # We need all states to use different variables.
+        states2 = [(KoreUtils.normalize_pattern(x, prefix=f"St{i}V"), y) for i,(x, y) in enumerate(states)]
         self.states = [x for (x, y) in states2]
         self.comments = {x:y for (x,y) in states2}
+        self.state_vars = [KoreUtils.free_evars_of_pattern(st) for st in self.states]
         #_LOGGER.warning(f"States: {len(states)}")
-        self.underlying_domains = [
-            underlying_domain_builder.build_abstract_constraint_domain(KoreUtils.free_evars_of_pattern(st))
-            for st in self.states
-        ]
+        self.underlying_domains = underlying_domains
 
     @F.cached_property
     def _top_sort(self):
@@ -89,8 +87,8 @@ class PatternMatchDomain(IAbstractPatternDomain):
         for idx,q in enumerate(c_simpl_list_norm):
             #_LOGGER.warning(f"q: {q}")
             mrs: T.List[MatchResult] = parallel_match(rs=self.rs, cfg=q, states=self.states, renaming=renamings[idx])
-            constraintss: T.List[T.List[Kore.MLPred]] = [
-                mr.constraints # type: ignore
+            constraintss: T.List[T.List[Kore.Pattern]] = [
+                mr.constraints
                 for mr in mrs
             ]
             cps: T.List[IAbstractConstraint|None] = list()
@@ -105,12 +103,13 @@ class PatternMatchDomain(IAbstractPatternDomain):
                 d = self.underlying_domains[i]
                 a1 = d.abstract(
                     ctx=ctx,
-                    c=constraints,
+                    over_variables=self.state_vars[i],
+                    constraints=constraints,
                 )
                 if len(ctx.broadcast_channel.constraints) == 0:
                     cps.append(a1)
                 else:
-                    a2: IAbstractConstraint = d.refine(ctx=ctx, a=a1, c=ctx.broadcast_channel.constraints)
+                    a2: IAbstractConstraint = d.refine(ctx=ctx, a=a1, constraints=ctx.broadcast_channel.constraints)
                     ctx.broadcast_channel.reset()
                     cps.append(a2)
             cpsl.append(cps)
@@ -160,8 +159,8 @@ class PatternMatchDomain(IAbstractPatternDomain):
 
     def concretize(self, a: IAbstractPattern) -> Kore.Pattern:
         assert type(a) is PatternMatchDomainElement
-        bot : Kore.MLPred = Kore.Bottom(self._top_sort) # type: ignore
-        concretized_constraints: T.List[T.List[Kore.MLPred]] = [
+        bot : Kore.Pattern = Kore.Bottom(self._top_sort)
+        concretized_constraints: T.List[T.List[Kore.Pattern]] = [
             (ud.concretize(b) if b is not None else [bot])
             for ud,b in zip(self.underlying_domains, a.constraint_per_state)
         ]

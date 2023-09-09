@@ -87,7 +87,7 @@ class MatchResult:
     cfg: Kore.Pattern                # what is being matched
     state: Kore.Pattern              # against which the match goes
     renaming: T.Dict[str, str]       # how we renamed the variables of `.state`
-    constraints: T.List[Kore.MLPred]
+    constraints: T.List[Kore.Pattern]
 
 # Guarantees that the i-th position of the result corresponds to the i-th position of `states`
 def parallel_match(rs: ReachabilitySystem, cfg: Kore.Pattern, states: T.List[Kore.Pattern], renaming: T.Dict[str, str]|None=None) -> T.List[MatchResult]:

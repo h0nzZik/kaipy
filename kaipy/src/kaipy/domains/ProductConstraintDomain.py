@@ -1,86 +1,77 @@
 import dataclasses
+import itertools
 import typing as T
 
 import pyk.kore.syntax as Kore
 
 from kaipy.AbstractionContext import AbstractionContext
 from kaipy.interfaces.IAbstractConstraintDomain import IAbstractConstraint, IAbstractConstraintDomain
-from kaipy.interfaces.IAbstractConstraintDomainBuilder import IAbstractConstraintDomainBuilder
 
 @dataclasses.dataclass
 class ProductConstraint(IAbstractConstraint):
-    left : IAbstractConstraint
-    right: IAbstractConstraint
+    underlying: T.List[IAbstractConstraint]
 
 class ProductConstraintDomain(IAbstractConstraintDomain):
-    left_domain: IAbstractConstraintDomain
-    right_domain: IAbstractConstraintDomain
+    underlying_domains: T.List[IAbstractConstraintDomain]
 
-    def __init__(self, left_domain: IAbstractConstraintDomain, right_domain: IAbstractConstraintDomain):
-        self.left_domain = left_domain
-        self.right_domain = right_domain
+    def __init__(self, underlying_domains: T.List[IAbstractConstraintDomain]):
+        self.underlying_domains = underlying_domains
 
-    def abstract(self, ctx: AbstractionContext, c: T.List[Kore.MLPred]) -> ProductConstraint:
-        left = self.left_domain.abstract(ctx, c)
-        right = self.right_domain.abstract(ctx, c)
-        return ProductConstraint(left=left, right=right)
+    def abstract(self, ctx: AbstractionContext, over_variables: T.Set[Kore.EVar], constraints: T.List[Kore.Pattern]) -> ProductConstraint:
+        ovs = over_variables.copy()
+        underlying: T.List[IAbstractConstraint] = list()
+        for ud in self.underlying_domains:
+            a = ud.abstract(ctx, over_variables=ovs, constraints=constraints)
+            ovs.update(ud.free_variables_of(a))
+            underlying.append(a)
+        
+        return ProductConstraint(underlying=underlying)
     
-    def refine(self, ctx: AbstractionContext, a: IAbstractConstraint, c: T.List[Kore.MLPred]) -> IAbstractConstraint:
+    def free_variables_of(self, a: IAbstractConstraint) -> T.Set[Kore.EVar]:
         assert type(a) is ProductConstraint
-        left = self.left_domain.refine(ctx, a.left, c)
-        right = self.right_domain.refine(ctx, a.right, c)
-        return ProductConstraint(left=left, right=right)
+        return set(*itertools.chain(ud.free_variables_of(ua) for ud,ua in zip(self.underlying_domains, a.underlying)))
+    
+    def refine(self, ctx: AbstractionContext, a: IAbstractConstraint, constraints: T.List[Kore.Pattern]) -> IAbstractConstraint:
+        assert type(a) is ProductConstraint
+        return ProductConstraint(underlying=[
+            ud.refine(ctx, ua, constraints)
+            for ud,ua in zip(self.underlying_domains, a.underlying)
+        ])
 
     def disjunction(self, ctx: AbstractionContext, a1: IAbstractConstraint, a2: IAbstractConstraint) -> ProductConstraint:
         assert type(a1) is ProductConstraint
         assert type(a2) is ProductConstraint
-        return ProductConstraint(
-            left=self.left_domain.disjunction(ctx, a1.left, a2.left),
-            right=self.right_domain.disjunction(ctx, a1.right, a2.right),    
-        )
+        return ProductConstraint(underlying=[
+            ud.disjunction(ctx, ua1, ua2)
+            for ud,ua1,ua2 in zip(self.underlying_domains, a1.underlying, a2.underlying)
+        ])
 
     def is_top(self, a: IAbstractConstraint) -> bool:
         assert type(a) is ProductConstraint
-        return self.left_domain.is_top(a.left) and self.right_domain.is_top(a.right)
+        return all([ud.is_top(ua) for ud,ua in zip(self.underlying_domains, a.underlying)])
 
     def is_bottom(self, a: IAbstractConstraint) -> bool:
         assert type(a) is ProductConstraint
-        return self.left_domain.is_bottom(a.left) or self.right_domain.is_bottom(a.right)
+        return any([ud.is_bottom(ua) for ud,ua in zip(self.underlying_domains, a.underlying)])
 
-    def concretize(self, a: IAbstractConstraint) -> T.List[Kore.MLPred]:
+    def concretize(self, a: IAbstractConstraint) -> T.List[Kore.Pattern]:
         assert type(a) is ProductConstraint
-        c_left = self.left_domain.concretize(a.left)
-        c_right = self.right_domain.concretize(a.right)
-        return c_left + c_right
+        return list(*itertools.chain(ud.concretize(ua) for ud,ua in zip(self.underlying_domains, a.underlying)))
 
     def subsumes(self, a1: IAbstractConstraint, a2: IAbstractConstraint) -> bool:
         assert type(a1) is ProductConstraint
         assert type(a2) is ProductConstraint
-        return self.left_domain.subsumes(a1.left, a2.left) and self.right_domain.subsumes(a1.right, a2.right)
+        return all([ud.subsumes(ua1, ua2) for ud,ua1,ua2 in zip(self.underlying_domains, a1.underlying, a2.underlying)])
     
     def equals(self, a1: IAbstractConstraint, a2: IAbstractConstraint) -> bool:
         assert type(a1) is ProductConstraint
         assert type(a2) is ProductConstraint
-        return self.left_domain.equals(a1.left, a2.left) and self.right_domain.equals(a1.right, a2.right)
+        return all([ud.equals(ua1, ua2) for ud,ua1,ua2 in zip(self.underlying_domains, a1.underlying, a2.underlying)])
 
     def to_str(self, a: IAbstractConstraint, indent: int) -> str:
         assert type(a) is ProductConstraint
         s = (indent*' ') + '<prod\n'
-        s = s + self.left_domain.to_str(a.left, indent=indent+1) + ",\n"
-        s = s + self.right_domain.to_str(a.right, indent=indent+1) + ",\n"
+        for ud,ua in zip(self.underlying_domains, a.underlying):
+            s = s + ud.to_str(ua, indent=indent+1) + ",\n"
         s = s + (indent*' ') + ">"
         return s
-
-
-class ProductConstraintDomainBuilder(IAbstractConstraintDomainBuilder):
-    left_builder: IAbstractConstraintDomainBuilder
-    right_builder: IAbstractConstraintDomainBuilder
-    
-    def __init__(self, left_builder: IAbstractConstraintDomainBuilder, right_builder: IAbstractConstraintDomainBuilder):
-        self.left_builder = left_builder
-        self.right_builder = right_builder
-    
-    def build_abstract_constraint_domain(self, over_variables: T.Set[Kore.EVar]) -> IAbstractConstraintDomain:
-        left_domain = self.left_builder.build_abstract_constraint_domain(over_variables)
-        right_domain = self.right_builder.build_abstract_constraint_domain(over_variables)
-        return ProductConstraintDomain(left_domain, right_domain)

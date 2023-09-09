@@ -6,36 +6,38 @@ import pyk.kore.syntax as Kore
 
 from kaipy.AbstractionContext import AbstractionContext
 from kaipy.interfaces.IAbstractConstraintDomain import IAbstractConstraint, IAbstractConstraintDomain
-from kaipy.interfaces.IAbstractConstraintDomainBuilder import IAbstractConstraintDomainBuilder
 
 
 _LOGGER: T.Final = logging.getLogger(__name__)
 
 class CachedConstraintDomain(IAbstractConstraintDomain):
-    cache: T.Dict[T.FrozenSet[Kore.MLPred], IAbstractConstraint]
+    cache: T.Dict[T.FrozenSet[Kore.Pattern], IAbstractConstraint]
     underlying: IAbstractConstraintDomain
 
     def __init__(self, underlying: IAbstractConstraintDomain):
         self.cache = dict()
         self.underlying = underlying
 
-    def abstract(self, ctx: AbstractionContext, c: T.List[Kore.MLPred]) -> IAbstractConstraint:
-        sc = frozenset(c)
+    def abstract(self, ctx: AbstractionContext, over_variables: T.Set[Kore.EVar], constraints: T.List[Kore.Pattern]) -> IAbstractConstraint:
+        sc = frozenset(constraints)
         if sc in self.cache.keys():
             return self.cache[sc]
 
         #_LOGGER.warning(f"**** CACHE MISS: {[x.text for x in sc]}")        
-        a = self.underlying.abstract(ctx, c)
+        a = self.underlying.abstract(ctx, over_variables=over_variables, constraints=constraints)
         self.cache[sc] = a
         return a
-    
-    def refine(self, ctx: AbstractionContext, a: IAbstractConstraint, c: T.List[Kore.MLPred]) -> IAbstractConstraint:
-        return self.underlying.refine(ctx, a, c)   
+
+    def free_variables_of(self, a: IAbstractConstraint) -> T.Set[Kore.EVar]:
+        return self.underlying.free_variables_of(a)
+
+    def refine(self, ctx: AbstractionContext, a: IAbstractConstraint, constraints: T.List[Kore.Pattern]) -> IAbstractConstraint:
+        return self.underlying.refine(ctx, a, constraints)
 
     def disjunction(self, ctx: AbstractionContext, a1: IAbstractConstraint, a2: IAbstractConstraint) -> IAbstractConstraint:
         return self.underlying.disjunction(ctx, a1, a2)
 
-    def concretize(self, a: IAbstractConstraint) -> T.List[Kore.MLPred]:
+    def concretize(self, a: IAbstractConstraint) -> T.List[Kore.Pattern]:
         # This is supposed to be fast, therefore I do not cache it
         return self.underlying.concretize(a)
     
@@ -53,14 +55,3 @@ class CachedConstraintDomain(IAbstractConstraintDomain):
 
     def to_str(self, a: IAbstractConstraint, indent: int) -> str:
         return self.underlying.to_str(a, indent)
-
-
-class CachedConstraintDomainBuilder(IAbstractConstraintDomainBuilder):
-    underlying: IAbstractConstraintDomainBuilder
-    
-    def __init__(self, underlying: IAbstractConstraintDomainBuilder):
-        self.underlying = underlying
-    
-    def build_abstract_constraint_domain(self, over_variables: T.Set[Kore.EVar]) -> IAbstractConstraintDomain:
-        underlying = self.underlying.build_abstract_constraint_domain(over_variables)
-        return CachedConstraintDomain(underlying)

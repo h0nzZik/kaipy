@@ -4,21 +4,20 @@ import pyk.kore.syntax as Kore
 
 import kaipy.kore_utils as KoreUtils
 
-from kaipy.interfaces.IAbstractConstraintDomainBuilder import IAbstractConstraintDomainBuilder
 from kaipy.interfaces.IAbstractConstraintDomain import IAbstractConstraintDomain
 from kaipy.interfaces.IAbstractPatternDomain import IAbstractPatternDomain
 from kaipy.interfaces.IAbstractSubstitutionDomain import IAbstractSubstitutionDomain
 from kaipy.interfaces.IAbstractSubstitutionsDomain import IAbstractSubstitutionsDomain
 
-from kaipy.domains.CachedConstraintDomain import CachedConstraintDomainBuilder
+from kaipy.domains.CachedConstraintDomain import CachedConstraintDomain
 from kaipy.domains.SubstitutionListDomain import SubstitutionListDomain
-from kaipy.domains.SubstitutionsConstraintDomain import SubstitutionsConstraintDomain, SubstitutionsConstraintDomainBuilder
+from kaipy.domains.SubstitutionsConstraintDomain import SubstitutionsConstraintDomain
 from kaipy.domains.BigsumPatternDomain import BigsumPatternDomain
 from kaipy.domains.FinitePatternDomain import FinitePatternDomain
 from kaipy.domains.ExactPatternDomain import ExactPatternDomain
 from kaipy.domains.CartesianAbstractSubstitutionDomain import CartesianAbstractSubstitutionDomain
-from kaipy.domains.ProductConstraintDomain import ProductConstraintDomainBuilder
-from kaipy.domains.KResultConstraintDomain import KResultConstraintDomain, KResultConstraintDomainBuilder
+from kaipy.domains.ProductConstraintDomain import ProductConstraintDomain
+from kaipy.domains.KResultConstraintDomain import KResultConstraintDomain
 from kaipy.domains.PatternMatchDomain import PatternMatchDomain
 from kaipy.domains.CachedPatternDomain import CachedPatternDomain
 from kaipy.PatternMatchDomainBuilder import build_pattern_match_domain
@@ -59,13 +58,10 @@ def build_abstract_pattern_domain(
     
     subst_domain: IAbstractSubstitutionDomain = CartesianAbstractSubstitutionDomain(cached_combined_domain)
     subst_list_domain: IAbstractSubstitutionsDomain = SubstitutionListDomain(subst_domain)
-    subst_domain_builder: IAbstractConstraintDomainBuilder = SubstitutionsConstraintDomainBuilder(rs=rs, nested=subst_list_domain)
+    subst_constr_domain: IAbstractConstraintDomain = SubstitutionsConstraintDomain(rs=rs, nested=subst_list_domain)
 
-    kresult_domain_builder: IAbstractConstraintDomainBuilder = KResultConstraintDomainBuilder(rs=rs)
-    product_domain_builder = ProductConstraintDomainBuilder(kresult_domain_builder, subst_domain_builder)
-    cached_product_domain_builder = CachedConstraintDomainBuilder(product_domain_builder)
-    pattern_match_domain = build_pattern_match_domain(rs, underlying_domain_builder=cached_product_domain_builder)
-
-    #pattern_match_domain = build_pattern_match_domain(rs, underlying_domain_builder=subst_domain_builder)
-
+    kresult_domain: IAbstractConstraintDomain = KResultConstraintDomain(rs=rs)
+    product_domain = ProductConstraintDomain([kresult_domain, subst_constr_domain])
+    cached_product_domain = CachedConstraintDomain(product_domain)
+    pattern_match_domain = build_pattern_match_domain(rs, underlying_domain=cached_product_domain)
     return pattern_match_domain

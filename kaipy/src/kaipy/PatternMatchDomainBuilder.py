@@ -4,7 +4,7 @@ import pyk.kore.syntax as Kore
 
 import kaipy.kore_utils as KoreUtils
 from kaipy.ReachabilitySystem import ReachabilitySystem
-from kaipy.interfaces.IAbstractConstraintDomainBuilder import IAbstractConstraintDomainBuilder
+from kaipy.interfaces.IAbstractConstraintDomain import IAbstractConstraintDomain
 from kaipy.domains.PatternMatchDomain import PatternMatchDomain
 
 def build_states(rs: ReachabilitySystem) -> T.List[T.Tuple[Kore.Pattern, str]]:
@@ -22,9 +22,9 @@ def build_states(rs: ReachabilitySystem) -> T.List[T.Tuple[Kore.Pattern, str]]:
        
 def build_pattern_match_domain(
     rs: ReachabilitySystem,
-    underlying_domain_builder: IAbstractConstraintDomainBuilder
+    underlying_domain: IAbstractConstraintDomain
 ) -> PatternMatchDomain:
     states = build_states(rs)
-    domain = PatternMatchDomain(rs, states, underlying_domain_builder)
+    domain = PatternMatchDomain(rs, states, [underlying_domain for _ in states])
     return domain
 

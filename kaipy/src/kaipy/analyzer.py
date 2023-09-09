@@ -20,7 +20,6 @@ import kaipy.kore_utils as KoreUtils
 from kaipy.BroadcastChannel import BroadcastChannel
 from kaipy.VariableManager import VariableManager
 from kaipy.AbstractionContext import AbstractionContext
-from kaipy.interfaces.IAbstractConstraintDomainBuilder import IAbstractConstraintDomainBuilder
 from kaipy.interfaces.IAbstractPatternDomain import IAbstractPattern, IAbstractPatternDomain
 from kaipy.interfaces.IAbstractSubstitutionDomain import IAbstractSubstitution, IAbstractSubstitutionDomain
 from kaipy.interfaces.IAbstractConstraintDomain import IAbstractConstraintDomain, IAbstractConstraint
@@ -77,6 +76,7 @@ def analyze(
         if len(diff) <= 0:
             break
         _LOGGER.warning(f'diff: {rs.kprint.kore_to_pretty(RSUtils.make_disjunction(rs, diff))}')
+        #_LOGGER.warning(f'diff_raw: {RSUtils.make_disjunction(rs, diff).text}')
         diff_step = { c:get_successors(rs, c) for c in diff }
         
         diff_step_norm = { c:[ KoreUtils.normalize_pattern(s) for s in succs] for c,succs in diff_step.items() }
@@ -86,6 +86,7 @@ def analyze(
             #_LOGGER.warning("More than 1 successor")
             #_LOGGER.warning(f'of: {rs.kprint.kore_to_pretty(RSUtils.make_disjunction(rs, diff))}')
             #_LOGGER.warning(f"succs_raw: {rs.kprint.kore_to_pretty(RSUtils.make_disjunction(rs, list(set(itertools.chain(*diff_step.values())))))}")
+            _LOGGER.warning(f"succs_raw: {RSUtils.make_disjunction(rs, list(set(itertools.chain(*diff_step_norm.values())))).text}")
             _LOGGER.warning(f"succs: {rs.kprint.kore_to_pretty(RSUtils.make_disjunction(rs, list(set(itertools.chain(*diff_step_norm.values())))))}")
         unified = cfgs_below_current.copy()
         unified.update(diff_step_norm)

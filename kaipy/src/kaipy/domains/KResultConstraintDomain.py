@@ -8,7 +8,6 @@ import pyk.kore.prelude as KorePrelude
 
 import kaipy.kore_utils as KoreUtils
 from kaipy.interfaces.IAbstractConstraintDomain import IAbstractConstraint, IAbstractConstraintDomain
-from kaipy.interfaces.IAbstractConstraintDomainBuilder import IAbstractConstraintDomainBuilder
 from kaipy.AbstractionContext import AbstractionContext
 from kaipy.ReachabilitySystem import ReachabilitySystem
 
@@ -20,15 +19,12 @@ class KResultConstraint(IAbstractConstraint):
 
 class KResultConstraintDomain(IAbstractConstraintDomain):
     rs: ReachabilitySystem
-    over_variables: T.Set[Kore.EVar]
 
     def __init__(
         self,
         rs: ReachabilitySystem,
-        over_variables: T.Set[Kore.EVar],
     ):
         self.rs = rs
-        self.over_variables = over_variables
     
     def _mk_isKResult_pattern(self, e: Kore.EVar, sort: Kore.Sort) -> Kore.MLPred:
         pe = Kore.App('kseq', (), (
@@ -39,13 +35,13 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
         iskr_true = Kore.Equals(KorePrelude.BOOL, sort, iskr, KorePrelude.TRUE)
         return iskr_true
 
-    def abstract(self, ctx: AbstractionContext, c: T.List[Kore.MLPred]) -> KResultConstraint:
+    def abstract(self, ctx: AbstractionContext, over_variables: T.Set[Kore.EVar], constraints: T.List[Kore.Pattern]) -> KResultConstraint:
         a = KResultConstraint(kresult_vars=[])
-        if len(c) <= 0:
+        if len(constraints) <= 0:
             return a
-        p = KoreUtils.make_conjunction(self.rs.sortof(c[0]), c)
+        p = KoreUtils.make_conjunction(self.rs.sortof(constraints[0]), constraints)
         monitored_evars: T.Dict[Kore.EVar, Kore.Pattern] = dict()
-        for x in c:
+        for x in constraints:
             for e in KoreUtils.free_evars_of_pattern(x):
                 # If we monitor only 'over_variables' - that is, variables that belong to the particular rule LHS,
                 # we will lose information about all other variables. For example, consider the rule LHS
@@ -55,13 +51,18 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
                 # We want to track the KResult information about S.
                 # (We also want to track the equality itself, but that is the business of another component.)
                 # The ideal solution would be to track only `over_variables` plus whatever variables has been created dynamically.
-                if e in self.over_variables or True:
+                if e in over_variables: # or e in ctx.variable_manager.generated or True:
                     monitored_evars[e] = p
-        #_LOGGER.warning(f"Monitoring: {[e.text for e in monitored_evars.keys()]}")
+        _LOGGER.warning(f"Monitoring: {[e.text for e in monitored_evars.keys()]}")
         a2 = self._refine_monitored(ctx, a, monitored_evars=monitored_evars)
         if len(a2.kresult_vars) > 0 or True:
-            _LOGGER.warning(f"Abstracted {[x.text for x in c]} into {self.to_str(a2, indent=0)}")
+            _LOGGER.warning(f"Abstracted {[x.text for x in constraints]} into {self.to_str(a2, indent=0)}")
         return a2
+
+    def free_variables_of(self, a: IAbstractConstraint) -> T.Set[Kore.EVar]:
+        assert type(a) is KResultConstraint
+        return set(a.kresult_vars)
+
 
     def is_top(self, a: IAbstractConstraint) -> bool:
         assert type(a) is KResultConstraint
@@ -88,12 +89,12 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
         conj_simp = self.rs.simplify(conj)
         return KoreUtils.is_bottom(conj_simp)
 
-    def refine(self, ctx: AbstractionContext, a: IAbstractConstraint, c: T.List[Kore.MLPred]) -> KResultConstraint:
+    def refine(self, ctx: AbstractionContext, a: IAbstractConstraint, constraints: T.List[Kore.Pattern]) -> KResultConstraint:
         assert type(a) is KResultConstraint
 
         monitored_evars: T.Dict[Kore.EVar, Kore.MLPred] = dict()
         equality_pairs: T.List[T.Tuple[Kore.EVar, Kore.EVar]] = list()
-        for p in c:
+        for p in constraints:
             match p:
                 case Kore.Equals(_, _, Kore.EVar(n1, s1), Kore.EVar(n2, s2)):
                     equality_pairs.append((Kore.EVar(n1, s1), Kore.EVar(n2, s2)))
@@ -145,7 +146,7 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
         
         return KResultConstraint(kresult_vars=(kresult_vars+(a.kresult_vars or list())))
     
-    def concretize(self, a: IAbstractConstraint) -> T.List[Kore.MLPred]:
+    def concretize(self, a: IAbstractConstraint) -> T.List[Kore.Pattern]:
         assert type(a) is KResultConstraint
 
         #_LOGGER.warning(f"Concretizing {self.to_str(a)}")
@@ -177,14 +178,3 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
     def to_str(self, a: IAbstractConstraint, indent: int) -> str:
         assert type(a) is KResultConstraint
         return (indent*' ') + f"<kresults {str([x.text for x in a.kresult_vars])}>"
-
-
-class KResultConstraintDomainBuilder(IAbstractConstraintDomainBuilder):
-    rs: ReachabilitySystem
-
-    def __init__(self, rs: ReachabilitySystem):
-        self.rs = rs
-    
-    def build_abstract_constraint_domain(self, over_variables: T.Set[Kore.EVar]) -> KResultConstraintDomain:
-        # ignore over_variables
-        return KResultConstraintDomain(self.rs, over_variables=over_variables)

@@ -25,7 +25,7 @@ from kaipy.domains.PatternMatchDomain import PatternMatchDomain, PatternMatchDom
 from kaipy.domains.BigsumPatternDomain import BigsumPattern, BigsumPatternDomain
 from kaipy.domains.ExactPatternDomain import ExactPattern, ExactPatternDomain
 from kaipy.domains.KResultConstraintDomain import KResultConstraint, KResultConstraintDomain
-from kaipy.domains.KeepEverythingConstraintDomain import KeepEverything, KeepEverythingConstraintDomain, KeepEverythingConstraintDomainBuilder
+from kaipy.domains.KeepEverythingConstraintDomain import KeepEverything, KeepEverythingConstraintDomain
 from kaipy.testing.testingbase import RSTestBase
 from kaipy.DefaultAbstractionContext import make_ctx
 from kaipy.DefaultPatternDomain import build_abstract_pattern_domain
@@ -153,6 +153,31 @@ class TestImp(MyTest):
         concrete_reachable_configurations = pattern_domain.concretize(result.reachable_configurations)
         _LOGGER.warning(reachability_system.kprint.kore_to_pretty(concrete_reachable_configurations))
         return result
+    
+    def test_kresult_cooperation(
+        self,
+        reachability_system: ReachabilitySystem,
+        context_aliases : ContextAliases
+    ):
+        input_pattern: Kore.Pattern = reachability_system.kdw.get_input_kore(
+            RSTestBase.LANGUAGES / "imp/very-simple.imp"
+        )
+
+        rests = pre_analyze(reachability_system, context_aliases, input_pattern)
+        pattern_domain: IAbstractPatternDomain = build_abstract_pattern_domain(
+            reachability_system,
+            rests,
+            input_pattern
+        )
+        ctx = make_ctx()
+        concrete_text = r'''\and{SortGeneratedTopCell{}}(Lbl'-LT-'generatedTop'-GT-'{}(Lbl'-LT-'T'-GT-'{}(Lbl'-LT-'k'-GT-'{}(kseq{}(inj{SortStmt{}, SortKItem{}}(Lbl'UndsEqlsUndsSClnUnds'IMP-SYNTAX'Unds'Stmt'Unds'Id'Unds'AExp{}(\dv{SortId{}}("x"), inj{SortInt{}, SortAExp{}}(\dv{SortInt{}}("3")))), kseq{}(Lbl'Hash'freezer'UndsUndsUnds'IMP-SYNTAX'Unds'Stmt'Unds'Stmt'Unds'Stmt1'Unds'{}(kseq{}(inj{SortStmt{}, SortKItem{}}(VARVSortStmtX0 : SortStmt{}), dotk{}())), VARVSortKX1 : SortK{}))), VARVSortStateCellX2 : SortStateCell{}, Lbl'-LT-'args'-GT-'{}(VARVSortListX3 : SortList{})), Lbl'-LT-'generatedCounter'-GT-'{}(\dv{SortInt{}}("0"))), \equals{SortBool{}, SortGeneratedTopCell{}}(\dv{SortBool{}}("true"), LblisKResult{}(kseq{}(inj{SortStmt{}, SortKItem{}}(VARVSortStmtX0 : SortStmt{}), dotk{}()))))'''
+        parser = KoreParser(concrete_text)
+        concrete = parser.pattern()
+        a = pattern_domain.abstract(ctx=ctx, c=concrete)
+        _LOGGER.warning(f"a: {pattern_domain.to_str(a, indent=0)}")
+        concretized = pattern_domain.concretize(a)
+        _LOGGER.warning(f"concretized: {reachability_system.kprint.kore_to_pretty(concretized)}")
+        assert False
 
     def test_kresult_constraint_domain(
         self,
@@ -161,16 +186,16 @@ class TestImp(MyTest):
     ):
         sortInt = Kore.SortApp("SortInt", ())
         x1 = Kore.EVar("x1", sortInt)
-        domain = KResultConstraintDomain(rs=reachability_system, over_variables={x1})
+        domain = KResultConstraintDomain(rs=reachability_system)
         ctx = make_ctx()
         concrete_constraint = domain._mk_isKResult_pattern(x1, reachability_system.top_sort)
-        a = domain.abstract(ctx=ctx, c=[concrete_constraint])
+        a = domain.abstract(ctx=ctx, over_variables={x1}, constraints=[concrete_constraint])
         assert x1 in a.kresult_vars
         c = domain.concretize(a=a)
         assert c == [concrete_constraint]
         x2 = Kore.EVar("x2", sortInt)
         x1_eq_x2 = Kore.Equals(sortInt, sortInt, x1, x2)
-        a2 = domain.refine(ctx=ctx, a=a, c=[x1_eq_x2])
+        a2 = domain.refine(ctx=ctx, a=a, constraints=[x1_eq_x2])
         assert x1 in a2.kresult_vars
         assert x2 in a2.kresult_vars
 
@@ -186,12 +211,12 @@ class TestImp(MyTest):
         x2_int = Kore.EVar("x2", sortInt)
         y1_k = Kore.EVar("y1", KorePrelude.SORT_K)
 
-        underlying_domain_builder = KeepEverythingConstraintDomainBuilder()
+        underlying_domain = KeepEverythingConstraintDomain()
         st1 = Kore.App('kseq', (), (x1_kitem,y1_k))
         st1_constrained = Kore.And(KorePrelude.SORT_K, st1, Kore.Not(KorePrelude.SORT_K, Kore.Equals(sortKItem, KorePrelude.SORT_K, x1_kitem, KorePrelude.inj(sortInt, sortKItem, x2_int))))
         pm_domain = PatternMatchDomain(
             rs=reachability_system,
-            underlying_domain_builder=underlying_domain_builder,
+            underlying_domains=[underlying_domain],
             states=[(st1,"only")])
         #print(pm_domain)
         ctx = make_ctx()

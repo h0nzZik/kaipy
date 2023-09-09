@@ -17,11 +17,15 @@ class IAbstractSubstitutionsDomain(abc.ABC):
         ...
     
     @abc.abstractmethod
+    def free_variables_of(self, a: IAbstractSubstitutions) -> T.Set[Kore.EVar]:
+        ...
+
+    @abc.abstractmethod
     def disjunction(self, ctx: AbstractionContext, a1: IAbstractSubstitutions, a2: IAbstractSubstitutions) -> IAbstractSubstitutions:
         ...
 
     @abc.abstractmethod
-    def refine(self, ctx: AbstractionContext, a: IAbstractSubstitutions, c: T.List[Kore.MLPred]) -> IAbstractSubstitutions:
+    def refine(self, ctx: AbstractionContext, a: IAbstractSubstitutions, constraints: T.List[Kore.Pattern]) -> IAbstractSubstitutions:
         ...
 
     @abc.abstractmethod

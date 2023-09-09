@@ -43,6 +43,10 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
         return CartesianAbstractSubstitution(m)
         #return CartesianAbstractSubstitution(m_filtered)
 
+    def free_variables_of(self, a: IAbstractSubstitution) -> T.Set[Kore.EVar]:
+        assert type(a) is CartesianAbstractSubstitution
+        return set(a.mapping.keys())
+
     def refine(self, ctx: AbstractionContext, a: IAbstractSubstitution, c: T.List[Kore.MLPred]) -> CartesianAbstractSubstitution:
         assert type(a) is CartesianAbstractSubstitution
         return a

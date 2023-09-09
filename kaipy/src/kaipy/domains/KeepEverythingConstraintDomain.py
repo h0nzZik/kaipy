@@ -1,28 +1,33 @@
 import abc
 import dataclasses
+import itertools
 import typing as T
 
 import pyk.kore.syntax as Kore
 
+import kaipy.kore_utils as KoreUtils
 from kaipy.AbstractionContext import AbstractionContext
-from kaipy.interfaces.IAbstractConstraintDomainBuilder import IAbstractConstraintDomainBuilder
 from kaipy.interfaces.IAbstractConstraintDomain import IAbstractConstraint, IAbstractConstraintDomain
 
 @dataclasses.dataclass
 class KeepEverything(IAbstractConstraint):
-    everything: T.List[Kore.MLPred]
+    everything: T.List[Kore.Pattern]
 
 class KeepEverythingConstraintDomain(IAbstractConstraintDomain):
-    def abstract(self, ctx: AbstractionContext, c: T.List[Kore.MLPred]) -> IAbstractConstraint:
-        return KeepEverything(everything=c)
+    def abstract(self, ctx: AbstractionContext, over_variables: T.Set[Kore.EVar], constraints: T.List[Kore.Pattern]) -> IAbstractConstraint:
+        return KeepEverything(everything=constraints)
     
-    def refine(self, ctx: AbstractionContext, a: IAbstractConstraint, c: T.List[Kore.MLPred]) -> IAbstractConstraint:
+    def free_variables_of(self, a: IAbstractConstraint) -> T.Set[Kore.EVar]:
+        assert type(a) is KeepEverything
+        return set(*itertools.chain(*[KoreUtils.free_evars_of_pattern(p) for p in a.everything]))
+
+    def refine(self, ctx: AbstractionContext, a: IAbstractConstraint, constraints: T.List[Kore.Pattern]) -> IAbstractConstraint:
         return a
 
     def disjunction(self, ctx: AbstractionContext, a1: IAbstractConstraint, a2: IAbstractConstraint) -> IAbstractConstraint:
         raise NotImplementedError()
 
-    def concretize(self, a: IAbstractConstraint) -> T.List[Kore.MLPred]:
+    def concretize(self, a: IAbstractConstraint) -> T.List[Kore.Pattern]:
         assert type(a) is KeepEverything
         return a.everything
     
@@ -47,9 +52,3 @@ class KeepEverythingConstraintDomain(IAbstractConstraintDomain):
     def to_str(self, a: IAbstractConstraint, indent: int) -> str:
         assert type(a) is KeepEverything
         return str([x.text for x in a.everything])
-
-
-
-class KeepEverythingConstraintDomainBuilder(IAbstractConstraintDomainBuilder):
-    def build_abstract_constraint_domain(self, over_variables: T.Set[Kore.EVar]) -> IAbstractConstraintDomain:
-        return KeepEverythingConstraintDomain()

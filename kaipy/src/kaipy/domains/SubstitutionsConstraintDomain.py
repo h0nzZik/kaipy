@@ -11,7 +11,6 @@ from kaipy.ReachabilitySystem import ReachabilitySystem
 from kaipy.AbstractionContext import AbstractionContext
 from kaipy.interfaces.IAbstractConstraintDomain import IAbstractConstraint, IAbstractConstraintDomain
 from kaipy.interfaces.IAbstractSubstitutionsDomain import IAbstractSubstitutions, IAbstractSubstitutionsDomain
-from kaipy.interfaces.IAbstractConstraintDomainBuilder import IAbstractConstraintDomainBuilder
 from kaipy.Substitution import Substitution
 from kaipy.cnf import to_cnf
 
@@ -26,36 +25,33 @@ class SubstitutionsConstraint(IAbstractConstraint):
 class SubstitutionsConstraintDomain(IAbstractConstraintDomain):
     nested: IAbstractSubstitutionsDomain
     rs: ReachabilitySystem
-    evars: T.Set[Kore.EVar]
 
     def __init__(
         self,
         rs: ReachabilitySystem,
         nested: IAbstractSubstitutionsDomain,
-        evars: T.Set[Kore.EVar],
     ):
         self.nested = nested
         self.rs = rs
-        self.evars = evars
         #_LOGGER.warning(f"SCD evars: {self.evars}")
 
 
-    def abstract(self, ctx: AbstractionContext, c: T.List[Kore.MLPred]) -> IAbstractConstraint:
-        if KoreUtils.any_is_bottom(c):
+    def abstract(self, ctx: AbstractionContext, over_variables: T.Set[Kore.EVar], constraints: T.List[Kore.Pattern]) -> IAbstractConstraint:
+        if KoreUtils.any_is_bottom(constraints):
             return SubstitutionsConstraint(None)
         
         eqls: T.Dict[Kore.EVar, Kore.Pattern] = dict()
-        for p in c:
+        for p in constraints:
             match p:
                 case Kore.Equals(_, _, Kore.EVar(_, _), Kore.EVar(_, _)):
                     continue
                 case Kore.Equals(_, _, Kore.EVar(n, s), right):
-                    if Kore.EVar(n,s) in self.evars:
+                    if Kore.EVar(n,s) in over_variables:
                         eqls[Kore.EVar(n,s)] = right
                     else:
                         _LOGGER.warning(f"Unknown variable {n}:{s}")
                 case Kore.Equals(_, _, left, Kore.EVar(n, s)):
-                    if Kore.EVar(n,s) in self.evars:
+                    if Kore.EVar(n,s) in over_variables:
                         eqls[Kore.EVar(n,s)] = left
                     else:
                         _LOGGER.warning(f"Unknown variable {n}:{s}")
@@ -64,13 +60,19 @@ class SubstitutionsConstraintDomain(IAbstractConstraintDomain):
         a = SubstitutionsConstraint(self.nested.abstract(ctx, [subst]))
         return a
 
+
+    def free_variables_of(self, a: IAbstractConstraint) -> T.Set[Kore.EVar]:
+        assert type(a) is SubstitutionsConstraint
+        if a.nested is None:
+            return set()
+        return self.nested.free_variables_of(a.nested)
     
-    def refine(self, ctx: AbstractionContext, a: IAbstractConstraint, c: T.List[Kore.MLPred]) -> SubstitutionsConstraint:
+    def refine(self, ctx: AbstractionContext, a: IAbstractConstraint, constraints: T.List[Kore.Pattern]) -> SubstitutionsConstraint:
         assert type(a) is SubstitutionsConstraint
         if a.nested is None:
             return a
         
-        new_nested = self.nested.refine(ctx, a.nested, c)
+        new_nested = self.nested.refine(ctx, a.nested, constraints)
         new_a = SubstitutionsConstraint(new_nested)
         return new_a
 
@@ -83,7 +85,7 @@ class SubstitutionsConstraintDomain(IAbstractConstraintDomain):
             return a1
         return SubstitutionsConstraint(self.nested.disjunction(ctx, a1.nested, a2.nested))
 
-    def concretize(self, a: IAbstractConstraint) -> T.List[Kore.MLPred]:
+    def concretize(self, a: IAbstractConstraint) -> T.List[Kore.Pattern]:
         assert type(a) is SubstitutionsConstraint
         if a.nested is None:
             return [Kore.Bottom(self.rs.top_sort)] # type:ignore
@@ -134,19 +136,3 @@ class SubstitutionsConstraintDomain(IAbstractConstraintDomain):
         s = s + (indent*' ') + ">"
         return s
     
-
-
-class SubstitutionsConstraintDomainBuilder(IAbstractConstraintDomainBuilder):
-    nested: IAbstractSubstitutionsDomain
-    rs: ReachabilitySystem
-
-    def __init__(self, nested: IAbstractSubstitutionsDomain, rs: ReachabilitySystem):
-        self.nested = nested
-        self.rs = rs
-    
-    def build_abstract_constraint_domain(self, over_variables: T.Set[Kore.EVar]) -> SubstitutionsConstraintDomain:
-        return SubstitutionsConstraintDomain(
-            rs=self.rs,
-            nested=self.nested,
-            evars=over_variables,
-        )
