@@ -204,6 +204,10 @@ class FinitePatternDomain(IAbstractPatternDomain):
             renaming=dict(renaming_2)
         )
     
+    def free_variables_of(self, a: IAbstractPattern) -> T.Set[Kore.EVar]:
+        assert type(a) is FinitePattern
+        return KoreUtils.free_evars_of_pattern(self.concretize(a))
+
     def refine(self, ctx: AbstractionContext, a: IAbstractPattern, c: Kore.Pattern) -> FinitePattern:
         assert type(a) is FinitePattern
         return a

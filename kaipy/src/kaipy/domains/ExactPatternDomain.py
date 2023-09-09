@@ -33,6 +33,10 @@ class ExactPatternDomain(IAbstractPatternDomain):
                 return ExactPattern(idx=i, sort=sort)
         return ExactPattern(idx=-1, sort=sort)
     
+    def free_variables_of(self, a: IAbstractPattern) -> T.Set[Kore.EVar]:
+        assert type(a) is ExactPattern
+        return set()
+    
     def refine(self, ctx: AbstractionContext, a: IAbstractPattern, c: Kore.Pattern) -> ExactPattern:
         assert type(a) is ExactPattern
         return a

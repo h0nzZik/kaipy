@@ -198,6 +198,9 @@ class PatternMatchDomain(IAbstractPatternDomain):
         #_LOGGER.warning(f'AFTER= {self.rs.kprint.kore_to_pretty(result)}')
         return result
 
+    def free_variables_of(self, a: IAbstractPattern) -> T.Set[Kore.EVar]:
+        return KoreUtils.free_evars_of_pattern(self.concretize(a))
+
     def equals(self, a1: IAbstractPattern, a2: IAbstractPattern) -> bool:
         assert type(a1) is PatternMatchDomainElement
         assert type(a2) is PatternMatchDomainElement

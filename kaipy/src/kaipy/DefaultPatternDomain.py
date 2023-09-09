@@ -61,7 +61,7 @@ def build_abstract_pattern_domain(
     subst_constr_domain: IAbstractConstraintDomain = SubstitutionsConstraintDomain(rs=rs, nested=subst_list_domain)
 
     kresult_domain: IAbstractConstraintDomain = KResultConstraintDomain(rs=rs)
-    product_domain = ProductConstraintDomain([kresult_domain, subst_constr_domain])
+    product_domain = ProductConstraintDomain([subst_constr_domain, kresult_domain])
     cached_product_domain = CachedConstraintDomain(product_domain)
     pattern_match_domain = build_pattern_match_domain(rs, underlying_domain=cached_product_domain)
     return pattern_match_domain

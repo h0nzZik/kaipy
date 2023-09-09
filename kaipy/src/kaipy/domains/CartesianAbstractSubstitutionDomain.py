@@ -45,7 +45,10 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
 
     def free_variables_of(self, a: IAbstractSubstitution) -> T.Set[Kore.EVar]:
         assert type(a) is CartesianAbstractSubstitution
-        return set(a.mapping.keys())
+        fvs = set(a.mapping.keys())
+        for k,v in a.mapping.items():
+            fvs.update(self.pattern_domain.free_variables_of(v))
+        return fvs
 
     def refine(self, ctx: AbstractionContext, a: IAbstractSubstitution, c: T.List[Kore.MLPred]) -> CartesianAbstractSubstitution:
         assert type(a) is CartesianAbstractSubstitution

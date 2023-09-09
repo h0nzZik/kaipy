@@ -26,6 +26,9 @@ class CachedPatternDomain(IAbstractPatternDomain):
         self.cache[c2] = a
         return a
 
+    def free_variables_of(self, a: IAbstractPattern) -> T.Set[Kore.EVar]:
+        return self.underlying.free_variables_of(a)
+
     def refine(self, ctx: AbstractionContext, a: IAbstractPattern, c: Kore.Pattern) -> IAbstractPattern:
         return self.underlying.refine(ctx, a, c)
 

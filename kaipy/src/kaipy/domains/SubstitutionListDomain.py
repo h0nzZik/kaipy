@@ -35,7 +35,7 @@ class SubstitutionListDomain(IAbstractSubstitutionsDomain):
     
     def free_variables_of(self, a: IAbstractSubstitutions) -> T.Set[Kore.EVar]:
         assert type(a) is SubstitutionList
-        return set(*itertools.chain(*[self.underlying.free_variables_of(e) for e in a.elements]))
+        return set(itertools.chain(*[self.underlying.free_variables_of(e) for e in a.elements]))
 
     def disjunction(self, ctx: AbstractionContext, a1: IAbstractSubstitutions, a2: IAbstractSubstitutions) -> SubstitutionList:
         assert type(a1) is SubstitutionList
