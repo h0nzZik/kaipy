@@ -6,6 +6,7 @@ import typing as T
 import pyk.kore.syntax as Kore
 
 from kaipy.AbstractionContext import AbstractionContext
+from kaipy.BroadcastChannel import BroadcastChannel
 from kaipy.interfaces.IAbstractConstraintDomain import IAbstractConstraint, IAbstractConstraintDomain
 
 _LOGGER: T.Final = logging.getLogger(__name__)

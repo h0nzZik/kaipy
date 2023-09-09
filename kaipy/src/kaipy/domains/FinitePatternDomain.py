@@ -177,8 +177,8 @@ class FinitePatternDomain(IAbstractPatternDomain):
 
         constraints: T.List[Kore.MLPred] = list()
         fvc = set((fp1.renaming or dict()).values())
-        #renaming_back = KoreUtils.reverse_renaming(fp1.renaming or dict())
-        renaming_back: T.Dict[str,str] = dict()
+        renaming_back = KoreUtils.reverse_renaming(fp1.renaming or dict())
+        #renaming_back: T.Dict[str,str] = dict()
         for x in constraints_all:
             match x:
                 #case Kore.Equals(_, _, Kore.EVar(n1, s1), Kore.EVar(n2, s2)):

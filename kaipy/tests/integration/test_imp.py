@@ -21,6 +21,7 @@ from kaipy.AbstractionContext import AbstractionContext
 from kaipy.DefaultAbstractionContext import make_ctx
 from kaipy.HeatPreAnalysis import ContextAlias, ContextAliases, pre_analyze
 from kaipy.ReachabilitySystem import ReachabilitySystem
+from kaipy.domains.FinitePatternDomain import FinitePattern, FinitePatternDomain
 from kaipy.domains.PatternMatchDomain import PatternMatchDomain, PatternMatchDomainElement
 from kaipy.domains.BigsumPatternDomain import BigsumPattern, BigsumPatternDomain
 from kaipy.domains.ExactPatternDomain import ExactPattern, ExactPatternDomain
@@ -154,6 +155,34 @@ class TestImp(MyTest):
         _LOGGER.warning(reachability_system.kprint.kore_to_pretty(concrete_reachable_configurations))
         return result
     
+    def test_finitepd_cooperation(
+        self,
+        reachability_system: ReachabilitySystem,
+        context_aliases : ContextAliases
+    ):
+        pat = Kore.App(symbol="Lbl'Hash'freezer'UndsPlusUndsUnds'IMP-SYNTAX'Unds'AExp'Unds'AExp'Unds'AExp1'Unds'", sorts=(), args=(Kore.App('kseq', (), (Kore.EVar('HOLE', Kore.SortApp('SortKItem', ())),KorePrelude.DOTK)),))
+        ctx = make_ctx()
+        fpd: IAbstractPatternDomain = FinitePatternDomain(rs=reachability_system, pl=[
+            pat,
+        ])
+        a = fpd.abstract(ctx=ctx, c=pat)
+        concretized = fpd.concretize(a)
+        #print(a)
+        #print(concretized)
+        #print(ctx.broadcast_channel.constraints)
+        match concretized:
+            case Kore.App("Lbl'Hash'freezer'UndsPlusUndsUnds'IMP-SYNTAX'Unds'AExp'Unds'AExp'Unds'AExp1'Unds'", (), (Kore.App('kseq', (), (ev1, KorePrelude.DOTK)),)):
+                #print(ev1)
+                match ctx.broadcast_channel.constraints:
+                    case [Kore.Equals(_, _, ev1, Kore.EVar('HOLE', Kore.SortApp('SortKItem', ())))]:
+                        assert True
+                    case _:
+                        assert False
+                assert True
+            case _:
+                assert False
+        assert True
+
     def test_kresult_cooperation(
         self,
         reachability_system: ReachabilitySystem,
