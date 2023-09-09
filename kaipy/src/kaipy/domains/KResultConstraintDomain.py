@@ -76,10 +76,10 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
             for e in KoreUtils.free_evars_of_pattern(x):
                 if e in over_variables: # or e in ctx.variable_manager.generated or True:
                     monitored_evars[e] = p
-        _LOGGER.warning(f"Monitoring: {[e.text for e in monitored_evars.keys()]}")
+        #_LOGGER.warning(f"Monitoring: {[e.text for e in monitored_evars.keys()]}")
         a2 = self._refine_monitored(ctx, a, monitored_evars=monitored_evars)
-        if len(a2.kresult_vars) > 0 or True:
-            _LOGGER.warning(f"Abstracted {[x.text for x in constraints]} into {self.to_str(a2, indent=0)}")
+        #if len(a2.kresult_vars) > 0 or True:
+        #    _LOGGER.warning(f"Abstracted {[x.text for x in constraints]} into {self.to_str(a2, indent=0)}")
         return a2
 
     def refine(self, ctx: AbstractionContext, a: IAbstractConstraint, constraints: T.List[Kore.Pattern]) -> KResultConstraint:
@@ -113,14 +113,14 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
         # We ignore transitivity of equality for now, because
         # the only known client (FinitePatternDomain) produces singleton lists only.
         kresult_vars = a.kresult_vars.copy()
-        _LOGGER.warning(f"_rbe: kresult_vars = {kresult_vars}")
+        #_LOGGER.warning(f"_rbe: kresult_vars = {kresult_vars}")
         for (e1,e2) in equality_pairs:
             if e1 in kresult_vars and e2 not in kresult_vars:
-                _LOGGER.warning(f"Adding {e2}")
+                #_LOGGER.warning(f"Adding {e2}")
                 kresult_vars.append(e2)
                 continue
             if e2 in kresult_vars and e1 not in kresult_vars:
-                _LOGGER.warning(f"Adding {e1}")
+                #_LOGGER.warning(f"Adding {e1}")
                 kresult_vars.append(e1)
                 continue
 

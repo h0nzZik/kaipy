@@ -167,13 +167,13 @@ class FinitePatternDomain(IAbstractPatternDomain):
         # }
 
         constraints_all = mrs[fp1.idx].constraints
-        _LOGGER.warning(f"Pattern: {c.text}")
-        _LOGGER.warning(f"State: {self.pl[fp1.idx].text}")
-        _LOGGER.warning(f"Constraints_all: {[x.text for x in constraints_all]}")
-        _LOGGER.warning(f"Pattern free variables = {KoreUtils.free_evars_of_pattern(c)}")
-        _LOGGER.warning(f"State free variables = {KoreUtils.free_evars_of_pattern(self.pl[fp1.idx])}")
-        _LOGGER.warning(f"fp1.renaming = {fp1.renaming}")
-        _LOGGER.warning(f"renaming2 = {renaming_2}")
+        #_LOGGER.warning(f"Pattern: {c.text}")
+        #_LOGGER.warning(f"State: {self.pl[fp1.idx].text}")
+        #_LOGGER.warning(f"Constraints_all: {[x.text for x in constraints_all]}")
+        #_LOGGER.warning(f"Pattern free variables = {KoreUtils.free_evars_of_pattern(c)}")
+        #_LOGGER.warning(f"State free variables = {KoreUtils.free_evars_of_pattern(self.pl[fp1.idx])}")
+        #_LOGGER.warning(f"fp1.renaming = {fp1.renaming}")
+        #_LOGGER.warning(f"renaming2 = {renaming_2}")
 
         constraints: T.List[Kore.Pattern] = list()
         #fvc = set((fp1.renaming or dict()).values())

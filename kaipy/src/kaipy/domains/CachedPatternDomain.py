@@ -11,7 +11,7 @@ from kaipy.interfaces.IAbstractPatternDomain import IAbstractPattern, IAbstractP
 class CachedPatternDomain(IAbstractPatternDomain):
     underlying: IAbstractPatternDomain
     # We cache only in one direction, since the other is supposed to be fast enough.
-    cache: T.Dict[Kore.Pattern, IAbstractPattern]
+    cache: T.Dict[Kore.Pattern, T.Tuple[IAbstractPattern, T.List[Kore.Pattern]]]
     
     def __init__(self, underlying: IAbstractPatternDomain):
         self.underlying = underlying
@@ -22,10 +22,14 @@ class CachedPatternDomain(IAbstractPatternDomain):
         #c2 = KoreUtils.normalize_pattern(c)
         c2 = c
         if c2 in self.cache:
-            return self.cache[c2]
+            a,msgs = self.cache[c2]
+            ctx.broadcast_channel.broadcast(msgs)
+            return a
 
+        # We have to cache the side-effects :-)
+        channel_len = len(ctx.broadcast_channel.constraints)
         a = self.underlying.abstract(ctx, c2)
-        self.cache[c2] = a
+        self.cache[c2] = (a, ctx.broadcast_channel.constraints[channel_len:])
         return a
 
     def free_variables_of(self, a: IAbstractPattern) -> T.Set[Kore.EVar]:

@@ -10,6 +10,7 @@ import pyk.kore.syntax as Kore
 
 import kaipy.kore_utils as KoreUtils
 import kaipy.rs_utils as RSUtils
+from kaipy.BroadcastChannel import BroadcastChannel
 from kaipy.VariableManager import VariableManager
 from kaipy.AbstractionContext import AbstractionContext
 from kaipy.ReachabilitySystem import ReachabilitySystem
@@ -84,6 +85,7 @@ class PatternMatchDomain(IAbstractPatternDomain):
         ]
 
         cpsl: T.List[T.List[IAbstractConstraint|None]] = list()
+        broadcast_channels = [BroadcastChannel() for _ in self.states]
         for idx,q in enumerate(c_simpl_list_norm):
             #_LOGGER.warning(f"q: {q}")
             mrs: T.List[MatchResult] = parallel_match(rs=self.rs, cfg=q, states=self.states, renaming=renamings[idx])
@@ -99,7 +101,8 @@ class PatternMatchDomain(IAbstractPatternDomain):
                     #_LOGGER.warning(f"Skipping bottom at {i}")
                     cps.append(None)
                     continue
-                ctx.broadcast_channel.reset()
+                ctx.broadcast_channel = broadcast_channels[i]
+                #ctx.broadcast_channel.reset()
                 d = self.underlying_domains[i]
                 a1 = d.abstract(
                     ctx=ctx,

@@ -1,6 +1,7 @@
 import typing as T
 
 import pyk.kore.syntax as Kore
+import pyk.kore.prelude as KorePrelude
 
 import kaipy.kore_utils as KoreUtils
 
@@ -32,7 +33,7 @@ def build_abstract_pattern_domain(
 ) -> IAbstractPatternDomain:
     initial_configuration = rs.simplify(initial_configuration)
     subpatterns: T.List[Kore.Pattern] = list(KoreUtils.some_subpatterns_of(initial_configuration).keys())
-    finite_set_of_patterns = rests + subpatterns
+    finite_set_of_patterns = rests + subpatterns + [KorePrelude.DOTK]
     exact_pattern_domain: IAbstractPatternDomain = ExactPatternDomain(
         rs,
         patterns=[
@@ -60,8 +61,13 @@ def build_abstract_pattern_domain(
     subst_list_domain: IAbstractSubstitutionsDomain = SubstitutionListDomain(subst_domain)
     subst_constr_domain: IAbstractConstraintDomain = SubstitutionsConstraintDomain(rs=rs, nested=subst_list_domain)
 
+    # Second substitution domain - to catch stuff coming out from the first subst domain. Mainly for `.K`
+    subst_domain_2: IAbstractSubstitutionDomain = CartesianAbstractSubstitutionDomain(exact_pattern_domain)
+    subst_list_domain_2: IAbstractSubstitutionsDomain = SubstitutionListDomain(subst_domain_2)
+    subst_constr_domain_2: IAbstractConstraintDomain = SubstitutionsConstraintDomain(rs=rs, nested=subst_list_domain_2)
+
     kresult_domain: IAbstractConstraintDomain = KResultConstraintDomain(rs=rs)
-    product_domain = ProductConstraintDomain([subst_constr_domain, kresult_domain])
+    product_domain = ProductConstraintDomain([subst_constr_domain, subst_constr_domain_2, kresult_domain])
     cached_product_domain = CachedConstraintDomain(product_domain)
     pattern_match_domain = build_pattern_match_domain(rs, underlying_domain=cached_product_domain)
     return pattern_match_domain

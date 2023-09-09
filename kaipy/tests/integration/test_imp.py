@@ -186,6 +186,34 @@ class TestImp(MyTest):
                 assert False
         assert True
 
+    def test_dotk(
+        self,
+        reachability_system: ReachabilitySystem,
+        context_aliases : ContextAliases
+    ):
+        input_pattern: Kore.Pattern = reachability_system.kdw.get_input_kore(
+            RSTestBase.LANGUAGES / "imp/very-simple.imp"
+        )
+
+        rests = pre_analyze(reachability_system, context_aliases, input_pattern)
+        pattern_domain = build_abstract_pattern_domain(
+            reachability_system,
+            rests,
+            input_pattern
+        )
+        ctx = make_ctx()
+        #concrete_text = r'''Lbl'-LT-'generatedTop'-GT-'{}(Lbl'-LT-'T'-GT-'{}(Lbl'-LT-'k'-GT-'{}(kseq{}(inj{SortStmt{}, SortKItem{}}(Lblint'UndsSClnUnds'IMP-SYNTAX'Unds'Stmt'Unds'Ids{}(Lbl'Stop'List'LBraQuotUndsCommUndsUnds'IMP-SYNTAX'Unds'Ids'Unds'Id'Unds'Ids'QuotRBraUnds'Ids{}())), kseq{}(Lbl'Hash'freezer'UndsUndsUnds'IMP-SYNTAX'Unds'Stmt'Unds'Stmt'Unds'Stmt0'Unds'{}(kseq{}(inj{SortStmt{}, SortKItem{}}(Lbl'UndsEqlsUndsSClnUnds'IMP-SYNTAX'Unds'Stmt'Unds'Id'Unds'AExp{}(\dv{SortId{}}("x"), inj{SortInt{}, SortAExp{}}(\dv{SortInt{}}("3")))), dotk{}())), dotk{}()))), Lbl'-LT-'state'-GT-'{}(Lbl'UndsPipe'-'-GT-Unds'{}(inj{SortId{}, SortKItem{}}(\dv{SortId{}}("x")), inj{SortInt{}, SortKItem{}}(\dv{SortInt{}}("0")))), Lbl'-LT-'args'-GT-'{}(VARVSortListX0 : SortList{})), Lbl'-LT-'generatedCounter'-GT-'{}(\dv{SortInt{}}("0")))'''
+        concrete_text = r'''Lbl'-LT-'generatedTop'-GT-'{}(Lbl'-LT-'T'-GT-'{}(Lbl'-LT-'k'-GT-'{}(kseq{}(inj{SortStmt{}, SortKItem{}}(Lblint'UndsSClnUnds'IMP-SYNTAX'Unds'Stmt'Unds'Ids{}(Lbl'Stop'List'LBraQuotUndsCommUndsUnds'IMP-SYNTAX'Unds'Ids'Unds'Id'Unds'Ids'QuotRBraUnds'Ids{}())), kseq{}(Lbl'Hash'freezer'UndsUndsUnds'IMP-SYNTAX'Unds'Stmt'Unds'Stmt'Unds'Stmt0'Unds'{}(kseq{}(inj{SortStmt{}, SortKItem{}}(Lbl'UndsEqlsUndsSClnUnds'IMP-SYNTAX'Unds'Stmt'Unds'Id'Unds'AExp{}(\dv{SortId{}}("x"), inj{SortInt{}, SortAExp{}}(\dv{SortInt{}}("3")))), dotk{}())), dotk{}()))), Lbl'-LT-'state'-GT-'{}(Lbl'UndsPipe'-'-GT-Unds'{}(inj{SortId{}, SortKItem{}}(\dv{SortId{}}("x")), inj{SortInt{}, SortKItem{}}(\dv{SortInt{}}("0")))), Lbl'-LT-'args'-GT-'{}(VARVSortListX0 : SortList{})), Lbl'-LT-'generatedCounter'-GT-'{}(\dv{SortInt{}}("0")))'''
+        parser = KoreParser(concrete_text)
+        concrete = parser.pattern()
+        #_LOGGER.warning(f"concrete: {reachability_system.kprint.kore_to_pretty(concrete)}")
+        a = pattern_domain.abstract(ctx=ctx, c=concrete)
+        _LOGGER.warning(f"a: {pattern_domain.to_str(a, indent=0)}")
+        #assert a.
+        concretized = pattern_domain.concretize(a)
+        _LOGGER.warning(f"concretized: {reachability_system.kprint.kore_to_pretty(concretized)}")
+        
+
     def test_kresult_cooperation(
         self,
         reachability_system: ReachabilitySystem,

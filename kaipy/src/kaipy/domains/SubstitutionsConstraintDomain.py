@@ -25,14 +25,17 @@ class SubstitutionsConstraint(IAbstractConstraint):
 class SubstitutionsConstraintDomain(IAbstractConstraintDomain):
     nested: IAbstractSubstitutionsDomain
     rs: ReachabilitySystem
+    catch_all: bool
 
     def __init__(
         self,
         rs: ReachabilitySystem,
         nested: IAbstractSubstitutionsDomain,
+        catch_all: bool = False,
     ):
         self.nested = nested
         self.rs = rs
+        self.catch_all = catch_all
         #_LOGGER.warning(f"SCD evars: {self.evars}")
 
 
@@ -40,18 +43,21 @@ class SubstitutionsConstraintDomain(IAbstractConstraintDomain):
         if KoreUtils.any_is_bottom(constraints):
             return SubstitutionsConstraint(None)
         
+        _LOGGER.warning(f"over_variables: {over_variables}")
+        _LOGGER.warning(f"len(constraints): {len(constraints)}")
+        
         eqls: T.Dict[Kore.EVar, Kore.Pattern] = dict()
         for p in constraints:
             match p:
                 case Kore.Equals(_, _, Kore.EVar(_, _), Kore.EVar(_, _)):
                     continue
                 case Kore.Equals(_, _, Kore.EVar(n, s), right):
-                    if Kore.EVar(n,s) in over_variables:
+                    if Kore.EVar(n,s) in over_variables or self.catch_all:
                         eqls[Kore.EVar(n,s)] = right
                     else:
                         _LOGGER.warning(f"Unknown variable {n}:{s}")
                 case Kore.Equals(_, _, left, Kore.EVar(n, s)):
-                    if Kore.EVar(n,s) in over_variables:
+                    if Kore.EVar(n,s) in over_variables or self.catch_all:
                         eqls[Kore.EVar(n,s)] = left
                     else:
                         _LOGGER.warning(f"Unknown variable {n}:{s}")

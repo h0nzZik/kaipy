@@ -24,8 +24,9 @@ class ProductConstraintDomain(IAbstractConstraintDomain):
     def abstract(self, ctx: AbstractionContext, over_variables: T.Set[Kore.EVar], constraints: T.List[Kore.Pattern]) -> ProductConstraint:
         ovs = over_variables.copy()
         underlying: T.List[IAbstractConstraint] = list()
+        ctx.broadcast_channel.reset()
         for ud in self.underlying_domains:
-            _LOGGER.warning(f"ovs: {ovs}")
+            #_LOGGER.warning(f"ovs: {ovs}")
             a = ud.abstract(ctx, over_variables=ovs, constraints=constraints+ctx.broadcast_channel.constraints)
             ovs.update(ud.free_variables_of(a))
             underlying.append(a)
