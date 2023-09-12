@@ -3,6 +3,7 @@ import collections
 import dataclasses
 import functools as F
 import itertools
+import time
 import typing as T
 import logging
 
@@ -10,6 +11,7 @@ import pyk.kore.syntax as Kore
 
 import kaipy.kore_utils as KoreUtils
 import kaipy.rs_utils as RSUtils
+from kaipy.PerfCounter import PerfCounter
 from kaipy.BroadcastChannel import BroadcastChannel
 from kaipy.VariableManager import VariableManager
 from kaipy.AbstractionContext import AbstractionContext
@@ -31,6 +33,7 @@ class PatternMatchDomain(IAbstractPatternDomain):
     state_vars: T.List[T.Set[Kore.EVar]]
     comments: T.Mapping[Kore.Pattern, str]
     underlying_domains: T.List[IAbstractConstraintDomain]
+    abstract_perf_counter: PerfCounter
     # invariant: len(states) == len(underlying_domains)
 
     # maybe?
@@ -48,6 +51,7 @@ class PatternMatchDomain(IAbstractPatternDomain):
         self.state_vars = [KoreUtils.free_evars_of_pattern(st) for st in self.states]
         #_LOGGER.warning(f"States: {len(states)}")
         self.underlying_domains = underlying_domains
+        self.abstract_perf_counter = PerfCounter()
 
     @F.cached_property
     def _top_sort(self):
@@ -63,6 +67,13 @@ class PatternMatchDomain(IAbstractPatternDomain):
         return evs
 
     def abstract(self, ctx: AbstractionContext, c: Kore.Pattern) -> PatternMatchDomainElement:
+        old = time.perf_counter()
+        a = self._abstract(ctx, c)
+        new = time.perf_counter()
+        self.abstract_perf_counter.add(new - old)
+        return a
+
+    def _abstract(self, ctx: AbstractionContext, c: Kore.Pattern) -> PatternMatchDomainElement:
         #_LOGGER.warning(f"c: {c.text}")
         c_simpl = self.rs.simplify(c)
         #_LOGGER.warning(f"c_simpl: {c_simpl.text}")
@@ -234,3 +245,9 @@ class PatternMatchDomain(IAbstractPatternDomain):
             s = s + f'{ud.to_str(b, indent=indent+2)}\n'
         s = s + (indent*' ') + "]"
         return s
+
+    def statistics(self) -> T.Dict[str, T.Any]:
+        return {
+            'abstract' : self.abstract_perf_counter.dict,
+            'underlying' : [d.statistics() for d in self.underlying_domains]
+        }

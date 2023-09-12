@@ -1,8 +1,10 @@
 import abc
+import time
 import typing as T
 
 import pyk.kore.syntax as Kore
 
+from kaipy.PerfCounter import PerfCounter
 import kaipy.kore_utils as KoreUtils
 from kaipy.AbstractionContext import AbstractionContext
 from kaipy.interfaces.IAbstractPatternDomain import IAbstractPattern, IAbstractPatternDomain
@@ -12,12 +14,21 @@ class CachedPatternDomain(IAbstractPatternDomain):
     underlying: IAbstractPatternDomain
     # We cache only in one direction, since the other is supposed to be fast enough.
     cache: T.Dict[Kore.Pattern, T.Tuple[IAbstractPattern, T.List[Kore.Pattern]]]
+    abstract_perf_counter: PerfCounter
     
     def __init__(self, underlying: IAbstractPatternDomain):
         self.underlying = underlying
         self.cache = dict()
+        self.abstract_perf_counter = PerfCounter()
 
     def abstract(self, ctx: AbstractionContext, c: Kore.Pattern) -> IAbstractPattern:
+        old = time.perf_counter()
+        a = self._abstract(ctx, c)
+        new = time.perf_counter()
+        self.abstract_perf_counter.add(new - old)
+        return a
+
+    def _abstract(self, ctx: AbstractionContext, c: Kore.Pattern) -> IAbstractPattern:
         # This breaks stuff
         #c2 = KoreUtils.normalize_pattern(c)
         c2 = c
@@ -58,3 +69,9 @@ class CachedPatternDomain(IAbstractPatternDomain):
     
     def to_str(self, a: IAbstractPattern, indent: int) -> str:
         return self.underlying.to_str(a, indent)
+    
+    def statistics(self) -> T.Dict[str, T.Any]:
+        return {
+            'abstract' : self.abstract_perf_counter.dict,
+            'underlying': [self.underlying.statistics()]
+        }

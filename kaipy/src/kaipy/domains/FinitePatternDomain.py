@@ -1,11 +1,13 @@
 import dataclasses
 import logging
 import functools
+import time
 import typing as T
 
 import pyk.kore.syntax as Kore
 
 import kaipy.kore_utils as KoreUtils
+from kaipy.PerfCounter import PerfCounter
 from kaipy.AbstractionContext import AbstractionContext
 from kaipy.VariableManager import VariableManager
 from kaipy.ParallelMatcher import parallel_match, MatchResult
@@ -67,11 +69,13 @@ class FinitePatternDomain(IAbstractPatternDomain):
     pl : T.List[Kore.Pattern] # list of terms with free variables
     rs : ReachabilitySystem
     subsumption_matrix: T.Set[T.Tuple[int,int]]
+    abstract_perf_counter: PerfCounter
 
     # pl - list of patterns potentially containing free variables
     def __init__(self, pl: T.List[Kore.Pattern], rs: ReachabilitySystem):
         self.pl = pl
         self.rs = rs
+        self.abstract_perf_counter = PerfCounter()
 
         #2for x in self.pl:
         #    _LOGGER.warning(f'{self.rs.kprint.kore_to_pretty(x)}')
@@ -91,6 +95,13 @@ class FinitePatternDomain(IAbstractPatternDomain):
         #_LOGGER.warning(f'{self.subsumption_matrix}')
     
     def abstract(self, ctx: AbstractionContext, c: Kore.Pattern) -> FinitePattern:
+        old = time.perf_counter()
+        a = self._abstract(ctx, c)
+        new = time.perf_counter()
+        self.abstract_perf_counter.add(new - old)
+        return a
+
+    def _abstract(self, ctx: AbstractionContext, c: Kore.Pattern) -> FinitePattern:
         csort = self.rs.sortof(c)
         mrs: T.List[MatchResult] = parallel_match(rs=self.rs, cfg=c, states=[(s if self.rs.sortof(s) == csort else Kore.Bottom(csort)) for s in self.pl])
 
@@ -271,3 +282,9 @@ class FinitePatternDomain(IAbstractPatternDomain):
         #c = self.concretize(a)
         #assert not KoreUtils.is_top(c) ?????
         #return self.rs.kprint.kore_to_pretty(c)
+
+
+    def statistics(self) -> T.Dict[str, T.Any]:
+        return {
+            'abstract' : self.abstract_perf_counter.dict,
+        }

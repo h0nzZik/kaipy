@@ -51,3 +51,7 @@ class IAbstractSubstitutionDomain(abc.ABC):
     @abc.abstractmethod
     def to_str(self, a: IAbstractSubstitution, indent: int) -> str:
         ...
+    
+    @abc.abstractmethod
+    def statistics(self) -> T.Dict[str, T.Any]:
+        ...

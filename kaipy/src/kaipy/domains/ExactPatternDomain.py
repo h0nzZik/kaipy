@@ -1,9 +1,11 @@
 import dataclasses
 import logging
+import time
 import typing as T
 
 import pyk.kore.syntax as Kore
 
+from kaipy.PerfCounter import PerfCounter
 import kaipy.kore_utils as KoreUtils
 from kaipy.AbstractionContext import AbstractionContext
 from kaipy.ReachabilitySystem import ReachabilitySystem
@@ -22,14 +24,23 @@ class ExactPattern(IAbstractPattern):
 class ExactPatternDomain(IAbstractPatternDomain):
     pl: T.List[Kore.Pattern]
     rs: ReachabilitySystem
+    abstract_perf_counter: PerfCounter
 
     def __init__(self, rs:ReachabilitySystem, patterns: T.List[Kore.Pattern]):
         for p in patterns:
             assert 0 == len(KoreUtils.free_evars_of_pattern(p))
         self.rs = rs
         self.pl = patterns 
+        self.abstract_perf_counter = PerfCounter()
 
     def abstract(self, ctx: AbstractionContext, c: Kore.Pattern) -> ExactPattern:
+        old = time.perf_counter()
+        a = self._abstract(ctx, c)
+        new = time.perf_counter()
+        self.abstract_perf_counter.add(new - old)
+        return a
+
+    def _abstract(self, ctx: AbstractionContext, c: Kore.Pattern) -> ExactPattern:
         sort = self.rs.kdw.sortof(c)
         for i,p in enumerate(self.pl):
             if p == c:
@@ -90,3 +101,8 @@ class ExactPatternDomain(IAbstractPatternDomain):
     def to_str(self, a: IAbstractPattern, indent: int) -> str:
         assert type(a) is ExactPattern
         return (indent*' ') + f'<idx={a.idx},sort={a.sort}>'
+
+    def statistics(self) -> T.Dict[str, T.Any]:
+        return {
+            'abstract' : self.abstract_perf_counter.dict,
+        }

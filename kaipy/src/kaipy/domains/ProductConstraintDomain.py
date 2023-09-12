@@ -1,12 +1,14 @@
 import dataclasses
 import itertools
 import logging
+import time
 import typing as T
 
 import pyk.kore.syntax as Kore
 
 from kaipy.AbstractionContext import AbstractionContext
 from kaipy.BroadcastChannel import BroadcastChannel
+from kaipy.PerfCounter import PerfCounter
 from kaipy.interfaces.IAbstractConstraintDomain import IAbstractConstraint, IAbstractConstraintDomain
 
 _LOGGER: T.Final = logging.getLogger(__name__)
@@ -17,11 +19,21 @@ class ProductConstraint(IAbstractConstraint):
 
 class ProductConstraintDomain(IAbstractConstraintDomain):
     underlying_domains: T.List[IAbstractConstraintDomain]
+    abstract_perf_counter: PerfCounter
 
     def __init__(self, underlying_domains: T.List[IAbstractConstraintDomain]):
         self.underlying_domains = underlying_domains
+        self.abstract_perf_counter = PerfCounter()
 
     def abstract(self, ctx: AbstractionContext, over_variables: T.Set[Kore.EVar], constraints: T.List[Kore.Pattern]) -> ProductConstraint:
+        old = time.perf_counter()
+        a = self._abstract(ctx, over_variables, constraints)
+        new = time.perf_counter()
+        self.abstract_perf_counter.add(new - old)
+        return a
+
+
+    def _abstract(self, ctx: AbstractionContext, over_variables: T.Set[Kore.EVar], constraints: T.List[Kore.Pattern]) -> ProductConstraint:
         ovs = over_variables.copy()
         underlying: T.List[IAbstractConstraint] = list()
         ctx.broadcast_channel.reset()
@@ -81,3 +93,10 @@ class ProductConstraintDomain(IAbstractConstraintDomain):
             s = s + ud.to_str(ua, indent=indent+1) + ",\n"
         s = s + (indent*' ') + ">"
         return s
+
+
+    def statistics(self) -> T.Dict[str, T.Any]:
+        return {
+            'abstract' : self.abstract_perf_counter.dict,
+            'underlying' : [d.statistics() for d in self.underlying_domains]
+        }

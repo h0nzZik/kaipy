@@ -1,5 +1,6 @@
 import dataclasses
 import logging
+import time
 import typing as T
 import pprint
 import itertools
@@ -9,6 +10,7 @@ from immutabledict import immutabledict
 import pyk.kore.syntax as Kore
 
 import kaipy.kore_utils as KoreUtils
+from kaipy.PerfCounter import PerfCounter
 from kaipy.AbstractionContext import AbstractionContext
 from kaipy.Substitution import Substitution
 from kaipy.interfaces.IAbstractPatternDomain import IAbstractPatternDomain, IAbstractPattern
@@ -24,12 +26,22 @@ class SubstitutionList(IAbstractSubstitutions):
 
 class SubstitutionListDomain(IAbstractSubstitutionsDomain):
     underlying: IAbstractSubstitutionDomain
+    abstract_perf_counter: PerfCounter
 
     # `underlying` has to be a finite domain in order for this to have finite height
     def __init__(self, underlying: IAbstractSubstitutionDomain):
         self.underlying = underlying
+        self.abstract_perf_counter = PerfCounter()
     
     def abstract(self, ctx: AbstractionContext, substs: T.List[Substitution]) -> IAbstractSubstitutions:
+        old = time.perf_counter()
+        a = self._abstract(ctx, substs)
+        new = time.perf_counter()
+        self.abstract_perf_counter.add(new - old)
+        return a
+
+
+    def _abstract(self, ctx: AbstractionContext, substs: T.List[Substitution]) -> IAbstractSubstitutions:
         els = [self.underlying.abstract(ctx, subst) for subst in substs]
         return SubstitutionList(elements=els)
     
@@ -90,4 +102,9 @@ class SubstitutionListDomain(IAbstractSubstitutionsDomain):
             s = f"{self.underlying.to_str(e, indent=indent+1)},\n"
         s = s + (indent*' ') + ">"
         return s
-        
+
+    def statistics(self) -> T.Dict[str, T.Any]:
+        return {
+            'abstract' : self.abstract_perf_counter.dict,
+            'underlying' : [self.underlying.statistics()]
+        }

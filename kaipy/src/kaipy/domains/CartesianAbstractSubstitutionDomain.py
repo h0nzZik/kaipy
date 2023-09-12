@@ -1,5 +1,6 @@
 import dataclasses
 import logging
+import time
 import typing as T
 import pprint
 import itertools
@@ -8,6 +9,7 @@ from immutabledict import immutabledict
 
 import pyk.kore.syntax as Kore
 
+from kaipy.PerfCounter import PerfCounter
 import kaipy.kore_utils as KoreUtils
 from kaipy.AbstractionContext import AbstractionContext
 from kaipy.Substitution import Substitution
@@ -23,11 +25,20 @@ class CartesianAbstractSubstitution(IAbstractSubstitution):
 
 class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
     pattern_domain: IAbstractPatternDomain
+    abstract_perf_counter: PerfCounter
 
     def __init__(self, pattern_domain: IAbstractPatternDomain):
         self.pattern_domain = pattern_domain
+        self.abstract_perf_counter = PerfCounter()
     
     def abstract(self, ctx: AbstractionContext, subst: Substitution) -> CartesianAbstractSubstitution:
+        old = time.perf_counter()
+        a = self._abstract(ctx, subst)
+        new = time.perf_counter()
+        self.abstract_perf_counter.add(new - old)
+        return a
+
+    def _abstract(self, ctx: AbstractionContext, subst: Substitution) -> CartesianAbstractSubstitution:
         #_LOGGER.warning(f"abstract({subst})")
         # we ignore `preds`
         m = {
@@ -185,3 +196,9 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
             s = s + self.pattern_domain.to_str(v, indent=indent+2) + '\n'
         s = s + (indent*' ') + ">"
         return s
+
+    def statistics(self) -> T.Dict[str, T.Any]:
+        return {
+            'abstract' : self.abstract_perf_counter.dict,
+            'underlying': [self.pattern_domain.statistics()]
+        }

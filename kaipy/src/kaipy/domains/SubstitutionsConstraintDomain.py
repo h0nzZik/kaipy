@@ -1,4 +1,5 @@
 import dataclasses
+import time
 import typing as T
 import logging
 from immutabledict import immutabledict
@@ -7,6 +8,7 @@ import pyk.kore.syntax as Kore
 
 import kaipy.kore_utils as KoreUtils
 import kaipy.rs_utils as RSUtils
+from kaipy.PerfCounter import PerfCounter
 from kaipy.ReachabilitySystem import ReachabilitySystem
 from kaipy.AbstractionContext import AbstractionContext
 from kaipy.interfaces.IAbstractConstraintDomain import IAbstractConstraint, IAbstractConstraintDomain
@@ -26,6 +28,7 @@ class SubstitutionsConstraintDomain(IAbstractConstraintDomain):
     nested: IAbstractSubstitutionsDomain
     rs: ReachabilitySystem
     catch_all: bool
+    abstract_perf_counter: PerfCounter
 
     def __init__(
         self,
@@ -36,10 +39,17 @@ class SubstitutionsConstraintDomain(IAbstractConstraintDomain):
         self.nested = nested
         self.rs = rs
         self.catch_all = catch_all
+        self.abstract_perf_counter = PerfCounter()
         #_LOGGER.warning(f"SCD evars: {self.evars}")
 
-
     def abstract(self, ctx: AbstractionContext, over_variables: T.Set[Kore.EVar], constraints: T.List[Kore.Pattern]) -> IAbstractConstraint:
+        old = time.perf_counter()
+        a = self._abstract(ctx, over_variables, constraints)
+        new = time.perf_counter()
+        self.abstract_perf_counter.add(new - old)
+        return a
+
+    def _abstract(self, ctx: AbstractionContext, over_variables: T.Set[Kore.EVar], constraints: T.List[Kore.Pattern]) -> IAbstractConstraint:
         if KoreUtils.any_is_bottom(constraints):
             return SubstitutionsConstraint(None)
         
@@ -142,3 +152,8 @@ class SubstitutionsConstraintDomain(IAbstractConstraintDomain):
         s = s + (indent*' ') + ">"
         return s
     
+    def statistics(self) -> T.Dict[str, T.Any]:
+        return {
+            'abstract' : self.abstract_perf_counter.dict,
+            'underlying' : [self.nested.statistics()]
+        }
