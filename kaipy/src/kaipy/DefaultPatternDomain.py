@@ -13,7 +13,7 @@ from kaipy.interfaces.IAbstractSubstitutionsDomain import IAbstractSubstitutions
 from kaipy.domains.CachedConstraintDomain import CachedConstraintDomain
 from kaipy.domains.DisjunctiveConstraintDomain import DisjunctiveConstraintDomain
 from kaipy.domains.SubstitutionListDomain import SubstitutionListDomain
-from kaipy.domains.SubstitutionsConstraintDomain import SubstitutionsConstraintDomain
+from kaipy.domains.SubstitutionConstraintDomain import SubstitutionConstraintDomain
 from kaipy.domains.BigsumPatternDomain import BigsumPatternDomain
 from kaipy.domains.FinitePatternDomain import FinitePatternDomain
 from kaipy.domains.ExactPatternDomain import ExactPatternDomain
@@ -59,16 +59,19 @@ def build_abstract_pattern_domain(
     cached_combined_domain: IAbstractPatternDomain = CachedPatternDomain(combined_domain)
     
     subst_domain: IAbstractSubstitutionDomain = CartesianAbstractSubstitutionDomain(cached_combined_domain)
-    subst_list_domain: IAbstractSubstitutionsDomain = SubstitutionListDomain(subst_domain)
-    subst_constr_domain: IAbstractConstraintDomain = SubstitutionsConstraintDomain(rs=rs, nested=subst_list_domain)
+    #subst_list_domain: IAbstractSubstitutionsDomain = SubstitutionListDomain(subst_domain)
+    subst_constr_domain: IAbstractConstraintDomain = SubstitutionConstraintDomain(rs=rs, nested=subst_domain)
 
     # Second substitution domain - to catch stuff coming out from the first subst domain. Mainly for `.K`
     subst_domain_2: IAbstractSubstitutionDomain = CartesianAbstractSubstitutionDomain(exact_pattern_domain)
-    subst_list_domain_2: IAbstractSubstitutionsDomain = SubstitutionListDomain(subst_domain_2)
-    subst_constr_domain_2: IAbstractConstraintDomain = SubstitutionsConstraintDomain(rs=rs, nested=subst_list_domain_2)
+    #subst_list_domain_2: IAbstractSubstitutionsDomain = SubstitutionListDomain(subst_domain_2)
+    subst_constr_domain_2: IAbstractConstraintDomain = SubstitutionConstraintDomain(rs=rs, nested=subst_domain_2)
 
     kresult_domain: IAbstractConstraintDomain = KResultConstraintDomain(rs=rs)
     product_domain = ProductConstraintDomain([subst_constr_domain, subst_constr_domain_2, kresult_domain])
-    cached_product_domain = CachedConstraintDomain(product_domain)
+
+    product_domain_disj = DisjunctiveConstraintDomain(product_domain, rs=rs)
+
+    cached_product_domain = CachedConstraintDomain(product_domain_disj)
     pattern_match_domain = build_pattern_match_domain(rs, underlying_domain=cached_product_domain)
     return pattern_match_domain
