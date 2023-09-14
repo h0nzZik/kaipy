@@ -61,7 +61,7 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
             fvs.update(self.pattern_domain.free_variables_of(v))
         return fvs
 
-    def refine(self, ctx: AbstractionContext, a: IAbstractSubstitution, c: T.List[Kore.MLPred]) -> CartesianAbstractSubstitution:
+    def refine(self, ctx: AbstractionContext, a: IAbstractSubstitution, c: T.List[Kore.Pattern]) -> CartesianAbstractSubstitution:
         assert type(a) is CartesianAbstractSubstitution
         return a
         #return self.do_refine(ctx, a, c)

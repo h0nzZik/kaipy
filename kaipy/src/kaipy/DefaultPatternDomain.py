@@ -11,6 +11,7 @@ from kaipy.interfaces.IAbstractSubstitutionDomain import IAbstractSubstitutionDo
 from kaipy.interfaces.IAbstractSubstitutionsDomain import IAbstractSubstitutionsDomain
 
 from kaipy.domains.CachedConstraintDomain import CachedConstraintDomain
+from kaipy.domains.DisjunctiveConstraintDomain import DisjunctiveConstraintDomain
 from kaipy.domains.SubstitutionListDomain import SubstitutionListDomain
 from kaipy.domains.SubstitutionsConstraintDomain import SubstitutionsConstraintDomain
 from kaipy.domains.BigsumPatternDomain import BigsumPatternDomain
