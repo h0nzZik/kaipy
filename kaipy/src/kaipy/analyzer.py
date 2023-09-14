@@ -5,6 +5,7 @@ import functools
 import logging
 import pprint
 import sys
+import time
 import typing as T
 
 from immutabledict import immutabledict
@@ -17,6 +18,7 @@ from pyk.ktool.kprint import KPrint
 import kaipy.rs_utils as RSUtils
 import kaipy.kore_utils as KoreUtils
 
+from kaipy.PerfCounter import PerfCounter
 from kaipy.BroadcastChannel import BroadcastChannel
 from kaipy.VariableManager import VariableManager
 from kaipy.AbstractionContext import AbstractionContext
@@ -44,6 +46,7 @@ def get_successors(rs: ReachabilitySystem, cfg: Kore.Pattern) -> T.List[Kore.Pat
 class AnalysisResult:
     reachable_configurations: IAbstractPattern
     iterations: int
+    statistics: T.Mapping[str, T.Any]
 
 def analyze(
     rs: ReachabilitySystem,
@@ -59,6 +62,7 @@ def analyze(
     ctx = make_ctx()
     initial_concrete: Kore.Pattern = KoreUtils.normalize_pattern(rs.simplify(initial_configuration))
     current_abstract: IAbstractPattern = pattern_domain.abstract(ctx, initial_concrete)
+    execution_counter = PerfCounter()
     curr_depth = 0
     while True:
         if max_depth is not None and curr_depth > max_depth:
@@ -77,7 +81,10 @@ def analyze(
             break
         _LOGGER.warning(f'diff: {rs.kprint.kore_to_pretty(RSUtils.make_disjunction(rs, diff))}')
         #_LOGGER.warning(f'diff_raw: {RSUtils.make_disjunction(rs, diff).text}')
+        old_timer_value = time.perf_counter()
         diff_step = { c:get_successors(rs, c) for c in diff }
+        new_timer_value = time.perf_counter()
+        execution_counter.add(new_timer_value - old_timer_value)
         
         diff_step_norm = { c:[ KoreUtils.normalize_pattern(s) for s in succs] for c,succs in diff_step.items() }
         # Should we clean up the pattern? I am not sure.
@@ -102,5 +109,13 @@ def analyze(
             new_abstract,
         )
         cfgs_below_current = unified
- 
-    return AnalysisResult(reachable_configurations=current_abstract, iterations=curr_depth)
+
+    statistics = {
+        'execution' : execution_counter.dict,
+        'abstraction' : pattern_domain.statistics(),
+    }
+    return AnalysisResult(
+        reachable_configurations=current_abstract,
+        iterations=curr_depth,
+        statistics=statistics,
+    )

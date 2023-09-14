@@ -302,6 +302,7 @@ class TestImp(MyTest):
         _LOGGER.warning(f"statistics: {pattern_domain.statistics()}")
         c = pattern_domain.concretize(a)
         _LOGGER.warning(f"concretized: {reachability_system.kprint.kore_to_pretty(c)}")
+        _LOGGER.warning(f"statistics: {pattern_domain.statistics()}")
 
 
     def test_analyze_very_simple(
