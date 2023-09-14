@@ -87,9 +87,9 @@ def compose_rules(
     # After the simplification, the intermediate variables (from 'other_renaming') should disappear
     # print(f"New lhs {rs.kprint.kore_to_pretty(new_lhs)}")
     # print(f"New rhs {rs.kprint.kore_to_pretty(new_rhs)}")
-    new_lhs_clean = KoreUtils.cleanup_pattern(rs.top_sort, new_lhs)
+    new_lhs_clean = KoreUtils.cleanup_pattern_new(new_lhs)
 
-    new_rhs_clean = KoreUtils.cleanup_pattern(rs.top_sort, new_rhs)
+    new_rhs_clean = KoreUtils.cleanup_pattern_new(new_rhs)
     # print(f"New lhs clean {rs.kprint.kore_to_pretty(new_lhs_clean)}")
     # print(f"New rhs clean {rs.kprint.kore_to_pretty(new_rhs_clean)}")
     rewrite = Kore.Rewrites(rs.top_sort, new_lhs_clean, new_rhs_clean)

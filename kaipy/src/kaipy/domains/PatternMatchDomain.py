@@ -202,8 +202,7 @@ class PatternMatchDomain(IAbstractPatternDomain):
         # We normalize such that different states in the disjunction have different variables
         constrained_states: T.List[Kore.Pattern] = [
             KoreUtils.normalize_pattern(
-                KoreUtils.cleanup_pattern(
-                    self._top_sort,
+                KoreUtils.cleanup_pattern_new(
                     self.rs.simplify(
                         Kore.And(
                             self.rs.sortof(state),

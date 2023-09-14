@@ -116,7 +116,7 @@ def collect_rests(
         # _LOGGER.info(
         #    f"input_pattern_simplified0: {rs.kprint.kore_to_pretty(input_pattern_simplified0)}"
         # )
-        input_pattern_simplified = KoreUtils.cleanup_pattern(rs.top_sort, input_pattern_simplified0)
+        input_pattern_simplified = KoreUtils.cleanup_pattern_new(input_pattern_simplified0)
         # input_pattern_simplified = input_pattern_simplified0
         # _LOGGER.info(
         #    f"input_pattern_simplified: {rs.kprint.kore_to_pretty(input_pattern_simplified)}"
