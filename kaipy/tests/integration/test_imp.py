@@ -315,7 +315,7 @@ class TestImp(MyTest):
             context_aliases=context_aliases,
             filename="imp/very-simple.imp"
         )
-        print(result)
+        _LOGGER.warning(result)
         #si: kaipy.analyzer.StateInfo = states.states_by_id['IMP.assignment']
         #si.print(kprint=reachability_system.kprint, subst_domain=subst_domain)
         #concrete_substitutions = list(si.concrete_substitutions(subst_domain))
