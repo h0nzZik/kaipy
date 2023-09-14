@@ -1,5 +1,6 @@
 import logging
 import typing as T
+import sys
 from pathlib import Path
 from immutabledict import immutabledict
 
@@ -276,6 +277,33 @@ class TestImp(MyTest):
             case _:
                 assert False
 
+    def test_abstract_concretize_simple(
+        self,
+        reachability_system: ReachabilitySystem,
+        context_aliases: ContextAliases
+    ):
+        sys.setrecursionlimit(4*10**3)
+        input_pattern: Kore.Pattern = reachability_system.kdw.get_input_kore(
+            RSTestBase.LANGUAGES / "imp/simple.imp"
+        )
+        rests = pre_analyze(reachability_system, context_aliases, input_pattern)
+        pattern_domain: IAbstractPatternDomain = build_abstract_pattern_domain(
+            reachability_system,
+            rests,
+            input_pattern
+        )
+        ctx = make_ctx()
+        concrete_text = r'''\and{SortGeneratedTopCell{}}(Lbl'-LT-'generatedTop'-GT-'{}(Lbl'-LT-'T'-GT-'{}(Lbl'-LT-'k'-GT-'{}(kseq{}(inj{SortStmt{}, SortKItem{}}(Lbl'UndsUndsUnds'IMP-SYNTAX'Unds'Stmt'Unds'Stmt'Unds'Stmt{}(Lbl'UndsEqlsUndsSClnUnds'IMP-SYNTAX'Unds'Stmt'Unds'Id'Unds'AExp{}(\dv{SortId{}}("x"), inj{SortInt{}, SortAExp{}}(\dv{SortInt{}}("1"))), Lbl'UndsUndsUnds'IMP-SYNTAX'Unds'Stmt'Unds'Stmt'Unds'Stmt{}(Lbl'UndsEqlsUndsSClnUnds'IMP-SYNTAX'Unds'Stmt'Unds'Id'Unds'AExp{}(\dv{SortId{}}("y"), Lbl'UndsPlusUndsUnds'IMP-SYNTAX'Unds'AExp'Unds'AExp'Unds'AExp{}(inj{SortInt{}, SortAExp{}}(\dv{SortInt{}}("2")), inj{SortId{}, SortAExp{}}(\dv{SortId{}}("x")))), Lbl'UndsUndsUnds'IMP-SYNTAX'Unds'Stmt'Unds'Stmt'Unds'Stmt{}(Lbl'UndsEqlsUndsSClnUnds'IMP-SYNTAX'Unds'Stmt'Unds'Id'Unds'AExp{}(\dv{SortId{}}("z"), Lbl'UndsPlusUndsUnds'IMP-SYNTAX'Unds'AExp'Unds'AExp'Unds'AExp{}(inj{SortId{}, SortAExp{}}(\dv{SortId{}}("y")), inj{SortInt{}, SortAExp{}}(\dv{SortInt{}}("3")))), Lbl'UndsEqlsUndsSClnUnds'IMP-SYNTAX'Unds'Stmt'Unds'Id'Unds'AExp{}(\dv{SortId{}}("x"), Lbl'UndsPlusUndsUnds'IMP-SYNTAX'Unds'AExp'Unds'AExp'Unds'AExp{}(inj{SortId{}, SortAExp{}}(\dv{SortId{}}("x")), inj{SortId{}, SortAExp{}}(\dv{SortId{}}("z")))))))), kseq{}(Lbl'Hash'freezer'UndsUndsUnds'IMP-SYNTAX'Unds'Stmt'Unds'Stmt'Unds'Stmt1'Unds'{}(kseq{}(inj{SortStmt{}, SortKItem{}}(VARVSortStmtX0 : SortStmt{}), dotk{}())), dotk{}()))), VARVSortStateCellX1 : SortStateCell{}, Lbl'-LT-'args'-GT-'{}(VARVSortListX2 : SortList{})), Lbl'-LT-'generatedCounter'-GT-'{}(\dv{SortInt{}}("0"))), \equals{SortBool{}, SortGeneratedTopCell{}}(\dv{SortBool{}}("true"), LblisKResult{}(kseq{}(inj{SortStmt{}, SortKItem{}}(VARVSortStmtX0 : SortStmt{}), dotk{}()))))'''
+        parser = KoreParser(concrete_text)
+        concrete = parser.pattern()
+        _LOGGER.warning(f"Input: {reachability_system.kprint.kore_to_pretty(concrete)}")
+        a = pattern_domain.abstract(ctx=ctx, c=concrete)
+        _LOGGER.warning(f"abstracted: {pattern_domain.to_str(a, 0)}")
+        _LOGGER.warning(f"statistics: {pattern_domain.statistics()}")
+        c = pattern_domain.concretize(a)
+        _LOGGER.warning(f"concretized: {reachability_system.kprint.kore_to_pretty(c)}")
+
+
     def test_analyze_very_simple(
         self,
         reachability_system: ReachabilitySystem,
@@ -293,7 +321,17 @@ class TestImp(MyTest):
         #assert len(concrete_substitutions) == 1
         #assert reachability_system.kprint.kore_to_pretty(concrete_substitutions[0].mapping[Kore.EVar("Var'Unds'DotVar2", Kore.SortApp('SortK', ()))]).strip() == '#freezer___IMP-SYNTAX_Stmt_Stmt_Stmt1_ ( Fresh3:Stmt ~> . ) ~> Fresh2 ~> .'
 
-    def test_analyze_simple(
+    def test_rl_num_rules(self, reachability_system: ReachabilitySystem):
+        cnt = 0
+        for axiom in reachability_system.kdw.rewrite_rules:
+            match axiom:
+                case Kore.Axiom(_, Kore.Rewrites(_, lhs, _), _):
+                    cnt = cnt + 1
+        _LOGGER.warning(f"Rewriting rules: {cnt}")
+        assert True
+
+
+    def test_analyze_simple_concrete(
         self,
         reachability_system: ReachabilitySystem,
         context_aliases: ContextAliases

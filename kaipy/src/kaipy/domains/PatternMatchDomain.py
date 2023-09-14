@@ -34,6 +34,7 @@ class PatternMatchDomain(IAbstractPatternDomain):
     comments: T.Mapping[Kore.Pattern, str]
     underlying_domains: T.List[IAbstractConstraintDomain]
     abstract_perf_counter: PerfCounter
+    concretize_perf_counter: PerfCounter
     # invariant: len(states) == len(underlying_domains)
 
     # maybe?
@@ -52,6 +53,7 @@ class PatternMatchDomain(IAbstractPatternDomain):
         #_LOGGER.warning(f"States: {len(states)}")
         self.underlying_domains = underlying_domains
         self.abstract_perf_counter = PerfCounter()
+        self.concretize_perf_counter = PerfCounter()
 
     @F.cached_property
     def _top_sort(self):
@@ -174,6 +176,13 @@ class PatternMatchDomain(IAbstractPatternDomain):
         return all([ud.is_bottom(b) if b is not None else True for ud,b in zip(self.underlying_domains, a.constraint_per_state)])
 
     def concretize(self, a: IAbstractPattern) -> Kore.Pattern:
+        old = time.perf_counter()
+        c = self._concretize(a)
+        new = time.perf_counter()
+        self.concretize_perf_counter.add(new - old)
+        return c
+    
+    def _concretize(self, a: IAbstractPattern) -> Kore.Pattern:
         assert type(a) is PatternMatchDomainElement
         bot : Kore.Pattern = Kore.Bottom(self._top_sort)
         concretized_constraints: T.List[T.List[Kore.Pattern]] = [
@@ -249,5 +258,6 @@ class PatternMatchDomain(IAbstractPatternDomain):
     def statistics(self) -> T.Dict[str, T.Any]:
         return {
             'abstract' : self.abstract_perf_counter.dict,
+            'concretize' : self.concretize_perf_counter.dict,
             'underlying' : [d.statistics() for d in self.underlying_domains]
         }
