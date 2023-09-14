@@ -579,7 +579,7 @@ def let_sort_rec(sort: Kore.Sort, phi: Kore.Pattern) -> Kore.Pattern:
             return Kore.Floor(os, sort, phi)
         case Kore.Ceil(os, _, phi):
             return Kore.Ceil(os, sort, phi)
-    return phi.with_sort(sort) # type: ignore
+    return phi.with_sort(sort)
 
 def is_predicate_pattern(phi: Kore.Pattern) -> bool:
     if issubclass(type(phi), Kore.MLPred):
@@ -629,8 +629,16 @@ def get_nonpredicate_part(phi: Kore.Pattern) -> Kore.Pattern | None:
     return phi
 
 def filter_out_unrelated_predicates(evs: T.Set[Kore.EVar], phi: Kore.Pattern) -> Kore.Pattern | None:
-    if not is_predicate_pattern(phi):
-        return phi
+    #if not is_predicate_pattern(phi):
+    #    return phi
+
+    match phi:
+        case Kore.Equals(os, s, l, r):
+            if type(l) is Kore.EVar and type(r) is Kore.EVar:
+                if l not in evs:
+                    return None
+                if r not in evs:
+                    return None
 
     if issubclass(type(phi), Kore.MLPred):
         if len(free_evars_of_pattern(phi).intersection(evs)) > 0:
@@ -639,8 +647,8 @@ def filter_out_unrelated_predicates(evs: T.Set[Kore.EVar], phi: Kore.Pattern) ->
 
     match phi:
         case Kore.And(s, l, r):
-            lf = filter_out_unrelated_predicates(evs, l)
-            rf = filter_out_unrelated_predicates(evs, r)
+            lf = filter_out_unrelated_predicates(evs.union(free_evars_of_pattern(r)), l)
+            rf = filter_out_unrelated_predicates(evs.union(free_evars_of_pattern(l)), r)
             if not lf and not rf:
                 return None
             if not lf:
@@ -649,8 +657,8 @@ def filter_out_unrelated_predicates(evs: T.Set[Kore.EVar], phi: Kore.Pattern) ->
                 return lf
             return Kore.And(s, lf, rf)
         case Kore.Or(s, l, r):
-            lf = filter_out_unrelated_predicates(evs, l)
-            rf = filter_out_unrelated_predicates(evs, r)
+            lf = filter_out_unrelated_predicates(evs.union(free_evars_of_pattern(r)), l)
+            rf = filter_out_unrelated_predicates(evs.union(free_evars_of_pattern(l)), r)
             if not lf and not rf:
                 return None
             if not lf:
@@ -663,7 +671,8 @@ def filter_out_unrelated_predicates(evs: T.Set[Kore.EVar], phi: Kore.Pattern) ->
             if not f:
                 return None
             return Kore.Not(s, f)
-    assert False
+    return phi
+    #assert False
 
 
 def cleanup_pattern_new(phi: Kore.Pattern) -> Kore.Pattern:

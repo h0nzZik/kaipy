@@ -111,6 +111,31 @@ class TestImp(MyTest):
         print(ss)
         assert set(ss) == set(['SortKItem', 'SortVoidVal', 'SortAExp', 'SortBlock', 'SortBExp', 'SortPgm', 'SortStmt', 'SortValue'])
 
+    def test_cleanup(
+        self,
+        reachability_system: ReachabilitySystem
+    ):
+        concrete_text = r'''\and{SortGeneratedTopCell{}}(Lbl'-LT-'generatedTop'-GT-'{}(Lbl'-LT-'T'-GT-'{}(Lbl'-LT-'k'-GT-'{}(kseq{}(inj{SortStmt{}, SortKItem{}}(Lblint'UndsSClnUnds'IMP-SYNTAX'Unds'Stmt'Unds'Ids{}(Lbl'UndsCommUndsUnds'IMP-SYNTAX'Unds'Ids'Unds'Id'Unds'Ids{}(\dv{SortId{}}("x"), Lbl'UndsCommUndsUnds'IMP-SYNTAX'Unds'Ids'Unds'Id'Unds'Ids{}(\dv{SortId{}}("y"), Lbl'UndsCommUndsUnds'IMP-SYNTAX'Unds'Ids'Unds'Id'Unds'Ids{}(\dv{SortId{}}("z"), Lbl'Stop'List'LBraQuotUndsCommUndsUnds'IMP-SYNTAX'Unds'Ids'Unds'Id'Unds'Ids'QuotRBraUnds'Ids{}()))))), kseq{}(Lbl'Hash'freezer'UndsUndsUnds'IMP-SYNTAX'Unds'Stmt'Unds'Stmt'Unds'Stmt0'Unds'{}(kseq{}(inj{SortStmt{}, SortKItem{}}(Lbl'UndsUndsUnds'IMP-SYNTAX'Unds'Stmt'Unds'Stmt'Unds'Stmt{}(Lbl'UndsEqlsUndsSClnUnds'IMP-SYNTAX'Unds'Stmt'Unds'Id'Unds'AExp{}(\dv{SortId{}}("x"), inj{SortInt{}, SortAExp{}}(\dv{SortInt{}}("1"))), Lbl'UndsUndsUnds'IMP-SYNTAX'Unds'Stmt'Unds'Stmt'Unds'Stmt{}(Lbl'UndsEqlsUndsSClnUnds'IMP-SYNTAX'Unds'Stmt'Unds'Id'Unds'AExp{}(\dv{SortId{}}("y"), Lbl'UndsPlusUndsUnds'IMP-SYNTAX'Unds'AExp'Unds'AExp'Unds'AExp{}(inj{SortInt{}, SortAExp{}}(\dv{SortInt{}}("2")), inj{SortId{}, SortAExp{}}(\dv{SortId{}}("x")))), Lbl'UndsUndsUnds'IMP-SYNTAX'Unds'Stmt'Unds'Stmt'Unds'Stmt{}(Lbl'UndsEqlsUndsSClnUnds'IMP-SYNTAX'Unds'Stmt'Unds'Id'Unds'AExp{}(\dv{SortId{}}("z"), Lbl'UndsPlusUndsUnds'IMP-SYNTAX'Unds'AExp'Unds'AExp'Unds'AExp{}(inj{SortId{}, SortAExp{}}(\dv{SortId{}}("y")), inj{SortInt{}, SortAExp{}}(\dv{SortInt{}}("3")))), Lbl'UndsEqlsUndsSClnUnds'IMP-SYNTAX'Unds'Stmt'Unds'Id'Unds'AExp{}(\dv{SortId{}}("x"), Lbl'UndsPlusUndsUnds'IMP-SYNTAX'Unds'AExp'Unds'AExp'Unds'AExp{}(inj{SortId{}, SortAExp{}}(\dv{SortId{}}("x")), inj{SortId{}, SortAExp{}}(\dv{SortId{}}("z")))))))), dotk{}())), VARREST2 : SortK{}))), VARSTATECELL : SortStateCell{}, VARARGSCELL : SortArgsCell{}), VARGENCOUNTERCELL : SortGeneratedCounterCell{}), \and{SortGeneratedTopCell{}}(\equals{SortKItem{}, SortGeneratedTopCell{}}(VARHERE : SortKItem{}, inj{SortStmt{}, SortKItem{}}(Lbl'UndsUndsUnds'IMP-SYNTAX'Unds'Stmt'Unds'Stmt'Unds'Stmt{}(Lblint'UndsSClnUnds'IMP-SYNTAX'Unds'Stmt'Unds'Ids{}(Lbl'UndsCommUndsUnds'IMP-SYNTAX'Unds'Ids'Unds'Id'Unds'Ids{}(\dv{SortId{}}("x"), Lbl'UndsCommUndsUnds'IMP-SYNTAX'Unds'Ids'Unds'Id'Unds'Ids{}(\dv{SortId{}}("y"), Lbl'UndsCommUndsUnds'IMP-SYNTAX'Unds'Ids'Unds'Id'Unds'Ids{}(\dv{SortId{}}("z"), Lbl'Stop'List'LBraQuotUndsCommUndsUnds'IMP-SYNTAX'Unds'Ids'Unds'Id'Unds'Ids'QuotRBraUnds'Ids{}())))), Lbl'UndsUndsUnds'IMP-SYNTAX'Unds'Stmt'Unds'Stmt'Unds'Stmt{}(Lbl'UndsEqlsUndsSClnUnds'IMP-SYNTAX'Unds'Stmt'Unds'Id'Unds'AExp{}(\dv{SortId{}}("x"), inj{SortInt{}, SortAExp{}}(\dv{SortInt{}}("1"))), Lbl'UndsUndsUnds'IMP-SYNTAX'Unds'Stmt'Unds'Stmt'Unds'Stmt{}(Lbl'UndsEqlsUndsSClnUnds'IMP-SYNTAX'Unds'Stmt'Unds'Id'Unds'AExp{}(\dv{SortId{}}("y"), Lbl'UndsPlusUndsUnds'IMP-SYNTAX'Unds'AExp'Unds'AExp'Unds'AExp{}(inj{SortInt{}, SortAExp{}}(\dv{SortInt{}}("2")), inj{SortId{}, SortAExp{}}(\dv{SortId{}}("x")))), Lbl'UndsUndsUnds'IMP-SYNTAX'Unds'Stmt'Unds'Stmt'Unds'Stmt{}(Lbl'UndsEqlsUndsSClnUnds'IMP-SYNTAX'Unds'Stmt'Unds'Id'Unds'AExp{}(\dv{SortId{}}("z"), Lbl'UndsPlusUndsUnds'IMP-SYNTAX'Unds'AExp'Unds'AExp'Unds'AExp{}(inj{SortId{}, SortAExp{}}(\dv{SortId{}}("y")), inj{SortInt{}, SortAExp{}}(\dv{SortInt{}}("3")))), Lbl'UndsEqlsUndsSClnUnds'IMP-SYNTAX'Unds'Stmt'Unds'Id'Unds'AExp{}(\dv{SortId{}}("x"), Lbl'UndsPlusUndsUnds'IMP-SYNTAX'Unds'AExp'Unds'AExp'Unds'AExp{}(inj{SortId{}, SortAExp{}}(\dv{SortId{}}("x")), inj{SortId{}, SortAExp{}}(\dv{SortId{}}("z")))))))))), \equals{SortK{}, SortGeneratedTopCell{}}(VARREST : SortK{}, VARREST2 : SortK{})))'''
+        parser = KoreParser(concrete_text)
+        concrete = parser.pattern()
+        nonp = KoreUtils.get_nonpredicate_part(concrete)
+        assert nonp is not None
+        _LOGGER.warning(f"nonp: {reachability_system.kprint.kore_to_pretty(nonp)}")
+        cln = KoreUtils.cleanup_pattern_new(concrete)
+        _LOGGER.warning(f"cln: {reachability_system.kprint.kore_to_pretty(cln)}")
+        assert type(cln) is Kore.App
+
+        sortInt = Kore.SortApp("SortInt", ())
+        second_pattern: Pattern = Kore.And(sortInt, Kore.EVar("X", sortInt), Kore.And(sortInt,
+            Kore.Equals(sortInt, sortInt, Kore.DV(sortInt, Kore.String("3")), Kore.EVar("Z", sortInt)),
+            Kore.Equals(sortInt, sortInt, Kore.EVar("Z", sortInt), Kore.EVar("X", sortInt)),
+        ))
+        _LOGGER.warning(f"second: {reachability_system.kprint.kore_to_pretty(second_pattern)}")
+        second_cln = KoreUtils.cleanup_pattern_new(second_pattern)
+        _LOGGER.warning(f"second_cln: {reachability_system.kprint.kore_to_pretty(second_cln)}")
+        assert second_cln.text == second_pattern.text
+        
+
     def test_exact_and_bigsum_pattern_domain(
         self,
         reachability_system: ReachabilitySystem
