@@ -126,7 +126,7 @@ class TestImp(MyTest):
         assert type(cln) is Kore.App
 
         sortInt = Kore.SortApp("SortInt", ())
-        second_pattern: Pattern = Kore.And(sortInt, Kore.EVar("X", sortInt), Kore.And(sortInt,
+        second_pattern: Kore.Pattern = Kore.And(sortInt, Kore.EVar("X", sortInt), Kore.And(sortInt,
             Kore.Equals(sortInt, sortInt, Kore.DV(sortInt, Kore.String("3")), Kore.EVar("Z", sortInt)),
             Kore.Equals(sortInt, sortInt, Kore.EVar("Z", sortInt), Kore.EVar("X", sortInt)),
         ))

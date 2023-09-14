@@ -579,7 +579,7 @@ def let_sort_rec(sort: Kore.Sort, phi: Kore.Pattern) -> Kore.Pattern:
             return Kore.Floor(os, sort, phi)
         case Kore.Ceil(os, _, phi):
             return Kore.Ceil(os, sort, phi)
-    return phi.with_sort(sort)
+    return phi.with_sort(sort) # type: ignore
 
 def is_predicate_pattern(phi: Kore.Pattern) -> bool:
     if issubclass(type(phi), Kore.MLPred):
@@ -637,6 +637,12 @@ def filter_out_unrelated_predicates(evs: T.Set[Kore.EVar], phi: Kore.Pattern) ->
             if type(l) is Kore.EVar and type(r) is Kore.EVar:
                 if l not in evs:
                     return None
+                if r not in evs:
+                    return None
+            elif type(l) is Kore.EVar:
+                if l not in evs:
+                    return None
+            elif type(r) is Kore.EVar:
                 if r not in evs:
                     return None
 
