@@ -15,11 +15,11 @@ class IAbstractMap(abc.ABC):
 class IAbstractMapDomain(abc.ABC):
 
     @abc.abstractmethod
-    def abstract(ctx: AbstractionContext, properties: T.List[Properties.MapProperty]) -> IAbstractMap:
+    def abstract(self, ctx: AbstractionContext, properties: T.List[Properties.MapProperty]) -> IAbstractMap:
         ...
     
     @abc.abstractmethod
-    def concretize(a: IAbstractMap) -> Kore.Pattern:
+    def concretize(self, a: IAbstractMap) -> Kore.Pattern:
         ...
 
     @abc.abstractmethod
