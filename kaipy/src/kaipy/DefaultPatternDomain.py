@@ -63,7 +63,11 @@ def build_abstract_pattern_domain(
     subst_constr_domain: IAbstractConstraintDomain = SubstitutionConstraintDomain(rs=rs, nested=subst_domain)
 
     # Second substitution domain - to catch stuff coming out from the first subst domain. Mainly for `.K`
-    subst_domain_2: IAbstractSubstitutionDomain = CartesianAbstractSubstitutionDomain(exact_pattern_domain)
+    exact_pattern_domain_2: IAbstractPatternDomain = ExactPatternDomain(
+        rs,
+        patterns=[KorePrelude.DOTK]
+    )
+    subst_domain_2: IAbstractSubstitutionDomain = CartesianAbstractSubstitutionDomain(exact_pattern_domain_2)
     #subst_list_domain_2: IAbstractSubstitutionsDomain = SubstitutionListDomain(subst_domain_2)
     subst_constr_domain_2: IAbstractConstraintDomain = SubstitutionConstraintDomain(rs=rs, nested=subst_domain_2)
 

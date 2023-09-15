@@ -77,6 +77,7 @@ class FinitePatternDomain(IAbstractPatternDomain):
         self.rs = rs
         self.abstract_perf_counter = PerfCounter()
 
+        _LOGGER.warning(f'size(self.pl): {len(self.pl)}')
         #2for x in self.pl:
         #    _LOGGER.warning(f'{self.rs.kprint.kore_to_pretty(x)}')
 
@@ -103,6 +104,7 @@ class FinitePatternDomain(IAbstractPatternDomain):
 
     def _abstract(self, ctx: AbstractionContext, c: Kore.Pattern) -> FinitePattern:
         csort = self.rs.sortof(c)
+        # TODO optimize for the case when the sorts do not match
         mrs: T.List[MatchResult] = parallel_match(rs=self.rs, cfg=c, states=[(s if self.rs.sortof(s) == csort else Kore.Bottom(csort)) for s in self.pl])
 
         fpl: T.List[FinitePattern] = list()
