@@ -14,12 +14,13 @@ class IAbstractMap(abc.ABC):
 
 class IAbstractMapDomain(abc.ABC):
 
+    # Ignores properties other than those inheriting from MapProperty
     @abc.abstractmethod
-    def abstract(self, ctx: AbstractionContext, properties: T.List[Properties.MapProperty]) -> IAbstractMap:
+    def abstract(self, ctx: AbstractionContext, properties: T.List[Properties.Property]) -> IAbstractMap:
         ...
     
     @abc.abstractmethod
-    def concretize(self, a: IAbstractMap) -> Kore.Pattern:
+    def concretize(self, a: IAbstractMap) -> T.List[Properties.Property]:
         ...
 
     @abc.abstractmethod

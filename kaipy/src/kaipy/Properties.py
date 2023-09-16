@@ -4,6 +4,7 @@ import typing as T
 import pyk.kore.syntax as Kore
 import pyk.kore.prelude as KorePrelude
 
+from kaipy.ReachabilitySystem import ReachabilitySystem
 from kaipy.IsTrue import IsTrue
 
 class Property:
@@ -38,11 +39,12 @@ class ThingWithProperties:
     properties: T.List[Property]
 
 
+map_in_keys: str = "Lbl'Unds'in'Unds'keys'LParUndsRParUnds'MAP'Unds'Bool'Unds'KItem'Unds'Map"
+map_lookup: str = "LblMap'Coln'lookup"
+map_size: str = "Lblsize'LParUndsRParUnds'MAP'Unds'Int'Unds'Map"
+
 # `about` is usually a variable (Kore.EVar), but can be anything of sort Map
 def patternToThingWithProperty(phi: Kore.Pattern) -> ThingWithProperties | None:
-    map_in_keys: str = "Lbl'Unds'in'Unds'keys'LParUndsRParUnds'MAP'Unds'Bool'Unds'KItem'Unds'Map"
-    map_lookup: str = "LblMap'Coln'lookup"
-    map_size: str = "Lblsize'LParUndsRParUnds'MAP'Unds'Int'Unds'Map"
     match phi:
         case Kore.Not(_, phi2):
             tpr = patternToThingWithProperty(phi2)
@@ -66,6 +68,20 @@ def patternToThingWithProperty(phi: Kore.Pattern) -> ThingWithProperties | None:
         case Kore.Equals(_, _, size, Kore.App(map_size, (), (about,))):
             return ThingWithProperties(about, [MapProperty_Size(size=size)])
     return None
+
+
+
+def thingWithPropertiesToConstraints(rs: ReachabilitySystem, twp: ThingWithProperties) -> T.List[Kore.Pattern]:
+    constraints: T.List[Kore.Pattern] = list()
+    for p in twp.properties:
+        match p:
+            case MapProperty_Size(sz):
+                constraints.append(Kore.Equals(Kore.SortApp('SortInt', ()), rs.top_sort, Kore.App(map_size, (), (twp.thing,)), sz))
+            case MapProperty_HasKey(key):
+                constraints.append(Kore.Equals(Kore.SortApp('SortBool', ()), rs.top_sort, KorePrelude.TRUE, Kore.App(map_in_keys, (), (key, twp.thing))))
+            case MapProperty_HasKeyValue(key, value):
+                constraints.append(Kore.Equals(rs.sortof(value), rs.top_sort, Kore.App(map_lookup, (), (twp.thing,key)), value))
+    return constraints
 
 
 # assumes there are no conjunctions in `constraints`;
