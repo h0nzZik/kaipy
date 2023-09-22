@@ -4,6 +4,7 @@ import time
 import typing as T
 
 import pyk.kore.syntax as Kore
+import pyk.kore.prelude as KorePrelude
 
 from kaipy.PerfCounter import PerfCounter
 import kaipy.Properties as Properties
@@ -14,7 +15,7 @@ from kaipy.interfaces.IAbstractMapDomain import IAbstractMap, IAbstractMapDomain
 from kaipy.AbstractionContext import AbstractionContext
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class BasicMap(IAbstractMap):
     # mapping from (typically functional) patterns, into (typically functional) patterns / terms.
     # None value represents an unknown value
@@ -26,6 +27,7 @@ class BasicMapDomain(IAbstractMapDomain):
     value_domain: IAbstractPatternDomain
     abstract_perf_counter: PerfCounter
 
+    # Stuff have to concretize to sort KItem in the underlying domains
     def __init__(self, rs: ReachabilitySystem, key_domain: IAbstractPatternDomain, value_domain: IAbstractPatternDomain):
         self.rs = rs
         self.key_domain = key_domain
@@ -33,7 +35,7 @@ class BasicMapDomain(IAbstractMapDomain):
         self.abstract_perf_counter = PerfCounter()
 
     def _keys_overlap(self, k1: IAbstractPattern, k2: IAbstractPattern):
-        return not KoreUtils.is_bottom(self.rs.simplify(Kore.And(self.rs.top_sort, self.key_domain.concretize(k1), self.key_domain.concretize(k2))))
+        return not KoreUtils.is_bottom(self.rs.simplify(Kore.And(KorePrelude.SORT_K_ITEM, self.key_domain.concretize(k1), self.key_domain.concretize(k2))))
 
 
     def abstract(self, ctx: AbstractionContext, properties: T.List[Properties.Property]) -> IAbstractMap:

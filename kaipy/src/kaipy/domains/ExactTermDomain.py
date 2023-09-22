@@ -13,7 +13,7 @@ from kaipy.interfaces.IAbstractPatternDomain import IAbstractPattern, IAbstractP
 
 _LOGGER: T.Final = logging.getLogger(__name__)
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class ExactTerm(IAbstractPattern):
     # -1 means Top
     idx: int

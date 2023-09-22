@@ -31,6 +31,7 @@ from kaipy.domains.KResultConstraintDomain import KResultConstraint, KResultCons
 from kaipy.domains.KeepEverythingMapDomain import KeepEverythingMap, KeepEverythingMapDomain
 from kaipy.domains.PropertyHubConstraintDomain import PropertyHubElements, PropertyHubConstraintDomain
 from kaipy.domains.KeepEverythingConstraintDomain import KeepEverything, KeepEverythingConstraintDomain
+from kaipy.domains.BasicMapDomain import BasicMap, BasicMapDomain
 from kaipy.testing.testingbase import RSTestBase
 from kaipy.DefaultAbstractionContext import make_ctx
 from kaipy.DefaultPatternDomain import build_abstract_pattern_domain
@@ -132,6 +133,41 @@ class TestImp(MyTest):
         _LOGGER.warning(f'{[p.text for p in c1]}')
         assert c1 == [prop1]
         assert True
+
+    def test_basic_map_domain(
+        self,
+        reachability_system: ReachabilitySystem,
+    ):
+        sortid = Kore.SortApp("SortId", ())
+        x = Kore.DV(sortid, Kore.String("x"))
+        y = Kore.DV(sortid, Kore.String("y"))
+        z = Kore.DV(sortid, Kore.String("z"))
+        x_kitem = KorePrelude.inj(sortid, KorePrelude.SORT_K_ITEM, x)
+        y_kitem = KorePrelude.inj(sortid, KorePrelude.SORT_K_ITEM, y)
+        z_kitem = KorePrelude.inj(sortid, KorePrelude.SORT_K_ITEM, z)
+        # TODO write a domain that wraps ExactTermDomain and allows injections to SortKItem
+        etd = ExactTermDomain(rs=reachability_system, patterns=[
+            x_kitem, y_kitem, z_kitem,
+        ])
+        md = BasicMapDomain(rs=reachability_system, key_domain=etd, value_domain=etd)
+        domain = PropertyHubConstraintDomain(rs=reachability_system, map_domain=md)
+        prop1 = Kore.Equals(
+            Kore.SortApp('SortBool', ()),
+            reachability_system.top_sort,
+            KorePrelude.TRUE,
+            Kore.App(kaipy.Properties.map_in_keys, (), (x_kitem, Kore.EVar('m', Kore.SortApp('SortMap', ()))))
+        )
+        prop2 = Kore.Equals(
+            KorePrelude.SORT_K_ITEM,
+            reachability_system.top_sort,
+            Kore.App(kaipy.Properties.map_lookup, (), (Kore.EVar('m', Kore.SortApp('SortMap', ())),y_kitem)), z_kitem
+        )
+
+        a1 = domain.abstract(ctx=make_ctx(), over_variables=set(), constraints=[prop1, prop2])
+        _LOGGER.warning(f'{domain.to_str(a1, indent=0)}')
+        concretized1 = domain.concretize(a1)
+        assert concretized1 == [prop1,prop2]
+        assert False
 
     def test_cleanup(
         self,
