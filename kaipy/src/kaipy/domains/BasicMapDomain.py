@@ -62,7 +62,7 @@ class BasicMapDomain(IAbstractMapDomain):
         for k1 in mapping.keys():
             for k2 in mapping.keys():
                 if k1 != k2:
-                    assert self._keys_overlap(k1, k2)
+                    assert not self._keys_overlap(k1, k2)
 
         return BasicMap(mapping=mapping)
     

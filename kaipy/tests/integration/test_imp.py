@@ -167,7 +167,6 @@ class TestImp(MyTest):
         _LOGGER.warning(f'{domain.to_str(a1, indent=0)}')
         concretized1 = domain.concretize(a1)
         assert concretized1 == [prop1,prop2]
-        assert False
 
     def test_cleanup(
         self,
