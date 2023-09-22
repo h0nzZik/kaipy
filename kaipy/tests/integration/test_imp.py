@@ -145,7 +145,6 @@ class TestImp(MyTest):
         x_kitem = KorePrelude.inj(sortid, KorePrelude.SORT_K_ITEM, x)
         y_kitem = KorePrelude.inj(sortid, KorePrelude.SORT_K_ITEM, y)
         z_kitem = KorePrelude.inj(sortid, KorePrelude.SORT_K_ITEM, z)
-        # TODO write a domain that wraps ExactTermDomain and allows injections to SortKItem
         etd = ExactTermDomain(rs=reachability_system, patterns=[
             x_kitem, y_kitem, z_kitem,
         ])
@@ -296,6 +295,32 @@ class TestImp(MyTest):
         concretized = pattern_domain.concretize(a)
         _LOGGER.warning(f"concretized: {reachability_system.kprint.kore_to_pretty(concretized)}")
         
+
+    def test_map_abstraction(
+        self,
+        reachability_system: ReachabilitySystem,
+        context_aliases : ContextAliases
+    ):
+        input_pattern: Kore.Pattern = reachability_system.kdw.get_input_kore(
+            RSTestBase.LANGUAGES / "imp/very-simple.imp"
+        )
+
+        rests = pre_analyze(reachability_system, context_aliases, input_pattern)
+        pattern_domain = build_abstract_pattern_domain(
+            reachability_system,
+            rests,
+            input_pattern
+        )
+        ctx = make_ctx()
+        concrete_text = r'''Lbl'-LT-'generatedTop'-GT-'{}(Lbl'-LT-'T'-GT-'{}(Lbl'-LT-'k'-GT-'{}(kseq{}(inj{SortStmt{}, SortKItem{}}(Lblint'UndsSClnUnds'IMP-SYNTAX'Unds'Stmt'Unds'Ids{}(Lbl'UndsCommUndsUnds'IMP-SYNTAX'Unds'Ids'Unds'Id'Unds'Ids{}(\dv{SortId{}}("y"), Lbl'UndsCommUndsUnds'IMP-SYNTAX'Unds'Ids'Unds'Id'Unds'Ids{}(\dv{SortId{}}("z"), Lbl'Stop'List'LBraQuotUndsCommUndsUnds'IMP-SYNTAX'Unds'Ids'Unds'Id'Unds'Ids'QuotRBraUnds'Ids{}())))), kseq{}(Lbl'Hash'freezer'UndsUndsUnds'IMP-SYNTAX'Unds'Stmt'Unds'Stmt'Unds'Stmt0'Unds'{}(kseq{}(inj{SortStmt{}, SortKItem{}}(Lbl'UndsUndsUnds'IMP-SYNTAX'Unds'Stmt'Unds'Stmt'Unds'Stmt{}(Lbl'UndsEqlsUndsSClnUnds'IMP-SYNTAX'Unds'Stmt'Unds'Id'Unds'AExp{}(\dv{SortId{}}("x"), inj{SortInt{}, SortAExp{}}(\dv{SortInt{}}("1"))), Lbl'UndsUndsUnds'IMP-SYNTAX'Unds'Stmt'Unds'Stmt'Unds'Stmt{}(Lbl'UndsEqlsUndsSClnUnds'IMP-SYNTAX'Unds'Stmt'Unds'Id'Unds'AExp{}(\dv{SortId{}}("y"), Lbl'UndsPlusUndsUnds'IMP-SYNTAX'Unds'AExp'Unds'AExp'Unds'AExp{}(inj{SortInt{}, SortAExp{}}(\dv{SortInt{}}("2")), inj{SortId{}, SortAExp{}}(\dv{SortId{}}("x")))), Lbl'UndsUndsUnds'IMP-SYNTAX'Unds'Stmt'Unds'Stmt'Unds'Stmt{}(Lbl'UndsEqlsUndsSClnUnds'IMP-SYNTAX'Unds'Stmt'Unds'Id'Unds'AExp{}(\dv{SortId{}}("z"), Lbl'UndsPlusUndsUnds'IMP-SYNTAX'Unds'AExp'Unds'AExp'Unds'AExp{}(inj{SortId{}, SortAExp{}}(\dv{SortId{}}("y")), inj{SortInt{}, SortAExp{}}(\dv{SortInt{}}("3")))), Lbl'UndsEqlsUndsSClnUnds'IMP-SYNTAX'Unds'Stmt'Unds'Id'Unds'AExp{}(\dv{SortId{}}("x"), Lbl'UndsPlusUndsUnds'IMP-SYNTAX'Unds'AExp'Unds'AExp'Unds'AExp{}(inj{SortId{}, SortAExp{}}(\dv{SortId{}}("x")), inj{SortId{}, SortAExp{}}(\dv{SortId{}}("z")))))))), dotk{}())), dotk{}()))), Lbl'-LT-'state'-GT-'{}(Lbl'UndsPipe'-'-GT-Unds'{}(inj{SortId{}, SortKItem{}}(\dv{SortId{}}("x")), inj{SortInt{}, SortKItem{}}(\dv{SortInt{}}("0")))), Lbl'-LT-'args'-GT-'{}(VARVSortListX0 : SortList{})), Lbl'-LT-'generatedCounter'-GT-'{}(\dv{SortInt{}}("0")))'''
+        parser = KoreParser(concrete_text)
+        concrete = parser.pattern()
+        _LOGGER.warning(f"concrete: {reachability_system.kprint.kore_to_pretty(concrete)}")
+        a = pattern_domain.abstract(ctx=ctx, c=concrete)
+        _LOGGER.warning(f"a: {pattern_domain.to_str(a, indent=0)}")
+        concretized = pattern_domain.concretize(a)
+        assert False
+
 
     def test_kresult_cooperation(
         self,
