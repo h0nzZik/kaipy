@@ -27,7 +27,7 @@ class PropertyHubMapElement(PropertyHubElement):
 class PropertyHubElements(IAbstractConstraint):
     elements: T.List[PropertyHubElement]
 
-class PropertyHubConstraintDomain(abc.ABC):
+class PropertyHubConstraintDomain(IAbstractConstraintDomain):
     rs: ReachabilitySystem
     map_domain: IAbstractMapDomain
     abstract_perf_counter: PerfCounter

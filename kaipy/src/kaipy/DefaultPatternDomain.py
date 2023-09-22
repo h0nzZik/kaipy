@@ -22,6 +22,9 @@ from kaipy.domains.ProductConstraintDomain import ProductConstraintDomain
 from kaipy.domains.KResultConstraintDomain import KResultConstraintDomain
 from kaipy.domains.PatternMatchDomain import PatternMatchDomain
 from kaipy.domains.CachedPatternDomain import CachedPatternDomain
+from kaipy.domains.CastToKItemTermDomain import CastToKItemTermDomain
+from kaipy.domains.BasicMapDomain import BasicMapDomain
+from kaipy.domains.PropertyHubConstraintDomain import PropertyHubConstraintDomain
 from kaipy.PatternMatchDomainBuilder import build_pattern_match_domain
 
 from kaipy.ReachabilitySystem import ReachabilitySystem
@@ -72,7 +75,19 @@ def build_abstract_pattern_domain(
     subst_constr_domain_2: IAbstractConstraintDomain = SubstitutionConstraintDomain(rs=rs, nested=subst_domain_2)
 
     kresult_domain: IAbstractConstraintDomain = KResultConstraintDomain(rs=rs)
-    product_domain = ProductConstraintDomain([subst_constr_domain, subst_constr_domain_2, kresult_domain])
+
+
+    exact_pattern_domain_3 = exact_pattern_domain
+    exact_kitem_domain = CastToKItemTermDomain(rs=rs, underlying=exact_pattern_domain_3)
+    basic_map_domain = BasicMapDomain(rs=rs, key_domain=exact_kitem_domain, value_domain=exact_kitem_domain)
+    property_hub_domain: IAbstractConstraintDomain = PropertyHubConstraintDomain(rs=rs, map_domain=basic_map_domain)
+
+    product_domain = ProductConstraintDomain([
+        subst_constr_domain,
+        subst_constr_domain_2,
+        kresult_domain,
+        property_hub_domain,
+    ])
 
     product_domain_disj = DisjunctiveConstraintDomain(product_domain, rs=rs)
 
