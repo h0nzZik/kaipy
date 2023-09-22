@@ -106,17 +106,39 @@ class PropertyHubConstraintDomain(abc.ABC):
                     raise NotImplementedError()
         return constraints
     
-    @abc.abstractmethod
     def is_top(self, a: IAbstractConstraint) -> bool:
-        ...
+        assert type(a) is PropertyHubElements
+        return len(a.elements) <= 0
 
-    @abc.abstractmethod
     def is_bottom(self, a: IAbstractConstraint) -> bool:
-        ...
+        assert type(a) is PropertyHubElements
+        for e in a.elements:
+            match e:
+                case PropertyHubMapElement(_, am):
+                    if self.map_domain.is_bottom(am):
+                        return True
+                case _:
+                    raise NotImplementedError()
+        return False
 
-    @abc.abstractmethod
     def subsumes(self, a1: IAbstractConstraint, a2: IAbstractConstraint) -> bool:
-        ...
+        assert type(a1) is PropertyHubElements
+        assert type(a2) is PropertyHubElements
+        for e1 in a1.elements:
+            assert type(e1.thing) is Kore.EVar
+            found: bool = False
+            for e2 in a2.elements:
+                assert type(e2.thing) is Kore.EVar
+                if e1.thing == e2.thing:
+                    assert type(e1) is PropertyHubMapElement
+                    assert type(e2) is PropertyHubMapElement
+                    if not self.map_domain.subsumes(e1.abstract_map, e2.abstract_map):
+                        return False
+                    found = True
+                    break
+            if not found:
+                return False
+        return True
     
     @abc.abstractmethod
     def equals(self, a1: IAbstractConstraint, a2: IAbstractConstraint) -> bool:
