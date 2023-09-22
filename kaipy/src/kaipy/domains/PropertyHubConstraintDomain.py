@@ -1,11 +1,12 @@
 import abc
 import dataclasses
-from enum import Enum
+import time
 import typing as T
 
 import pyk.kore.syntax as Kore
 
 import kaipy.kore_utils as KoreUtils
+from kaipy.PerfCounter import PerfCounter
 from kaipy.interfaces.IAbstractConstraintDomain import IAbstractConstraint, IAbstractConstraintDomain
 from kaipy.interfaces.IAbstractMapDomain import IAbstractMap, IAbstractMapDomain
 from kaipy.AbstractionContext import AbstractionContext
@@ -29,10 +30,12 @@ class PropertyHubElements(IAbstractConstraint):
 class PropertyHubConstraintDomain(abc.ABC):
     rs: ReachabilitySystem
     map_domain: IAbstractMapDomain
+    abstract_perf_counter: PerfCounter
 
     def __init__(self, rs: ReachabilitySystem, map_domain: IAbstractMapDomain):
         self.rs = rs
         self.map_domain = map_domain
+        self.abstract_perf_counter = PerfCounter()
 
     def _thing_supported(self, thing: Kore.Pattern) -> bool:
         match thing:
@@ -43,6 +46,13 @@ class PropertyHubConstraintDomain(abc.ABC):
         return False
 
     def abstract(self, ctx: AbstractionContext, over_variables: T.Set[Kore.EVar], constraints: T.List[Kore.Pattern]) -> IAbstractConstraint:
+        old = time.perf_counter()
+        a = self._abstract(ctx, over_variables, constraints)
+        new = time.perf_counter()
+        self.abstract_perf_counter.add(new - old)
+        return a
+
+    def _abstract(self, ctx: AbstractionContext, over_variables: T.Set[Kore.EVar], constraints: T.List[Kore.Pattern]) -> IAbstractConstraint:
         # TODO think about whether we want to use 'over_variables' or not
         twps: T.List[kaipy.Properties.ThingWithProperties] = kaipy.Properties.constraints_to_things(constraints)
 
@@ -140,14 +150,24 @@ class PropertyHubConstraintDomain(abc.ABC):
                 return False
         return True
     
-    @abc.abstractmethod
     def equals(self, a1: IAbstractConstraint, a2: IAbstractConstraint) -> bool:
-        ...
+        assert type(a1) is PropertyHubElements
+        assert type(a2) is PropertyHubElements
+        return self.subsumes(a1, a2) and self.subsumes(a2, a1)
 
-    @abc.abstractmethod
     def to_str(self, a: IAbstractConstraint, indent: int) -> str:
-        ...
+        assert type(a) is PropertyHubElements
+        s = (indent*' ') + "<phcd\n"
+        for e in a.elements:
+            assert type(e) is PropertyHubMapElement
+            s = s + self.map_domain.to_str(e.abstract_map, indent=indent+1) + ',\n'
+        s = s + (indent*' ') + ">"
+        return s
     
-    @abc.abstractmethod
     def statistics(self) -> T.Dict[str, T.Any]:
-        ...
+        return {
+            'abstract' : self.abstract_perf_counter.dict,
+            'underlying' : {
+                'map_domain' : self.map_domain.statistics(),
+            },
+        }
