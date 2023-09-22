@@ -61,6 +61,8 @@ class CastToKItemTermDomain(IAbstractPatternDomain):
 
     def concretize(self, a: IAbstractPattern) -> Kore.Pattern:
         assert type(a) is CastToKItemTerm
+        if a.underlying is None:
+            return Kore.Top(KorePrelude.SORT_K_ITEM)
         c1 = self.underlying.concretize(a.underlying)
         s = self.rs.sortof(c1)
         if s == KorePrelude.SORT_K_ITEM:
@@ -70,17 +72,29 @@ class CastToKItemTermDomain(IAbstractPatternDomain):
     def equals(self, a1: IAbstractPattern, a2: IAbstractPattern) -> bool:
         assert type(a1) is CastToKItemTerm
         assert type(a2) is CastToKItemTerm
+        if a1.underlying is None and a2.underlying is None:
+            return True
+        if a1.underlying is None and a2.underlying is not None:
+            return False
+        if a1.underlying is not None and a2.underlying is None:
+            return False
+        assert a1.underlying is not None
+        assert a2.underlying is not None
         return self.underlying.equals(a1.underlying, a2.underlying)
 
     def subsumes(self, a1: IAbstractPattern, a2: IAbstractPattern) -> bool:
         assert type(a1) is CastToKItemTerm
         assert type(a2) is CastToKItemTerm
+        if a2.underlying is None:
+            return True
+        if a1.underlying is None:
+            return False
         return self.underlying.subsumes(a1.underlying, a2.underlying)
     
     def to_str(self, a: IAbstractPattern, indent: int) -> str:
         assert type(a) is CastToKItemTerm
-        s = self.underlying.to_str(a.underlying)
-        return "<cast-to-kitem: " + s + ">"
+        s = self.underlying.to_str(a.underlying, indent=indent+1) if a.underlying is not None else "<None>"
+        return (indent*' ') + "<cast-to-kitem: \n" + s + ">"
     
     def statistics(self) -> T.Dict[str, T.Any]:
         return {
