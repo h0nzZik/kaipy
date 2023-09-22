@@ -23,10 +23,10 @@ import kaipy.Properties
 from kaipy.DefaultAbstractionContext import make_ctx
 from kaipy.HeatPreAnalysis import ContextAlias, ContextAliases, pre_analyze
 from kaipy.ReachabilitySystem import ReachabilitySystem
-from kaipy.domains.FinitePatternDomain import FinitePattern, FinitePatternDomain
+from kaipy.domains.FiniteTermDomain import FiniteTerm, FiniteTermDomain
 from kaipy.domains.PatternMatchDomain import PatternMatchDomain, PatternMatchDomainElement
 from kaipy.domains.BigsumPatternDomain import BigsumPattern, BigsumPatternDomain
-from kaipy.domains.ExactPatternDomain import ExactPattern, ExactPatternDomain
+from kaipy.domains.ExactTermDomain import ExactTerm, ExactTermDomain
 from kaipy.domains.KResultConstraintDomain import KResultConstraint, KResultConstraintDomain
 from kaipy.domains.KeepEverythingMapDomain import KeepEverythingMap, KeepEverythingMapDomain
 from kaipy.domains.PropertyHubConstraintDomain import PropertyHubElements, PropertyHubConstraintDomain
@@ -167,11 +167,11 @@ class TestImp(MyTest):
         p3: Kore.Pattern = KorePrelude.inj(Kore.SortApp('SortInt', ()), Kore.SortApp('SortKItem', ()), p2)
         p4: Kore.Pattern = Kore.App('kseq', (), (p1,p3))
         
-        pd_p4 = ExactPatternDomain(rs=reachability_system, patterns=[p4])
+        pd_p4 = ExactTermDomain(rs=reachability_system, patterns=[p4])
         assert KoreUtils.is_top(pd_p4.concretize(pd_p4.abstract(ctx=make_ctx(), c=p3)))
         assert p4 == pd_p4.concretize(pd_p4.abstract(ctx=make_ctx(), c=p4))
 
-        pd_p2 = ExactPatternDomain(rs=reachability_system, patterns=[p2])
+        pd_p2 = ExactTermDomain(rs=reachability_system, patterns=[p2])
         pd_bigsum = BigsumPatternDomain(rs=reachability_system, domains=[pd_p4, pd_p2])
         assert KoreUtils.is_top(pd_bigsum.concretize(pd_bigsum.abstract(ctx=make_ctx(), c=p3)))
         assert p4 == pd_bigsum.concretize(pd_bigsum.abstract(ctx=make_ctx(), c=p4))
@@ -211,7 +211,7 @@ class TestImp(MyTest):
         pat1 = Kore.App(symbol="Lbl'Hash'freezer'UndsPlusUndsUnds'IMP-SYNTAX'Unds'AExp'Unds'AExp'Unds'AExp1'Unds'", sorts=(), args=(Kore.App('kseq', (), (Kore.EVar('HOLE', Kore.SortApp('SortKItem', ())),KorePrelude.DOTK)),))
         pat2 = Kore.App(symbol="Lbl'Hash'freezer'UndsPlusUndsUnds'IMP-SYNTAX'Unds'AExp'Unds'AExp'Unds'AExp1'Unds'", sorts=(), args=(Kore.App('kseq', (), (Kore.EVar('XYZ', Kore.SortApp('SortKItem', ())),KorePrelude.DOTK)),))
         ctx = make_ctx()
-        fpd: IAbstractPatternDomain = FinitePatternDomain(rs=reachability_system, pl=[
+        fpd: IAbstractPatternDomain = FiniteTermDomain(rs=reachability_system, pl=[
             pat1,
         ])
         a = fpd.abstract(ctx=ctx, c=pat2)

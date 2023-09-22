@@ -15,8 +15,8 @@ from kaipy.domains.DisjunctiveConstraintDomain import DisjunctiveConstraintDomai
 from kaipy.domains.SubstitutionListDomain import SubstitutionListDomain
 from kaipy.domains.SubstitutionConstraintDomain import SubstitutionConstraintDomain
 from kaipy.domains.BigsumPatternDomain import BigsumPatternDomain
-from kaipy.domains.FinitePatternDomain import FinitePatternDomain
-from kaipy.domains.ExactPatternDomain import ExactPatternDomain
+from kaipy.domains.FiniteTermDomain import FiniteTermDomain
+from kaipy.domains.ExactTermDomain import ExactTermDomain
 from kaipy.domains.CartesianAbstractSubstitutionDomain import CartesianAbstractSubstitutionDomain
 from kaipy.domains.ProductConstraintDomain import ProductConstraintDomain
 from kaipy.domains.KResultConstraintDomain import KResultConstraintDomain
@@ -35,7 +35,7 @@ def build_abstract_pattern_domain(
     initial_configuration = rs.simplify(initial_configuration)
     subpatterns: T.List[Kore.Pattern] = list(KoreUtils.some_subpatterns_of(initial_configuration).keys())
     finite_set_of_patterns = rests + subpatterns + [KorePrelude.DOTK]
-    exact_pattern_domain: IAbstractPatternDomain = ExactPatternDomain(
+    exact_pattern_domain: IAbstractPatternDomain = ExactTermDomain(
         rs,
         patterns=[
             p
@@ -43,7 +43,7 @@ def build_abstract_pattern_domain(
             if 0 == len(KoreUtils.free_evars_of_pattern(p))
         ],
     )
-    finite_pattern_domain: IAbstractPatternDomain = FinitePatternDomain(
+    finite_pattern_domain: IAbstractPatternDomain = FiniteTermDomain(
         pl=[
             p
             for p in finite_set_of_patterns
@@ -63,7 +63,7 @@ def build_abstract_pattern_domain(
     subst_constr_domain: IAbstractConstraintDomain = SubstitutionConstraintDomain(rs=rs, nested=subst_domain)
 
     # Second substitution domain - to catch stuff coming out from the first subst domain. Mainly for `.K`
-    exact_pattern_domain_2: IAbstractPatternDomain = ExactPatternDomain(
+    exact_pattern_domain_2: IAbstractPatternDomain = ExactTermDomain(
         rs,
         patterns=[KorePrelude.DOTK]
     )

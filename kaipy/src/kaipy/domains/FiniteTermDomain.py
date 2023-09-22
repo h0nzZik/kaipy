@@ -19,7 +19,7 @@ from kaipy.VariableManager import VariableManager
 _LOGGER: T.Final = logging.getLogger(__name__)
 
 @dataclasses.dataclass
-class FinitePattern(IAbstractPattern):
+class FiniteTerm(IAbstractPattern):
     # -1 means Top
     idx: int
     sort: Kore.Sort
@@ -65,7 +65,7 @@ class FinitePattern(IAbstractPattern):
 
 
 
-class FinitePatternDomain(IAbstractPatternDomain):
+class FiniteTermDomain(IAbstractPatternDomain):
     pl : T.List[Kore.Pattern] # list of terms with free variables
     rs : ReachabilitySystem
     subsumption_matrix: T.Set[T.Tuple[int,int]]
@@ -95,27 +95,27 @@ class FinitePatternDomain(IAbstractPatternDomain):
         _LOGGER.warning(f'Computed subsumption matrix (size {len(self.subsumption_matrix)})')
         #_LOGGER.warning(f'{self.subsumption_matrix}')
     
-    def abstract(self, ctx: AbstractionContext, c: Kore.Pattern) -> FinitePattern:
+    def abstract(self, ctx: AbstractionContext, c: Kore.Pattern) -> FiniteTerm:
         old = time.perf_counter()
         a = self._abstract(ctx, c)
         new = time.perf_counter()
         self.abstract_perf_counter.add(new - old)
         return a
 
-    def _abstract(self, ctx: AbstractionContext, c: Kore.Pattern) -> FinitePattern:
+    def _abstract(self, ctx: AbstractionContext, c: Kore.Pattern) -> FiniteTerm:
         csort = self.rs.sortof(c)
         # TODO optimize for the case when the sorts do not match
         mrs: T.List[MatchResult] = parallel_match(rs=self.rs, cfg=c, states=[(s if self.rs.sortof(s) == csort else Kore.Bottom(csort)) for s in self.pl])
 
-        fpl: T.List[FinitePattern] = list()
+        fpl: T.List[FiniteTerm] = list()
         for i,mr in enumerate(mrs):
             if len(mr.constraints) == 1 and KoreUtils.is_bottom(mr.constraints[0]):
                 continue
-            fp = FinitePattern(i, csort, mr.renaming or dict())
+            fp = FiniteTerm(i, csort, mr.renaming or dict())
             fpl.append(fp)
         if len(fpl) == 0:
             #_LOGGER.warning(f'no nice pattern found for {self.rs.kprint.kore_to_pretty(c)}')
-            return FinitePattern(-1, csort, None)
+            return FiniteTerm(-1, csort, None)
         #if len(fpl) == 1:
         #    #_LOGGER.warning(f'unique nice pattern found')
         #    return fpl[0]
@@ -207,50 +207,50 @@ class FinitePatternDomain(IAbstractPatternDomain):
         if len(constraints) > 0:
             ctx.broadcast_channel.broadcast(constraints) # type: ignore
 
-        return FinitePattern(
+        return FiniteTerm(
             idx=fp1.idx,
             sort=fp1.sort,
             renaming=dict(renaming_2)
         )
     
     def free_variables_of(self, a: IAbstractPattern) -> T.Set[Kore.EVar]:
-        assert type(a) is FinitePattern
+        assert type(a) is FiniteTerm
         return KoreUtils.free_evars_of_pattern(self.concretize(a))
 
-    def refine(self, ctx: AbstractionContext, a: IAbstractPattern, c: Kore.Pattern) -> FinitePattern:
-        assert type(a) is FinitePattern
+    def refine(self, ctx: AbstractionContext, a: IAbstractPattern, c: Kore.Pattern) -> FiniteTerm:
+        assert type(a) is FiniteTerm
         return a
 
     def is_top(self, a: IAbstractPattern) -> bool:
-        assert type(a) is FinitePattern
+        assert type(a) is FiniteTerm
         return a.idx == -1
 
     def is_bottom(self, a: IAbstractPattern) -> bool:
-        assert type(a) is FinitePattern
+        assert type(a) is FiniteTerm
         return False
 
     def concretize(self, a: IAbstractPattern) -> Kore.Pattern:
-        assert type(a) is FinitePattern
+        assert type(a) is FiniteTerm
         if self.is_top(a):
             return Kore.Top(a.sort)
         return KoreUtils.rename_vars(dict(a.renaming) if a.renaming else dict(), self.pl[a.idx])
 
     def equals(self, a1: IAbstractPattern, a2: IAbstractPattern) -> bool:
-        assert type(a1) is FinitePattern
-        assert type(a2) is FinitePattern
+        assert type(a1) is FiniteTerm
+        assert type(a2) is FiniteTerm
 
         return a1.idx == a2.idx
 
-    def disjunction(self, ctx: AbstractionContext, a1: IAbstractPattern, a2: IAbstractPattern) -> FinitePattern:
-        assert type(a1) is FinitePattern
-        assert type(a2) is FinitePattern
+    def disjunction(self, ctx: AbstractionContext, a1: IAbstractPattern, a2: IAbstractPattern) -> FiniteTerm:
+        assert type(a1) is FiniteTerm
+        assert type(a2) is FiniteTerm
         if (a1.idx == a2.idx) and (a1.sort == a2.sort) and (a1.renaming == a2.renaming):
             return a1
-        return FinitePattern(idx=-1, sort=a1.sort, renaming=dict())
+        return FiniteTerm(idx=-1, sort=a1.sort, renaming=dict())
 
     def subsumes(self, a1: IAbstractPattern, a2: IAbstractPattern) -> bool:
-        assert type(a1) is FinitePattern
-        assert type(a2) is FinitePattern
+        assert type(a1) is FiniteTerm
+        assert type(a2) is FiniteTerm
 
         if a1.sort != a2.sort:
             return False
@@ -274,7 +274,7 @@ class FinitePatternDomain(IAbstractPatternDomain):
         #return self.rs.subsumes(self.concretize(a1), self.concretize(a2))[0]
 
     def to_str(self, a: IAbstractPattern, indent: int) -> str:
-        assert type(a) is FinitePattern
+        assert type(a) is FiniteTerm
         s = (indent*' ') + '<fpd \n'
         s = s + ((indent+1)*' ') + f'idx={a.idx}\n'
         s = s + ((indent+1)*' ') + 'renaming=' + (str({k : v for k,v in a.renaming.items()}) if a.renaming else "<None>") + "\n"

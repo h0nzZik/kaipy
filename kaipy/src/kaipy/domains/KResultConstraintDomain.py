@@ -122,7 +122,7 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
 
     def _refine_by_equalities(self, a: KResultConstraint, equality_pairs: T.List[T.Tuple[Kore.EVar, Kore.EVar]]) -> KResultConstraint:
         # We ignore transitivity of equality for now, because
-        # the only known client (FinitePatternDomain) produces singleton lists only.
+        # the only known client (FiniteTermDomain) produces singleton lists only.
         kresult_vars = a.kresult_vars.copy()
         #_LOGGER.warning(f"_rbe: kresult_vars = {kresult_vars}")
         for (e1,e2) in equality_pairs:
