@@ -127,7 +127,11 @@ class TestImp(MyTest):
             Kore.App(kaipy.Properties.map_in_keys, (), (KorePrelude.inj(Kore.SortApp('SortInt', ()), KorePrelude.SORT_K_ITEM, KorePrelude.int_dv(5)), Kore.EVar('m', Kore.SortApp('SortMap', ()))))
         )
         a1 = domain.abstract(ctx=make_ctx(), over_variables=set(), constraints=[prop1])
-        assert False
+        _LOGGER.warning(f'{a1}')
+        c1 = domain.concretize(a1)
+        _LOGGER.warning(f'{[p.text for p in c1]}')
+        assert c1 == [prop1]
+        assert True
 
     def test_cleanup(
         self,
