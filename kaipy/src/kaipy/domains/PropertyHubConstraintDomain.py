@@ -76,9 +76,11 @@ class PropertyHubConstraintDomain(IAbstractConstraintDomain):
   
     def free_variables_of(self, a: IAbstractConstraint) -> T.Set[Kore.EVar]:
         assert type(a) is PropertyHubElements
-        match a:
-            case PropertyHubMapElement(thing, _):
-                return KoreUtils.free_evars_of_pattern(thing)
+        evs: T.Set[Kore.EVar] = set()
+        for e in a.elements:
+            match e:
+                case PropertyHubMapElement(thing, _):
+                    return KoreUtils.free_evars_of_pattern(thing)
         raise NotImplementedError()
 
     def refine(self, ctx: AbstractionContext, a: IAbstractConstraint, constraints: T.List[Kore.Pattern]) -> IAbstractConstraint:
