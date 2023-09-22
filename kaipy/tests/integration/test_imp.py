@@ -19,6 +19,7 @@ from kaipy.interfaces.IAbstractSubstitutionDomain import IAbstractSubstitutionDo
 from kaipy.interfaces.IAbstractPatternDomain import IAbstractPatternDomain
 
 from kaipy.AbstractionContext import AbstractionContext
+import kaipy.Properties
 from kaipy.DefaultAbstractionContext import make_ctx
 from kaipy.HeatPreAnalysis import ContextAlias, ContextAliases, pre_analyze
 from kaipy.ReachabilitySystem import ReachabilitySystem
@@ -27,6 +28,8 @@ from kaipy.domains.PatternMatchDomain import PatternMatchDomain, PatternMatchDom
 from kaipy.domains.BigsumPatternDomain import BigsumPattern, BigsumPatternDomain
 from kaipy.domains.ExactPatternDomain import ExactPattern, ExactPatternDomain
 from kaipy.domains.KResultConstraintDomain import KResultConstraint, KResultConstraintDomain
+from kaipy.domains.KeepEverythingMapDomain import KeepEverythingMap, KeepEverythingMapDomain
+from kaipy.domains.PropertyHubConstraintDomain import PropertyHubElements, PropertyHubConstraintDomain
 from kaipy.domains.KeepEverythingConstraintDomain import KeepEverything, KeepEverythingConstraintDomain
 from kaipy.testing.testingbase import RSTestBase
 from kaipy.DefaultAbstractionContext import make_ctx
@@ -110,6 +113,21 @@ class TestImp(MyTest):
         ss = reachability_system.kdw.user_declared_sorts
         print(ss)
         assert set(ss) == set(['SortKItem', 'SortVoidVal', 'SortAExp', 'SortBlock', 'SortBExp', 'SortPgm', 'SortStmt', 'SortValue'])
+
+    def test_propertyhub_domain(
+        self,
+        reachability_system: ReachabilitySystem
+    ):
+        md = KeepEverythingMapDomain()
+        domain = PropertyHubConstraintDomain(rs=reachability_system, map_domain=md)
+        prop1 = Kore.Equals(
+            Kore.SortApp('SortBool', ()),
+            reachability_system.top_sort,
+            KorePrelude.TRUE,
+            Kore.App(kaipy.Properties.map_in_keys, (), (KorePrelude.inj(Kore.SortApp('SortInt', ()), KorePrelude.SORT_K_ITEM, KorePrelude.int_dv(5)), Kore.EVar('m', Kore.SortApp('SortMap', ()))))
+        )
+        a1 = domain.abstract(ctx=make_ctx(), over_variables=set(), constraints=[prop1])
+        assert False
 
     def test_cleanup(
         self,

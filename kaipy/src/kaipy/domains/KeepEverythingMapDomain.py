@@ -5,9 +5,10 @@ import typing as T
 import pyk.kore.syntax as Kore
 
 import kaipy.Properties as Properties
-from kaipy.IAbstractMapDomain import IAbstractMap, IAbstractMapDomain
+from kaipy.interfaces.IAbstractMapDomain import IAbstractMap, IAbstractMapDomain
 from kaipy.AbstractionContext import AbstractionContext
 
+@dataclasses.dataclass
 class KeepEverythingMap(IAbstractMap):
     properties: T.List[Properties.Property]
 
@@ -22,7 +23,7 @@ class KeepEverythingMapDomain(IAbstractMapDomain):
 
     def disjunction(self, ctx: AbstractionContext, a1: IAbstractMap, a2: IAbstractMap) -> IAbstractMap:
         assert type(a1) is KeepEverythingMap
-        assert type(a2) is KeepEverythingMap2
+        assert type(a2) is KeepEverythingMap
         return KeepEverythingMap(properties=a1.properties+a2.properties)
     
     def is_top(self, a: IAbstractMap) -> bool:
