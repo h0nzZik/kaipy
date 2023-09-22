@@ -81,7 +81,7 @@ class PropertyHubConstraintDomain(IAbstractConstraintDomain):
             match e:
                 case PropertyHubMapElement(thing, _):
                     return KoreUtils.free_evars_of_pattern(thing)
-        raise NotImplementedError()
+            raise NotImplementedError()
 
     def refine(self, ctx: AbstractionContext, a: IAbstractConstraint, constraints: T.List[Kore.Pattern]) -> IAbstractConstraint:
         return a
