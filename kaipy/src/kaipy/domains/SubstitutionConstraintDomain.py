@@ -52,8 +52,8 @@ class SubstitutionConstraintDomain(IAbstractConstraintDomain):
         if KoreUtils.any_is_bottom(constraints):
             return SubstitutionConstraint(None)
         
-        _LOGGER.warning(f"over_variables: {over_variables}")
-        _LOGGER.warning(f"len(constraints): {len(constraints)}")
+        #_LOGGER.warning(f"over_variables: {over_variables}")
+        #_LOGGER.warning(f"len(constraints): {len(constraints)}")
         
         eqls: T.Dict[Kore.EVar, Kore.Pattern] = dict()
         for p in constraints:

@@ -125,7 +125,7 @@ class TestImp(MyTest):
             Kore.SortApp('SortBool', ()),
             reachability_system.top_sort,
             KorePrelude.TRUE,
-            Kore.App(kaipy.Properties.map_in_keys, (), (KorePrelude.inj(Kore.SortApp('SortInt', ()), KorePrelude.SORT_K_ITEM, KorePrelude.int_dv(5)), Kore.EVar('m', Kore.SortApp('SortMap', ()))))
+            Kore.App(kaipy.Properties.Labels.map_in_keys, (), (KorePrelude.inj(Kore.SortApp('SortInt', ()), KorePrelude.SORT_K_ITEM, KorePrelude.int_dv(5)), Kore.EVar('m', Kore.SortApp('SortMap', ()))))
         )
         a1 = domain.abstract(ctx=make_ctx(), over_variables=set(), constraints=[prop1])
         _LOGGER.warning(f'{a1}')
@@ -154,12 +154,12 @@ class TestImp(MyTest):
             Kore.SortApp('SortBool', ()),
             reachability_system.top_sort,
             KorePrelude.TRUE,
-            Kore.App(kaipy.Properties.map_in_keys, (), (x_kitem, Kore.EVar('m', Kore.SortApp('SortMap', ()))))
+            Kore.App(kaipy.Properties.Labels.map_in_keys, (), (x_kitem, Kore.EVar('m', Kore.SortApp('SortMap', ()))))
         )
         prop2 = Kore.Equals(
             KorePrelude.SORT_K_ITEM,
             reachability_system.top_sort,
-            Kore.App(kaipy.Properties.map_lookup, (), (Kore.EVar('m', Kore.SortApp('SortMap', ())),y_kitem)), z_kitem
+            Kore.App(kaipy.Properties.Labels.map_lookup, (), (Kore.EVar('m', Kore.SortApp('SortMap', ())),y_kitem)), z_kitem
         )
 
         a1 = domain.abstract(ctx=make_ctx(), over_variables=set(), constraints=[prop1, prop2])
@@ -302,7 +302,7 @@ class TestImp(MyTest):
         context_aliases : ContextAliases
     ):
         input_pattern: Kore.Pattern = reachability_system.kdw.get_input_kore(
-            RSTestBase.LANGUAGES / "imp/very-simple.imp"
+            RSTestBase.LANGUAGES / "imp/simple.imp"
         )
 
         rests = pre_analyze(reachability_system, context_aliases, input_pattern)
@@ -319,6 +319,7 @@ class TestImp(MyTest):
         a = pattern_domain.abstract(ctx=ctx, c=concrete)
         _LOGGER.warning(f"a: {pattern_domain.to_str(a, indent=0)}")
         concretized = pattern_domain.concretize(a)
+        _LOGGER.warning(f"concretized: {reachability_system.kprint.kore_to_pretty(concretized)}")
         assert False
 
 

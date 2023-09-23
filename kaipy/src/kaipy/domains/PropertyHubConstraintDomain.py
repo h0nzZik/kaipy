@@ -1,6 +1,7 @@
 import abc
 import dataclasses
 import time
+import logging
 import typing as T
 
 import pyk.kore.syntax as Kore
@@ -13,7 +14,7 @@ from kaipy.AbstractionContext import AbstractionContext
 from kaipy.ReachabilitySystem import ReachabilitySystem
 import kaipy.Properties
 
-
+_LOGGER: T.Final = logging.getLogger(__name__)
 
 @dataclasses.dataclass(frozen=True)
 class PropertyHubElement(IAbstractConstraint):
@@ -55,6 +56,7 @@ class PropertyHubConstraintDomain(IAbstractConstraintDomain):
     def _abstract(self, ctx: AbstractionContext, over_variables: T.Set[Kore.EVar], constraints: T.List[Kore.Pattern]) -> IAbstractConstraint:
         # TODO think about whether we want to use 'over_variables' or not
         twps: T.List[kaipy.Properties.ThingWithProperties] = kaipy.Properties.constraints_to_things(constraints)
+        _LOGGER.warning(f"twps: {twps}")
 
         # TODO: What if there are too many things (with properties)? How do we ensure termination of everything, including disjunction?
         elements: T.List[PropertyHubElement] = list()
@@ -111,6 +113,7 @@ class PropertyHubConstraintDomain(IAbstractConstraintDomain):
         assert type(a) is PropertyHubElements
         constraints: T.List[Kore.Pattern] = list()
         for e in a.elements:
+            _LOGGER.warning(f"concretize element {e}")
             match e:
                 case PropertyHubMapElement(Kore.EVar(_, _), ae):
                     props = self.map_domain.concretize(ae)

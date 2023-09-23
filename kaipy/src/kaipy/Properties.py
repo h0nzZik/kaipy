@@ -38,10 +38,10 @@ class ThingWithProperties:
     thing: Kore.Pattern # should be functional in all valuations; e.g., a variable
     properties: T.List[Property]
 
-
-map_in_keys: str = "Lbl'Unds'in'Unds'keys'LParUndsRParUnds'MAP'Unds'Bool'Unds'KItem'Unds'Map"
-map_lookup: str = "LblMap'Coln'lookup"
-map_size: str = "Lblsize'LParUndsRParUnds'MAP'Unds'Int'Unds'Map"
+class Labels:
+    map_in_keys: T.Final = "Lbl'Unds'in'Unds'keys'LParUndsRParUnds'MAP'Unds'Bool'Unds'KItem'Unds'Map"
+    map_lookup: T.Final = "LblMap'Coln'lookup"
+    map_size: T.Final = "Lblsize'LParUndsRParUnds'MAP'Unds'Int'Unds'Map"
 
 # `about` is usually a variable (Kore.EVar), but can be anything of sort Map
 def patternToThingWithProperty(phi: Kore.Pattern) -> ThingWithProperties | None:
@@ -53,19 +53,19 @@ def patternToThingWithProperty(phi: Kore.Pattern) -> ThingWithProperties | None:
                     p.negate()
             return tpr
         # Map.in_keys
-        case Kore.Equals(_, _, KorePrelude.TRUE, Kore.App(map_in_keys, (), (item, about))):
+        case Kore.Equals(_, _, KorePrelude.TRUE, Kore.App(Labels.map_in_keys, (), (item, about))):
             return ThingWithProperties(about, [MapProperty_HasKey(key=item)])
-        case Kore.Equals(_, _, Kore.App(map_in_keys, (), (item, about)), KorePrelude.TRUE):
+        case Kore.Equals(_, _, Kore.App(Labels.map_in_keys, (), (item, about)), KorePrelude.TRUE):
             return ThingWithProperties(about, [MapProperty_HasKey(key=item)])
         # Map.lookup
-        case Kore.Equals(_, _, Kore.App(map_lookup, (), (about,key)), value):
+        case Kore.Equals(_, _, Kore.App(Labels.map_lookup, (), (about,key)), value):
             return ThingWithProperties(about, [MapProperty_HasKeyValue(key=key,value=value)])
-        case Kore.Equals(_, _, value, Kore.App(map_lookup, (), (about,key))):
+        case Kore.Equals(_, _, value, Kore.App(Labels.map_lookup, (), (about,key))):
             return ThingWithProperties(about, [MapProperty_HasKeyValue(key=key,value=value)])
         # Map.size
-        case Kore.Equals(_, _, Kore.App(map_size, (), (about,)), size):
+        case Kore.Equals(_, _, Kore.App(Labels.map_size, (), (about,)), size):
             return ThingWithProperties(about, [MapProperty_Size(size=size)])
-        case Kore.Equals(_, _, size, Kore.App(map_size, (), (about,))):
+        case Kore.Equals(_, _, size, Kore.App(Labels.map_size, (), (about,))):
             return ThingWithProperties(about, [MapProperty_Size(size=size)])
     return None
 
@@ -76,11 +76,11 @@ def thingWithPropertiesToConstraints(rs: ReachabilitySystem, twp: ThingWithPrope
     for p in twp.properties:
         match p:
             case MapProperty_Size(sz):
-                constraints.append(Kore.Equals(Kore.SortApp('SortInt', ()), rs.top_sort, Kore.App(map_size, (), (twp.thing,)), sz))
+                constraints.append(Kore.Equals(Kore.SortApp('SortInt', ()), rs.top_sort, Kore.App(Labels.map_size, (), (twp.thing,)), sz))
             case MapProperty_HasKey(key):
-                constraints.append(Kore.Equals(Kore.SortApp('SortBool', ()), rs.top_sort, KorePrelude.TRUE, Kore.App(map_in_keys, (), (key, twp.thing))))
+                constraints.append(Kore.Equals(Kore.SortApp('SortBool', ()), rs.top_sort, KorePrelude.TRUE, Kore.App(Labels.map_in_keys, (), (key, twp.thing))))
             case MapProperty_HasKeyValue(key, value):
-                constraints.append(Kore.Equals(rs.sortof(value), rs.top_sort, Kore.App(map_lookup, (), (twp.thing,key)), value))
+                constraints.append(Kore.Equals(rs.sortof(value), rs.top_sort, Kore.App(Labels.map_lookup, (), (twp.thing,key)), value))
     return constraints
 
 
