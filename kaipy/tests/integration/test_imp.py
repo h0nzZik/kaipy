@@ -134,10 +134,32 @@ class TestImp(MyTest):
         assert c1 == [prop1]
         assert True
 
+    def test_things_properties(
+        self,
+        reachability_system: ReachabilitySystem,
+    ):
+        sortid = Kore.SortApp("SortId", ())
+        x = Kore.DV(sortid, Kore.String("x"))
+        x_kitem = KorePrelude.inj(sortid, KorePrelude.SORT_K_ITEM, x)
+        prop1: Kore.Pattern = Kore.Equals(
+            Kore.SortApp('SortBool', ()),
+            reachability_system.top_sort,
+            KorePrelude.TRUE,
+            Kore.App(kaipy.Properties.Labels.map_in_keys, (), (x_kitem, Kore.EVar('m', Kore.SortApp('SortMap', ()))))
+        )
+        twp = kaipy.Properties.patternToThingWithProperty(prop1)
+        assert twp is not None
+        assert twp.thing == Kore.EVar(name='m', sort=Kore.SortApp(name='SortMap', sorts=()))
+        assert len(twp.properties) == 1
+        twps = kaipy.Properties.constraints_to_things([prop1])
+        _LOGGER.warning(twps)
+        assert twps == [twp]
+
     def test_basic_map_domain(
         self,
         reachability_system: ReachabilitySystem,
     ):
+        # Given
         sortid = Kore.SortApp("SortId", ())
         x = Kore.DV(sortid, Kore.String("x"))
         y = Kore.DV(sortid, Kore.String("y"))
@@ -161,10 +183,11 @@ class TestImp(MyTest):
             reachability_system.top_sort,
             Kore.App(kaipy.Properties.Labels.map_lookup, (), (Kore.EVar('m', Kore.SortApp('SortMap', ())),y_kitem)), z_kitem
         )
-
         a1 = domain.abstract(ctx=make_ctx(), over_variables=set(), constraints=[prop1, prop2])
         _LOGGER.warning(f'{domain.to_str(a1, indent=0)}')
         concretized1 = domain.concretize(a1)
+
+        # Then
         assert concretized1 == [prop1,prop2]
 
     def test_cleanup(
