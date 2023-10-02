@@ -32,17 +32,16 @@ class PatternMatchDomain(IAbstractPatternDomain):
     states: T.List[Kore.Pattern]
     state_vars: T.List[T.Set[Kore.EVar]]
     comments: T.Mapping[Kore.Pattern, str]
-    underlying_domains: T.List[IAbstractConstraintDomain]
+    underlying_domain: IAbstractConstraintDomain
     abstract_perf_counter: PerfCounter
     concretize_perf_counter: PerfCounter
-    # invariant: len(states) == len(underlying_domains)
 
     # maybe?
     # precondition: `states` must cover all possible configurations; that is, a big disjunction over `states` is Top.
     def __init__(self,
         rs: ReachabilitySystem,
         states: T.List[T.Tuple[Kore.Pattern, str]],
-        underlying_domains: T.List[IAbstractConstraintDomain],
+        underlying_domain: IAbstractConstraintDomain,
     ):
         self.rs = rs
         # We need all states to use different variables.
@@ -51,7 +50,7 @@ class PatternMatchDomain(IAbstractPatternDomain):
         self.comments = {x:y for (x,y) in states2}
         self.state_vars = [KoreUtils.free_evars_of_pattern(st) for st in self.states]
         #_LOGGER.warning(f"States: {len(states)}")
-        self.underlying_domains = underlying_domains
+        self.underlying_domain = underlying_domain
         self.abstract_perf_counter = PerfCounter()
         self.concretize_perf_counter = PerfCounter()
 
@@ -116,7 +115,7 @@ class PatternMatchDomain(IAbstractPatternDomain):
                     continue
                 ctx.broadcast_channel = broadcast_channels[i]
                 #ctx.broadcast_channel.reset()
-                d = self.underlying_domains[i]
+                d = self.underlying_domain
                 a1 = d.abstract(
                     ctx=ctx,
                     # This has to be constant, otherwise there might be infinitely many abstract substitutions, as the number of variables of a term grows during execution
@@ -133,7 +132,7 @@ class PatternMatchDomain(IAbstractPatternDomain):
             cpsl.append(cps)
         
         # Now compute all the disjunctions
-        final_cps: T.List[IAbstractConstraint|None] = [None for _ in self.underlying_domains]
+        final_cps: T.List[IAbstractConstraint|None] = [None for _ in self.states]
         for i in range(len(cps)):
             for current_cps in cpsl:
                 if final_cps[i] is None:
@@ -144,7 +143,7 @@ class PatternMatchDomain(IAbstractPatternDomain):
                     continue
                 fci = final_cps[i]
                 assert fci is not None
-                final_cps[i] = self.underlying_domains[i].disjunction(ctx, fci, cci)
+                final_cps[i] = self.underlying_domain.disjunction(ctx, fci, cci)
         return PatternMatchDomainElement(constraint_per_state=final_cps)#, renaming= KoreUtils.reverse_renaming(renaming))
 
     def refine(self, ctx: AbstractionContext, a: IAbstractPattern, c: Kore.Pattern) -> PatternMatchDomainElement:
@@ -156,8 +155,8 @@ class PatternMatchDomain(IAbstractPatternDomain):
         assert type(a1) is PatternMatchDomainElement
         assert type(a2) is PatternMatchDomainElement
         cps = [ 
-            ud.disjunction(ctx, b1, b2) if (b1 is not None and b2 is not None) else (b1 if b2 is None else b2)
-            for ud,b1,b2 in zip(self.underlying_domains, a1.constraint_per_state,a2.constraint_per_state)
+            self.underlying_domain.disjunction(ctx, b1, b2) if (b1 is not None and b2 is not None) else (b1 if b2 is None else b2)
+            for b1,b2 in zip(a1.constraint_per_state,a2.constraint_per_state)
         ]
         # Here we assume that all states have different variables.
         #renaming = dict(a1.renaming)
@@ -169,11 +168,11 @@ class PatternMatchDomain(IAbstractPatternDomain):
 
     def is_top(self, a: IAbstractPattern) -> bool:
         assert type(a) is PatternMatchDomainElement
-        return all([ud.is_top(b) if b is not None else False for ud,b in zip(self.underlying_domains, a.constraint_per_state)])
+        return all([self.underlying_domain.is_top(b) if b is not None else False for b in a.constraint_per_state])
 
     def is_bottom(self, a: IAbstractPattern) -> bool:
         assert type(a) is PatternMatchDomainElement
-        return all([ud.is_bottom(b) if b is not None else True for ud,b in zip(self.underlying_domains, a.constraint_per_state)])
+        return all([self.underlying_domain.is_bottom(b) if b is not None else True for b in a.constraint_per_state])
 
     def concretize(self, a: IAbstractPattern) -> Kore.Pattern:
         old = time.perf_counter()
@@ -186,8 +185,8 @@ class PatternMatchDomain(IAbstractPatternDomain):
         assert type(a) is PatternMatchDomainElement
         bot : Kore.Pattern = Kore.Bottom(self._top_sort)
         concretized_constraints: T.List[T.List[Kore.Pattern]] = [
-            (ud.concretize(b) if b is not None else [bot])
-            for ud,b in zip(self.underlying_domains, a.constraint_per_state)
+            (self.underlying_domain.concretize(b) if b is not None else [bot])
+            for b in a.constraint_per_state
         ]
 
         ccr_conjs = [
@@ -229,28 +228,28 @@ class PatternMatchDomain(IAbstractPatternDomain):
         assert type(a1) is PatternMatchDomainElement
         assert type(a2) is PatternMatchDomainElement
         return all([
-            (ud.equals(b1, b2) if (b1 is not None and b2 is not None) else ((b1 is None) == (b2 is None)))
-            for ud,b1,b2 in zip(self.underlying_domains, a1.constraint_per_state, a2.constraint_per_state)
+            (self.underlying_domain.equals(b1, b2) if (b1 is not None and b2 is not None) else ((b1 is None) == (b2 is None)))
+            for b1,b2 in zip(a1.constraint_per_state, a2.constraint_per_state)
         ])
 
     def subsumes(self, a1: IAbstractPattern, a2: IAbstractPattern) -> bool:
         assert type(a1) is PatternMatchDomainElement
         assert type(a2) is PatternMatchDomainElement
         return all([
-            (ud.subsumes(b1, b2) if (b1 is not None and b2 is not None) else ((b1 is None) >= (b2 is None)))
-            for ud,b1,b2 in zip(self.underlying_domains, a1.constraint_per_state, a2.constraint_per_state)
+            (self.underlying_domain.subsumes(b1, b2) if (b1 is not None and b2 is not None) else ((b1 is None) >= (b2 is None)))
+            for b1,b2 in zip(a1.constraint_per_state, a2.constraint_per_state)
         ])
 
     def to_str(self, a: IAbstractPattern, indent: int) -> str:
         assert type(a) is PatternMatchDomainElement
         s: str = (indent*' ') + "pmd[\n"
-        for i,(ud,b) in enumerate(zip(self.underlying_domains, a.constraint_per_state)):
+        for i,b in enumerate(a.constraint_per_state):
             if b is None:
                 continue
-            if ud.is_bottom(b):
+            if self.underlying_domain.is_bottom(b):
                 continue
             s = s + (indent+1)*' ' + f'{i} ({self.comments[self.states[i]]}) => \n'
-            s = s + f'{ud.to_str(b, indent=indent+2)}\n'
+            s = s + f'{self.underlying_domain.to_str(b, indent=indent+2)}\n'
         s = s + (indent*' ') + "]"
         return s
 
@@ -258,5 +257,5 @@ class PatternMatchDomain(IAbstractPatternDomain):
         return {
             'abstract' : self.abstract_perf_counter.dict,
             'concretize' : self.concretize_perf_counter.dict,
-            'underlying' : [d.statistics() for d in self.underlying_domains]
+            'underlying' : [self.underlying_domain.statistics()]
         }

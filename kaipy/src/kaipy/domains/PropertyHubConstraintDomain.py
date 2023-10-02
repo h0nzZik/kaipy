@@ -55,6 +55,7 @@ class PropertyHubConstraintDomain(IAbstractConstraintDomain):
 
     def _abstract(self, ctx: AbstractionContext, over_variables: T.Set[Kore.EVar], constraints: T.List[Kore.Pattern]) -> IAbstractConstraint:
         # TODO think about whether we want to use 'over_variables' or not
+        _LOGGER.warning(f"constraints: {[c.text for c in constraints]}")
         twps: T.List[kaipy.Properties.ThingWithProperties] = kaipy.Properties.constraints_to_things(constraints)
         _LOGGER.warning(f"twps: {twps}")
 

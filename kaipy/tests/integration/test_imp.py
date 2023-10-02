@@ -391,7 +391,7 @@ class TestImp(MyTest):
         st1_constrained = Kore.And(KorePrelude.SORT_K, st1, Kore.Not(KorePrelude.SORT_K, Kore.Equals(sortKItem, KorePrelude.SORT_K, x1_kitem, KorePrelude.inj(sortInt, sortKItem, x2_int))))
         pm_domain = PatternMatchDomain(
             rs=reachability_system,
-            underlying_domains=[underlying_domain],
+            underlying_domain=underlying_domain,
             states=[(st1,"only")])
         #print(pm_domain)
         ctx = make_ctx()
