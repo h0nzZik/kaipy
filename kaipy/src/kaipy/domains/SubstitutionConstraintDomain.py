@@ -149,6 +149,7 @@ class SubstitutionConstraintDomain(IAbstractConstraintDomain):
     
     def statistics(self) -> T.Dict[str, T.Any]:
         return {
+            'name' : "SubstitutionConstraintDomain",
             'abstract' : self.abstract_perf_counter.dict,
             'underlying' : [self.nested.statistics()]
         }

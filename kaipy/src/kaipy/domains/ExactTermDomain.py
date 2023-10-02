@@ -104,5 +104,6 @@ class ExactTermDomain(IAbstractPatternDomain):
 
     def statistics(self) -> T.Dict[str, T.Any]:
         return {
+            'name' : 'ExactTermDomain',
             'abstract' : self.abstract_perf_counter.dict,
         }

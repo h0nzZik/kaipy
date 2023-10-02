@@ -255,6 +255,7 @@ class PatternMatchDomain(IAbstractPatternDomain):
 
     def statistics(self) -> T.Dict[str, T.Any]:
         return {
+            'name' : 'PatternMatchDomain',
             'abstract' : self.abstract_perf_counter.dict,
             'concretize' : self.concretize_perf_counter.dict,
             'underlying' : [self.underlying_domain.statistics()]

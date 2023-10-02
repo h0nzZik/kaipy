@@ -199,6 +199,7 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
 
     def statistics(self) -> T.Dict[str, T.Any]:
         return {
+            'name' : 'CartesianAbstractSubstitutionDomain',
             'abstract' : self.abstract_perf_counter.dict,
             'underlying': [self.pattern_domain.statistics()]
         }

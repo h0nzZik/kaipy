@@ -192,5 +192,6 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
 
     def statistics(self) -> T.Dict[str, T.Any]:
         return {
+            'name' : 'KResultConstraintDomain',
             'abstract' : self.abstract_perf_counter.dict,
         }

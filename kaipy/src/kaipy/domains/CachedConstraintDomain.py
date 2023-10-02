@@ -69,6 +69,7 @@ class CachedConstraintDomain(IAbstractConstraintDomain):
 
     def statistics(self) -> T.Dict[str, T.Any]:
         return {
+            'name' : 'CachedConstraintDomain',
             'abstract' : self.abstract_perf_counter.dict,
             'underlying': [self.underlying.statistics()]
         }

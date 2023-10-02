@@ -288,5 +288,6 @@ class FiniteTermDomain(IAbstractPatternDomain):
 
     def statistics(self) -> T.Dict[str, T.Any]:
         return {
+            'name' : 'FiniteTermDomain',
             'abstract' : self.abstract_perf_counter.dict,
         }

@@ -174,6 +174,7 @@ class PropertyHubConstraintDomain(IAbstractConstraintDomain):
     
     def statistics(self) -> T.Dict[str, T.Any]:
         return {
+            'name' : 'PropertyHubConstraintDomain',
             'abstract' : self.abstract_perf_counter.dict,
             'underlying' : {
                 'map_domain' : self.map_domain.statistics(),

@@ -72,6 +72,7 @@ class CachedPatternDomain(IAbstractPatternDomain):
     
     def statistics(self) -> T.Dict[str, T.Any]:
         return {
+            'name' : 'CachedPatternDomain',
             'abstract' : self.abstract_perf_counter.dict,
             'underlying': [self.underlying.statistics()]
         }

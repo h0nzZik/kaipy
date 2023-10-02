@@ -130,6 +130,7 @@ class DisjunctiveConstraintDomain(IAbstractConstraintDomain):
     
     def statistics(self) -> T.Dict[str, T.Any]:
         return {
+            'name' : 'DisjunctiveConstraintDomain',
             'abstract' : self.abstract_perf_counter.dict,
             'underlying' : [self.underlying.statistics()]
         }

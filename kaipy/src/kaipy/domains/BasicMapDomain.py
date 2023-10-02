@@ -132,6 +132,7 @@ class BasicMapDomain(IAbstractMapDomain):
     
     def statistics(self) -> T.Dict[str, T.Any]:
         return {
+            'name' : 'BasicMapDomain',
             'abstract' : self.abstract_perf_counter.dict,
             'underlying' : {
                 'key_domain' : self.key_domain.statistics(),

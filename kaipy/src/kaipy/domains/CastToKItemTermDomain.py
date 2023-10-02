@@ -98,5 +98,6 @@ class CastToKItemTermDomain(IAbstractPatternDomain):
     
     def statistics(self) -> T.Dict[str, T.Any]:
         return {
+            'name' : 'CastToKItemTermDomain',
             'underlying': [self.underlying.statistics()]
         }

@@ -105,6 +105,7 @@ class SubstitutionListDomain(IAbstractSubstitutionsDomain):
 
     def statistics(self) -> T.Dict[str, T.Any]:
         return {
+            'name' : "SubstitutionListDomain",
             'abstract' : self.abstract_perf_counter.dict,
             'underlying' : [self.underlying.statistics()]
         }

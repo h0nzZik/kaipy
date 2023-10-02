@@ -141,6 +141,7 @@ class BigsumPatternDomain(IAbstractPatternDomain):
     
     def statistics(self) -> T.Dict[str, T.Any]:
         return {
+            'name' : 'BigsumPatternDomain',
             'abstract' : self.abstract_perf_counter.dict,
             'underlying' : [d.statistics() for d in self.domains]
         }
