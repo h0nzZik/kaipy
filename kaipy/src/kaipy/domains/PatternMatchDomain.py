@@ -37,6 +37,7 @@ class PatternMatchDomain(IAbstractPatternDomain):
     underlying_domain: IAbstractConstraintDomain
     abstract_perf_counter: PerfCounter
     concretize_perf_counter: PerfCounter
+    disjunct_cache: T.Dict[Kore.Pattern, T.List[IAbstractConstraint|None]]
 
     # maybe?
     # precondition: `states` must cover all possible configurations; that is, a big disjunction over `states` is Top.
@@ -51,6 +52,7 @@ class PatternMatchDomain(IAbstractPatternDomain):
         self.states = [x for (x, y) in states2]
         self.comments = {x:y for (x,y) in states2}
         self.state_vars = [KoreUtils.free_evars_of_pattern(st) for st in self.states]
+        self.disjunct_cache = dict()
         #_LOGGER.warning(f"States: {len(states)}")
         self.underlying_domain = underlying_domain
         self.abstract_perf_counter = PerfCounter()
@@ -163,6 +165,11 @@ class PatternMatchDomain(IAbstractPatternDomain):
         for idx,q in enumerate(c_simpl_list_norm):
             #_LOGGER.warning(f"q: {q}")
 
+            if q in self.disjunct_cache.keys():
+                cpsl[idx] = self.disjunct_cache[q]
+                continue
+
+
             prefiltered_states_0 : T.List[T.Tuple[int, Kore.Pattern]] = list(enumerate(self.states))
             prefiltered_states: T.List[T.Tuple[int, Kore.Pattern]] = [
                 (i, s)
@@ -208,6 +215,7 @@ class PatternMatchDomain(IAbstractPatternDomain):
                 #    a2: IAbstractConstraint = d.refine(ctx=ctx, a=a1, constraints=ctx.broadcast_channel.constraints)
                 #    ctx.broadcast_channel.reset()
                 #    cps.append(a2)
+            self.disjunct_cache[q] = cps
             cpsl[idx] = cps
         
         # Now compute all the disjunctions
