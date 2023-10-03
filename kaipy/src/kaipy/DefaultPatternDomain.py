@@ -86,7 +86,7 @@ def build_abstract_pattern_domain(
         subst_constr_domain,
         subst_constr_domain_2,
         kresult_domain,
-        property_hub_domain,
+        #property_hub_domain,
     ])
 
     product_domain_disj = DisjunctiveConstraintDomain(product_domain, rs=rs)
