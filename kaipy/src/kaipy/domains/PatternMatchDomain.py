@@ -285,20 +285,22 @@ class PatternMatchDomain(IAbstractPatternDomain):
 
         #_LOGGER.warning(f'ccr_conjs: {ccr_conjs}')
 
+        constrained_states_not_yet_normalized: T.List[Kore.Pattern] = self.rs.map_simplify([
+            Kore.And(
+                self.rs.sortof(state),
+                state,
+                ccr_conj, #KoreUtils.rename_vars(a.renaming, ccr_conj)
+            )
+            for i,(state,ccr_conj) in enumerate(zip(self.states, ccr_conjs))
+        ])
+
+
         # We normalize such that different states in the disjunction have different variables
         constrained_states: T.List[Kore.Pattern] = [
             KoreUtils.normalize_pattern(
-                KoreUtils.cleanup_pattern_new(
-                    self.rs.simplify(
-                        Kore.And(
-                            self.rs.sortof(state),
-                            state,
-                            ccr_conj, #KoreUtils.rename_vars(a.renaming, ccr_conj)
-                        )
-                    )
-                ), prefix=f"Z{i}"
+                KoreUtils.cleanup_pattern_new(csnn), prefix=f"Z{i}"
             ) 
-            for i,(state,ccr_conj) in enumerate(zip(self.states, ccr_conjs))
+            for i,csnn in enumerate(constrained_states_not_yet_normalized)
         ]
         result = KoreUtils.make_disjunction(self._top_sort, constrained_states)
         #_LOGGER.warning(f'BEFORE= {self.rs.kprint.kore_to_pretty(result)}')
