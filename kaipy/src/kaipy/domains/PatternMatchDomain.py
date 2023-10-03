@@ -37,7 +37,8 @@ class PatternMatchDomain(IAbstractPatternDomain):
     underlying_domain: IAbstractConstraintDomain
     abstract_perf_counter: PerfCounter
     concretize_perf_counter: PerfCounter
-    disjunct_cache: T.Dict[Kore.Pattern, T.List[IAbstractConstraint|None]]
+    disjunct_abstract_cache: T.Dict[Kore.Pattern, T.List[IAbstractConstraint|None]]
+    disjunct_concretize_cache: T.Dict[Kore.Pattern, Kore.Pattern]
 
     # maybe?
     # precondition: `states` must cover all possible configurations; that is, a big disjunction over `states` is Top.
@@ -52,7 +53,8 @@ class PatternMatchDomain(IAbstractPatternDomain):
         self.states = [x for (x, y) in states2]
         self.comments = {x:y for (x,y) in states2}
         self.state_vars = [KoreUtils.free_evars_of_pattern(st) for st in self.states]
-        self.disjunct_cache = dict()
+        self.disjunct_abstract_cache = dict()
+        self.disjunct_concretize_cache = dict()
         #_LOGGER.warning(f"States: {len(states)}")
         self.underlying_domain = underlying_domain
         self.abstract_perf_counter = PerfCounter()
@@ -165,8 +167,8 @@ class PatternMatchDomain(IAbstractPatternDomain):
         for idx,q in enumerate(c_simpl_list_norm):
             #_LOGGER.warning(f"q: {q}")
 
-            if q in self.disjunct_cache.keys():
-                cpsl[idx] = self.disjunct_cache[q]
+            if q in self.disjunct_abstract_cache.keys():
+                cpsl[idx] = self.disjunct_abstract_cache[q]
                 continue
 
 
@@ -215,7 +217,7 @@ class PatternMatchDomain(IAbstractPatternDomain):
                 #    a2: IAbstractConstraint = d.refine(ctx=ctx, a=a1, constraints=ctx.broadcast_channel.constraints)
                 #    ctx.broadcast_channel.reset()
                 #    cps.append(a2)
-            self.disjunct_cache[q] = cps
+            self.disjunct_abstract_cache[q] = cps
             cpsl[idx] = cps
         
         # Now compute all the disjunctions
@@ -285,15 +287,24 @@ class PatternMatchDomain(IAbstractPatternDomain):
 
         #_LOGGER.warning(f'ccr_conjs: {ccr_conjs}')
 
-        constrained_states_not_yet_normalized: T.List[Kore.Pattern] = self.rs.map_simplify([
+        # disjunct_concretize_cache
+        # TODO One problem with this caching is that we do not preserve the order of self.states
+        conjs: T.List[Kore.Pattern] = [
             Kore.And(
                 self.rs.sortof(state),
                 state,
                 ccr_conj, #KoreUtils.rename_vars(a.renaming, ccr_conj)
             )
-            for i,(state,ccr_conj) in enumerate(zip(self.states, ccr_conjs))
-        ])
-
+            for (state,ccr_conj) in zip(self.states, ccr_conjs)
+        ]
+        conjs_not_cached = [k for k in conjs if k not in self.disjunct_concretize_cache.keys()]
+        constrained_states_not_yet_normalized_not_cached: T.List[Kore.Pattern] = self.rs.map_simplify(conjs_not_cached)
+        for (k,v) in zip(conjs_not_cached, constrained_states_not_yet_normalized_not_cached):
+            self.disjunct_concretize_cache[k] = v
+        
+        constrained_states_not_yet_normalized = constrained_states_not_yet_normalized_not_cached + [
+            self.disjunct_concretize_cache[k] for k in conjs if k in self.disjunct_concretize_cache.keys()
+        ]
 
         # We normalize such that different states in the disjunction have different variables
         constrained_states: T.List[Kore.Pattern] = [
