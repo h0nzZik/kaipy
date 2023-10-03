@@ -52,3 +52,6 @@ class KeepEverythingConstraintDomain(IAbstractConstraintDomain):
     def to_str(self, a: IAbstractConstraint, indent: int) -> str:
         assert type(a) is KeepEverything
         return str([x.text for x in a.everything])
+
+    def statistics(self) -> T.Dict[str, T.Any]:
+        return dict()

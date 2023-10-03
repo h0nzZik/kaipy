@@ -25,7 +25,7 @@ class IAbstractSubstitutionDomain(abc.ABC):
         ...
 
     @abc.abstractmethod
-    def refine(self, ctx: AbstractionContext, a: IAbstractSubstitution, c: T.List[Kore.MLPred]) -> IAbstractSubstitution:
+    def refine(self, ctx: AbstractionContext, a: IAbstractSubstitution, c: T.List[Kore.Pattern]) -> IAbstractSubstitution:
         ...
 
     @abc.abstractmethod
@@ -50,4 +50,8 @@ class IAbstractSubstitutionDomain(abc.ABC):
 
     @abc.abstractmethod
     def to_str(self, a: IAbstractSubstitution, indent: int) -> str:
+        ...
+    
+    @abc.abstractmethod
+    def statistics(self) -> T.Dict[str, T.Any]:
         ...

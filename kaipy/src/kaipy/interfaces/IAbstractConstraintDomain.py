@@ -52,3 +52,7 @@ class IAbstractConstraintDomain(abc.ABC):
     @abc.abstractmethod
     def to_str(self, a: IAbstractConstraint, indent: int) -> str:
         ...
+    
+    @abc.abstractmethod
+    def statistics(self) -> T.Dict[str, T.Any]:
+        ...

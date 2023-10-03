@@ -116,7 +116,7 @@ def collect_rests(
         # _LOGGER.info(
         #    f"input_pattern_simplified0: {rs.kprint.kore_to_pretty(input_pattern_simplified0)}"
         # )
-        input_pattern_simplified = KoreUtils.cleanup_pattern(rs.top_sort, input_pattern_simplified0)
+        input_pattern_simplified = KoreUtils.cleanup_pattern_new(input_pattern_simplified0)
         # input_pattern_simplified = input_pattern_simplified0
         # _LOGGER.info(
         #    f"input_pattern_simplified: {rs.kprint.kore_to_pretty(input_pattern_simplified)}"
@@ -126,7 +126,7 @@ def collect_rests(
         execute_result: KoreRpc.ExecuteResult = rs.kcs.client.execute(
             input_pattern_simplified, max_depth=1
         )
-        # print(f"input_pattern_with_side (kore): {input_pattern_with_side.text}")
+        #_LOGGER.warning(f"input_pattern_with_side (kore): {rs.kprint.kore_to_pretty(input_pattern_with_side)}")
         # _LOGGER.info(f"execute result depth: {execute_result.depth}")
         # _LOGGER.info(f"execute result reason: {execute_result.reason}")
         if execute_result.reason == KoreRpc.StopReason.STUCK:
@@ -191,10 +191,14 @@ def collect_rests(
                 for i, ns in enumerate(execute_result.next_states):
                     _LOGGER.warning(f"ns[{i}]: {rs.kprint.kore_to_pretty(ns.kore)}")
             assert len(execute_result.next_states) == 2
-            # if execute_result.next_states[0].substitution is None:
-            #    print(f"next_states[0]: {rs.kprint.kore_to_pretty(execute_result.next_states[0].kore)}")
-            #    print(f"next_states[1]: {rs.kprint.kore_to_pretty(execute_result.next_states[1].kore)}")
-            # assert execute_result.next_states[0].substitution is not None
+            if execute_result.next_states[0].substitution is None:
+                pass
+            #_LOGGER.warning(f"next_states[0]: {rs.kprint.kore_to_pretty(execute_result.next_states[0].kore)}")
+            #_LOGGER.warning(f"next_states[1]: {rs.kprint.kore_to_pretty(execute_result.next_states[1].kore)}")
+            assert execute_result.next_states[0].substitution is not None
+            #if execute_result.next_states[1].substitution is not None:
+            #    _LOGGER.warning(f"should be None: {rs.kprint.kore_to_pretty(execute_result.next_states[1].substitution)}")
+            # There might be a lot of negations, saying that no rule matched
             assert execute_result.next_states[1].substitution is None  # the residual
             new_state = execute_result.next_states[0].kore
             side_condition = execute_result.next_states[0].predicate or Kore.Top(

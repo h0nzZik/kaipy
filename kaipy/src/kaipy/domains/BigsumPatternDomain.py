@@ -1,8 +1,10 @@
 import dataclasses
+import time
 import typing as T
 
 import pyk.kore.syntax as Kore
 
+from kaipy.PerfCounter import PerfCounter
 from kaipy.ReachabilitySystem import ReachabilitySystem
 from kaipy.AbstractionContext import AbstractionContext
 from kaipy.interfaces.IAbstractPatternDomain import IAbstractPattern, IAbstractPatternDomain
@@ -19,12 +21,21 @@ class BigsumPattern(IAbstractPattern):
 class BigsumPatternDomain(IAbstractPatternDomain):
     rs: ReachabilitySystem
     domains: T.List[IAbstractPatternDomain]
+    abstract_perf_counter: PerfCounter
 
     def __init__(self, rs:ReachabilitySystem, domains: T.List[IAbstractPatternDomain]):
         self.rs = rs
         self.domains = domains
+        self.abstract_perf_counter = PerfCounter()
     
     def abstract(self, ctx: AbstractionContext, c: Kore.Pattern) -> BigsumPattern:
+        old = time.perf_counter()
+        a = self._abstract(ctx, c)
+        new = time.perf_counter()
+        self.abstract_perf_counter.add(new - old)
+        return a
+
+    def _abstract(self, ctx: AbstractionContext, c: Kore.Pattern) -> BigsumPattern:
         sort = self.rs.kdw.sortof(c)
         for i,d in enumerate(self.domains):
             a = d.abstract(ctx, c)
@@ -127,3 +138,10 @@ class BigsumPatternDomain(IAbstractPatternDomain):
         s = s + self.domains[a.idx].to_str(a.ap, indent=indent+1) + "\n"
         s = s + indent*' ' + ">"
         return s
+    
+    def statistics(self) -> T.Dict[str, T.Any]:
+        return {
+            'name' : 'BigsumPatternDomain',
+            'abstract' : self.abstract_perf_counter.dict,
+            'underlying' : [d.statistics() for d in self.domains]
+        }

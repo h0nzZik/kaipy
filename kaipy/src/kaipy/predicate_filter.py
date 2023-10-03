@@ -1,9 +1,12 @@
 import typing as T
+import logging
 
 import pyk.kore.syntax as Kore
 
 import kaipy.kore_utils as KoreUtils
 from kaipy.cnf import to_cnf
+
+_LOGGER: T.Final = logging.getLogger(__name__)
 
 def filter_out_predicates(
     phi: Kore.Pattern,
@@ -27,6 +30,8 @@ def filter_out_predicates(
                 return lf, (ps1 + ps2)
             return Kore.And(sort, lf, rf), (ps1 + ps2)
         case Kore.Or(sort, left, right):
+            _LOGGER.warning(f"Kore.Or: {phi.text}")
+            assert False
             lf, ps1 = filter_out_predicates(left)
             rf, ps2 = filter_out_predicates(right)
             ps1l = KoreUtils.make_conjunction(sort, ps1)

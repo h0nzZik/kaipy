@@ -1,4 +1,5 @@
 import dataclasses
+import time
 import typing as T
 import logging
 import itertools
@@ -7,6 +8,7 @@ import pyk.kore.syntax as Kore
 import pyk.kore.prelude as KorePrelude
 
 import kaipy.kore_utils as KoreUtils
+from kaipy.PerfCounter import PerfCounter
 from kaipy.interfaces.IAbstractConstraintDomain import IAbstractConstraint, IAbstractConstraintDomain
 from kaipy.AbstractionContext import AbstractionContext
 from kaipy.ReachabilitySystem import ReachabilitySystem
@@ -19,12 +21,14 @@ class KResultConstraint(IAbstractConstraint):
 
 class KResultConstraintDomain(IAbstractConstraintDomain):
     rs: ReachabilitySystem
+    abstract_perf_counter: PerfCounter
 
     def __init__(
         self,
         rs: ReachabilitySystem,
     ):
         self.rs = rs
+        self.abstract_perf_counter = PerfCounter()
     
     def _mk_isKResult_pattern(self, e: Kore.EVar, sort: Kore.Sort) -> Kore.MLPred:
         pe = Kore.App('kseq', (), (
@@ -66,6 +70,13 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
         return KoreUtils.is_bottom(conj_simp)
 
     def abstract(self, ctx: AbstractionContext, over_variables: T.Set[Kore.EVar], constraints: T.List[Kore.Pattern]) -> KResultConstraint:
+        old = time.perf_counter()
+        a = self._abstract(ctx, over_variables, constraints)
+        new = time.perf_counter()
+        self.abstract_perf_counter.add(new - old)
+        return a
+
+    def _abstract(self, ctx: AbstractionContext, over_variables: T.Set[Kore.EVar], constraints: T.List[Kore.Pattern]) -> KResultConstraint:
         a = KResultConstraint(kresult_vars=[])
         if len(constraints) <= 0:
             return a
@@ -111,7 +122,7 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
 
     def _refine_by_equalities(self, a: KResultConstraint, equality_pairs: T.List[T.Tuple[Kore.EVar, Kore.EVar]]) -> KResultConstraint:
         # We ignore transitivity of equality for now, because
-        # the only known client (FinitePatternDomain) produces singleton lists only.
+        # the only known client (FiniteTermDomain) produces singleton lists only.
         kresult_vars = a.kresult_vars.copy()
         #_LOGGER.warning(f"_rbe: kresult_vars = {kresult_vars}")
         for (e1,e2) in equality_pairs:
@@ -177,3 +188,10 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
     def to_str(self, a: IAbstractConstraint, indent: int) -> str:
         assert type(a) is KResultConstraint
         return (indent*' ') + f"<kresults {str([x.text for x in a.kresult_vars])}>"
+
+
+    def statistics(self) -> T.Dict[str, T.Any]:
+        return {
+            'name' : 'KResultConstraintDomain',
+            'abstract' : self.abstract_perf_counter.dict,
+        }

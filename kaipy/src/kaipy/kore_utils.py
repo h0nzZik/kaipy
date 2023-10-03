@@ -1,6 +1,6 @@
 import functools
 import typing as T
-from itertools import chain, product
+import itertools
 import logging
 
 import pyk.kore.syntax as Kore
@@ -329,7 +329,7 @@ def free_occs_det(pattern: Kore.Pattern) -> list[Kore.EVar]:
     return occurrences
 
 def free_evars_of_pattern(p: Kore.Pattern) -> T.Set[Kore.EVar]:
-    return set(chain.from_iterable(free_occs(p).values()))
+    return set(itertools.chain.from_iterable(free_occs(p).values()))
 
 
 def existentially_quantify_variables(
@@ -567,6 +567,8 @@ def let_sort_rec(sort: Kore.Sort, phi: Kore.Pattern) -> Kore.Pattern:
             return Kore.And(sort, let_sort_rec(sort, left), let_sort_rec(sort, right))
         case Kore.Or(_, left, right):
             return Kore.Or(sort, let_sort_rec(sort, left), let_sort_rec(sort, right))
+        case Kore.Not(_, sub):
+            return Kore.Not(sort, let_sort_rec(sort, sub))
         case Kore.Top(_):
             return Kore.Top(sort)
         case Kore.Bottom(_):
@@ -581,8 +583,135 @@ def let_sort_rec(sort: Kore.Sort, phi: Kore.Pattern) -> Kore.Pattern:
             return Kore.Ceil(os, sort, phi)
     return phi.with_sort(sort) # type: ignore
 
+def is_predicate_pattern(phi: Kore.Pattern) -> bool:
+    if issubclass(type(phi), Kore.MLPred):
+        return True
 
-def cleanup_pattern(top_sort: Kore.Sort, phi: Kore.Pattern) -> Kore.Pattern:
+    match phi:
+        case Kore.And(_, l, r):
+            return is_predicate_pattern(l) and is_predicate_pattern(r)
+        case Kore.Or(_, l, r):
+            return is_predicate_pattern(l) and is_predicate_pattern(r)
+        case Kore.Not(_, phi2):
+            return is_predicate_pattern(phi2)
+
+    return False
+
+def get_nonpredicate_part(phi: Kore.Pattern) -> Kore.Pattern | None:
+    if is_predicate_pattern(phi):
+        return None
+    
+    match phi:
+        case Kore.And(s, l, r):
+            fl = get_nonpredicate_part(l)
+            fr = get_nonpredicate_part(r)
+            if not fl and not fr:
+                return None
+            if not fl:
+                return fr
+            if not fr:
+                return fl
+            return Kore.And(s, fl, fr)
+        case Kore.Or(s, l, r):
+            fl = get_nonpredicate_part(l)
+            fr = get_nonpredicate_part(r)
+            if not fl and not fr:
+                return None
+            if not fl:
+                return fr
+            if not fr:
+                return fl
+            return Kore.Or(s, fl, fr)
+        case Kore.Not(s, phi2):
+            f = get_nonpredicate_part(phi2)
+            if not f:
+                return None
+            return Kore.Not(s, f)
+
+    return phi
+
+
+def get_k_cell_0(phi: Kore.Pattern) -> T.List[Kore.Pattern]:
+    match phi:
+        case Kore.And(_, l, r):
+            return get_k_cell(l) + get_k_cell(r)
+        case Kore.App("Lbl'-LT-'k'-GT-'", _, _):
+            return [phi]
+        case Kore.App(_, _, args):
+            gkc = [get_k_cell(a) for a in args]
+            return list(itertools.chain(*gkc))
+    return []
+    #assert False
+
+def get_k_cell(phi: Kore.Pattern) -> T.List[Kore.Pattern]:
+    np = get_nonpredicate_part(phi)
+    if np is None:
+        return []
+    return get_k_cell_0(np)
+
+def filter_out_unrelated_predicates(evs: T.Set[Kore.EVar], phi: Kore.Pattern) -> Kore.Pattern | None:
+    #if not is_predicate_pattern(phi):
+    #    return phi
+
+    match phi:
+        case Kore.Equals(os, s, l, r):
+            if type(l) is Kore.EVar and type(r) is Kore.EVar:
+                if l not in evs:
+                    return None
+                if r not in evs:
+                    return None
+            elif type(l) is Kore.EVar:
+                if l not in evs:
+                    return None
+            elif type(r) is Kore.EVar:
+                if r not in evs:
+                    return None
+
+    if issubclass(type(phi), Kore.MLPred):
+        if len(free_evars_of_pattern(phi).intersection(evs)) > 0:
+            return phi
+        return None
+
+    match phi:
+        case Kore.And(s, l, r):
+            lf = filter_out_unrelated_predicates(evs.union(free_evars_of_pattern(r)), l)
+            rf = filter_out_unrelated_predicates(evs.union(free_evars_of_pattern(l)), r)
+            if not lf and not rf:
+                return None
+            if not lf:
+                return rf
+            if not rf:
+                return lf
+            return Kore.And(s, lf, rf)
+        case Kore.Or(s, l, r):
+            lf = filter_out_unrelated_predicates(evs.union(free_evars_of_pattern(r)), l)
+            rf = filter_out_unrelated_predicates(evs.union(free_evars_of_pattern(l)), r)
+            if not lf and not rf:
+                return None
+            if not lf:
+                return rf
+            if not rf:
+                return lf
+            return Kore.Or(s, lf, rf)
+        case Kore.Not(s, phi2):
+            f = filter_out_unrelated_predicates(evs, phi2)
+            if not f:
+                return None
+            return Kore.Not(s, f)
+    return phi
+    #assert False
+
+
+def cleanup_pattern_new(phi: Kore.Pattern) -> Kore.Pattern:
+    nonp = get_nonpredicate_part(phi)
+    assert nonp is not None
+    evs = free_evars_of_pattern(nonp)
+    filtered = filter_out_unrelated_predicates(evs, phi)
+    assert filtered is not None
+    return filtered
+
+
+def cleanup_pattern_old(top_sort: Kore.Sort, phi: Kore.Pattern) -> Kore.Pattern:
     main_part, _ = PredicateFilter.filter_out_predicates(phi)
     assert main_part is not None
     fvphi = free_evars_of_pattern(phi)
@@ -591,21 +720,6 @@ def cleanup_pattern(top_sort: Kore.Sort, phi: Kore.Pattern) -> Kore.Pattern:
     if rest is None:
         return evs2_p
     return Kore.And(top_sort, rest, evs2_p)
-
-def cleanup_pattern_new(top_sort: Kore.Sort, phi: Kore.Pattern) -> Kore.Pattern:
-    main_part, preds = PredicateFilter.filter_out_predicates(phi)
-    assert main_part is not None
-    fvmain = free_evars_of_pattern(main_part)
-    preds_filtered: T.List[Kore.Pattern] = [
-        p
-        for p in preds
-        if len(free_evars_of_pattern(p).intersection(fvmain)) >= 1
-    ]
-    _LOGGER.warning(f"main_part: {main_part}")
-    _LOGGER.warning(f"preds: {preds}")
-    _LOGGER.warning(f"preds_filtered: {preds_filtered}")
-    return make_conjunction(top_sort, [main_part]+preds_filtered)
-    
 
 def cleanup_eqs(
     top_sort: Kore.Sort,

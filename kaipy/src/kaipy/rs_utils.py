@@ -36,7 +36,7 @@ def match_ca(
     )
     # print(f"ca_renamed: {rs.kprint.kore_to_pretty(ca_renamed)}")
     eca = existentially_quantify_free_variables(rs.top_sort, ca_renamed)
-    ir: KoreRpc.ImpliesResult = rs.kcs.client.implies(data, eca)
+    ir: KoreRpc.ImpliesResult = rs.implies(data, eca)
     if not ir.satisfiable:
         raise ValueError("No match. Bad context?")
     if ir.substitution is None:

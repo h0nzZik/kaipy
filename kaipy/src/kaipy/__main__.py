@@ -520,7 +520,7 @@ def perform_analysis(rs: ReachabilitySystem, spg, normalize, input_kore):
         # print(f"Node: {rs.kprint.kore_to_pretty(node.pattern)}")
         # print(f"Substitution: {rs.kprint.kore_to_pretty(sp)}")
         patt: Kore.Pattern = Kore.And(rs.top_sort, node.pattern, sp)
-        simplified_patt = KoreUtils.cleanup_pattern(rs.top_sort, rs.simplify(patt))
+        simplified_patt = KoreUtils.cleanup_pattern_new(rs.simplify(patt))
         # print(f"Executing pattern: {rs.kprint.kore_to_pretty(simplified_patt)}")
         # exec_result = rs.kcs.client.execute(pattern=patt, max_depth=1)
         exec_result = rs.kcs.client.execute(pattern=simplified_patt, max_depth=1)
@@ -713,9 +713,9 @@ def combine_rules(
     # After the simplification, the intermediate variables (from 'other_renaming') should disappear
     # print(f"New lhs {rs.kprint.kore_to_pretty(new_lhs)}")
     # print(f"New rhs {rs.kprint.kore_to_pretty(new_rhs)}")
-    new_lhs_clean = KoreUtils.cleanup_pattern(rs.top_sort, new_lhs)
+    new_lhs_clean = KoreUtils.cleanup_pattern_new(new_lhs)
 
-    new_rhs_clean = KoreUtils.cleanup_pattern(rs.top_sort, new_rhs)
+    new_rhs_clean = KoreUtils.cleanup_pattern_new(new_rhs)
     # print(f"New lhs clean {rs.kprint.kore_to_pretty(new_lhs_clean)}")
     # print(f"New rhs clean {rs.kprint.kore_to_pretty(new_rhs_clean)}")
     rewrite = Kore.Rewrites(rs.top_sort, new_lhs_clean, new_rhs_clean)

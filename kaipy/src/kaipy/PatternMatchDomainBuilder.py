@@ -25,6 +25,6 @@ def build_pattern_match_domain(
     underlying_domain: IAbstractConstraintDomain
 ) -> PatternMatchDomain:
     states = build_states(rs)
-    domain = PatternMatchDomain(rs, states, [underlying_domain for _ in states])
+    domain = PatternMatchDomain(rs, states, underlying_domain)
     return domain
 
