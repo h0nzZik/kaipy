@@ -79,7 +79,7 @@ class PatternMatchDomain(IAbstractPatternDomain):
     def head_is_a_candidate(self, head_of_q: Kore.Pattern, head_of_candidate: Kore.Pattern) -> bool:
         match (head_of_q,head_of_candidate):
             case (_, Kore.And(_, l, r)):
-                return self.head_is_a_candidate(head_of_q, l) and self.head_is_a_candidate(head_q, r)
+                return self.head_is_a_candidate(head_of_q, l) and self.head_is_a_candidate(head_of_q, r)
 
             case (Kore.App('inj', _, (Kore.App(sym1, _, _),)),Kore.App('inj', _, (Kore.App(sym2, _, _),))):
                 if sym1 != sym2:
