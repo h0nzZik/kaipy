@@ -22,6 +22,8 @@ from kaipy.ParallelMatcher import parallel_match, MatchResult
 
 _LOGGER: T.Final = logging.getLogger(__name__)
 
+
+
 @dataclasses.dataclass
 class PatternMatchDomainElement(IAbstractPattern):
     constraint_per_state: T.List[IAbstractConstraint|None] # The None is here because not every abstract domain can effectively abstract Bottom
@@ -100,14 +102,23 @@ class PatternMatchDomain(IAbstractPatternDomain):
         broadcast_channels = [BroadcastChannel() for _ in self.states]
         for idx,q in enumerate(c_simpl_list_norm):
             #_LOGGER.warning(f"q: {q}")
-            mrs: T.List[MatchResult] = parallel_match(rs=self.rs, cfg=q, states=self.states, renaming=renamings[idx])
+
+            prefiltered_states : T.List[T.Tuple[int, Kore.Pattern]] = list(enumerate(self.states))
+
+            mrs: T.List[MatchResult] = parallel_match(
+                rs=self.rs,
+                cfg=q,
+                states=[s for (i, s) in prefiltered_states],
+                renaming=renamings[idx]
+            )
             constraintss: T.List[T.List[Kore.Pattern]] = [
                 mr.constraints
                 for mr in mrs
             ]
             cps: T.List[IAbstractConstraint|None] = list()
 
-            for i,constraints in enumerate(constraintss):
+            for idx,constraints in enumerate(constraintss):
+                i,_ = prefiltered_states[idx]
                 #_LOGGER.warning(f"{i}: {constraints}")
                 if KoreUtils.any_is_bottom(constraints):
                     #_LOGGER.warning(f"Skipping bottom at {i}")

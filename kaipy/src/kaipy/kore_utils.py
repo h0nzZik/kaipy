@@ -1,6 +1,6 @@
 import functools
 import typing as T
-from itertools import chain, product
+import itertools
 import logging
 
 import pyk.kore.syntax as Kore
@@ -329,7 +329,7 @@ def free_occs_det(pattern: Kore.Pattern) -> list[Kore.EVar]:
     return occurrences
 
 def free_evars_of_pattern(p: Kore.Pattern) -> T.Set[Kore.EVar]:
-    return set(chain.from_iterable(free_occs(p).values()))
+    return set(itertools.chain.from_iterable(free_occs(p).values()))
 
 
 def existentially_quantify_variables(
@@ -627,6 +627,24 @@ def get_nonpredicate_part(phi: Kore.Pattern) -> Kore.Pattern | None:
             return Kore.Not(s, f)
 
     return phi
+
+
+def get_k_cell_0(phi: Kore.Pattern) -> T.List[Kore.Pattern]:
+    match phi:
+        case Kore.And(_, l, r):
+            return get_k_cell(l) + get_k_cell(r)
+        case Kore.App("Lbl'-LT-'k'-GT-'", _, _):
+            return [phi]
+        case Kore.App(_, _, args):
+            gkc = [get_k_cell(a) for a in args]
+            return list(itertools.chain(*gkc))
+    assert False
+
+def get_k_cell(phi: Kore.Pattern) -> T.List[Kore.Pattern]:
+    np = get_nonpredicate_part(phi)
+    if np is None:
+        return []
+    return get_k_cell_0(np)
 
 def filter_out_unrelated_predicates(evs: T.Set[Kore.EVar], phi: Kore.Pattern) -> Kore.Pattern | None:
     #if not is_predicate_pattern(phi):
