@@ -76,6 +76,66 @@ class PatternMatchDomain(IAbstractPatternDomain):
         self.abstract_perf_counter.add(new - old)
         return a
 
+    def head_is_a_candidate(self, head_of_q: Kore.Pattern, head_of_candidate: Kore.Pattern) -> bool:
+        match (head_of_q,head_of_candidate):
+            case (_, Kore.And(_, l, r)):
+                return self.head_is_a_candidate(head_of_q, l) and self.head_is_a_candidate(head_q, r)
+
+            case (Kore.App('inj', _, (Kore.App(sym1, _, _),)),Kore.App('inj', _, (Kore.App(sym2, _, _),))):
+                if sym1 != sym2:
+                    #_LOGGER.warning(f'filtered out (1)')
+                    return False
+                return True
+
+            case (Kore.App('inj', (from1,to1), _),Kore.App('inj', (from2,to2), _)):
+                if from1 != from2:
+                    #_LOGGER.warning(f'filtered out (2)')
+                    return False
+                return True
+
+            case (Kore.App(sym1, _, _), Kore.App(sym2, _, _)):
+                if sym1 != sym2:
+                    #_LOGGER.warning(f'filtered out (3)')
+                    return False
+                return True
+        return True
+
+
+    def is_a_candidate(self, q: Kore.Pattern, candidate: Kore.Pattern) -> bool:
+        ks_of_q = KoreUtils.get_k_cell(q)
+        if len(ks_of_q) != 1:
+            return True
+        
+        ks_of_candidate = KoreUtils.get_k_cell(candidate)
+        if len(ks_of_candidate) != 1:
+            return True
+        
+        k_of_q = ks_of_q[0]
+        k_of_candidate = ks_of_candidate[0]
+
+        #_LOGGER.warning(f'k_of_q: {k_of_q.text}')
+        #_LOGGER.warning(f'k_of_candidate: {k_of_candidate.text}')
+
+        match k_of_q:
+            case Kore.App(_, _, (Kore.App('kseq', _, (a,_)),)):
+                head_of_q = a
+            case _:
+                return True
+        
+        match k_of_candidate:
+            case Kore.App(_, _, (Kore.App('kseq', _, (a,_)),)):
+                head_of_candidate = a
+            case _:
+                return True
+        rv = self.head_is_a_candidate(head_of_q, head_of_candidate)
+
+        if rv:
+            _LOGGER.warning(f'head_of_q: {head_of_q.text}')
+            _LOGGER.warning(f'head_of_candidate: {head_of_candidate.text}')                    
+            _LOGGER.warning(f'candidate: {candidate.text}')
+
+        return rv
+
     def _abstract(self, ctx: AbstractionContext, c: Kore.Pattern) -> PatternMatchDomainElement:
         #_LOGGER.warning(f"c: {c.text}")
         c_simpl = self.rs.simplify(c)
@@ -98,12 +158,18 @@ class PatternMatchDomain(IAbstractPatternDomain):
             for x in c_simpl_list_norm
         ]
 
-        cpsl: T.List[T.List[IAbstractConstraint|None]] = list()
+        cpsl: T.List[T.List[IAbstractConstraint|None]] = [list() for _ in c_simpl_list_norm]
         broadcast_channels = [BroadcastChannel() for _ in self.states]
         for idx,q in enumerate(c_simpl_list_norm):
             #_LOGGER.warning(f"q: {q}")
 
-            prefiltered_states : T.List[T.Tuple[int, Kore.Pattern]] = list(enumerate(self.states))
+            prefiltered_states_0 : T.List[T.Tuple[int, Kore.Pattern]] = list(enumerate(self.states))
+            prefiltered_states: T.List[T.Tuple[int, Kore.Pattern]] = [
+                (i, s)
+                for (i, s) in prefiltered_states_0
+                if self.is_a_candidate(q, s)
+            ]
+            _LOGGER.warning(f"Candidates: {len(prefiltered_states)}")
 
             mrs: T.List[MatchResult] = parallel_match(
                 rs=self.rs,
@@ -115,14 +181,14 @@ class PatternMatchDomain(IAbstractPatternDomain):
                 mr.constraints
                 for mr in mrs
             ]
-            cps: T.List[IAbstractConstraint|None] = list()
+            cps: T.List[IAbstractConstraint|None] = [None for _ in self.states]
 
-            for idx,constraints in enumerate(constraintss):
-                i,_ = prefiltered_states[idx]
+            for idx2,constraints in enumerate(constraintss):
+                i,_ = prefiltered_states[idx2]
                 #_LOGGER.warning(f"{i}: {constraints}")
                 if KoreUtils.any_is_bottom(constraints):
                     #_LOGGER.warning(f"Skipping bottom at {i}")
-                    cps.append(None)
+                    #cps.append(None)
                     continue
                 ctx.broadcast_channel = broadcast_channels[i]
                 #ctx.broadcast_channel.reset()
@@ -133,18 +199,18 @@ class PatternMatchDomain(IAbstractPatternDomain):
                     over_variables=self.state_vars[i], #.union({Kore.EVar(renamings[idx][v.name], v.sort) for v in KoreUtils.free_evars_of_pattern(q)}),
                     constraints=constraints,
                 )
-                cps.append(a1)
+                cps[i] = a1
                 #if len(ctx.broadcast_channel.constraints) == 0:
                 #    cps.append(a1)
                 #else:
                 #    a2: IAbstractConstraint = d.refine(ctx=ctx, a=a1, constraints=ctx.broadcast_channel.constraints)
                 #    ctx.broadcast_channel.reset()
                 #    cps.append(a2)
-            cpsl.append(cps)
+            cpsl[idx] = cps
         
         # Now compute all the disjunctions
         final_cps: T.List[IAbstractConstraint|None] = [None for _ in self.states]
-        for i in range(len(cps)):
+        for i in range(len(final_cps)):
             for current_cps in cpsl:
                 if final_cps[i] is None:
                     final_cps[i] = current_cps[i]
