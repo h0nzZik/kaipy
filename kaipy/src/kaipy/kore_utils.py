@@ -567,6 +567,8 @@ def let_sort_rec(sort: Kore.Sort, phi: Kore.Pattern) -> Kore.Pattern:
             return Kore.And(sort, let_sort_rec(sort, left), let_sort_rec(sort, right))
         case Kore.Or(_, left, right):
             return Kore.Or(sort, let_sort_rec(sort, left), let_sort_rec(sort, right))
+        case Kore.Not(_, sub):
+            return Kore.Not(sort, let_sort_rec(sort, sub))
         case Kore.Top(_):
             return Kore.Top(sort)
         case Kore.Bottom(_):
@@ -638,7 +640,8 @@ def get_k_cell_0(phi: Kore.Pattern) -> T.List[Kore.Pattern]:
         case Kore.App(_, _, args):
             gkc = [get_k_cell(a) for a in args]
             return list(itertools.chain(*gkc))
-    assert False
+    return []
+    #assert False
 
 def get_k_cell(phi: Kore.Pattern) -> T.List[Kore.Pattern]:
     np = get_nonpredicate_part(phi)
