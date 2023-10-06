@@ -1464,18 +1464,17 @@
         "poetry2nix": "poetry2nix"
       },
       "locked": {
-        "lastModified": 1696491819,
-        "narHash": "sha256-WjolGOqS/liz609TlGOXI5RjnQQo9NIh4jK5MXZ5B1k=",
-        "owner": "runtimeverification",
-        "repo": "pyk",
-        "rev": "79c45d9f1ae355b591cbd2e8b77c6205ab170835",
-        "type": "github"
+        "lastModified": 1696613773,
+        "narHash": "sha256-7TUrkKC7Gh/E0/h/gxrSdBKOICkrnD7Tlnwmb3k9Zqk=",
+        "ref": "refs/heads/perf-rpc",
+        "rev": "77a5f6bf8f34f586305c1f6dfeb5d00e2aead33a",
+        "revCount": 466,
+        "type": "git",
+        "url": "file:///home/jan/projects/pyk-profile-rpc-client"
       },
       "original": {
-        "owner": "runtimeverification",
-        "ref": "v0.1.461",
-        "repo": "pyk",
-        "type": "github"
+        "type": "git",
+        "url": "file:///home/jan/projects/pyk-profile-rpc-client"
       }
     },
     "rapidjson-src": {

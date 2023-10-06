@@ -20,6 +20,7 @@ from kaipy.interfaces.IAbstractPatternDomain import IAbstractPatternDomain
 
 from kaipy.AbstractionContext import AbstractionContext
 import kaipy.Properties
+from kaipy.PerfCounter import PerfCounter
 from kaipy.DefaultAbstractionContext import make_ctx
 from kaipy.HeatPreAnalysis import ContextAlias, ContextAliases, pre_analyze
 from kaipy.ReachabilitySystem import ReachabilitySystem
@@ -245,6 +246,8 @@ class TestImp(MyTest):
         )
 
         rests = pre_analyze(reachability_system, context_aliases, input_pattern)
+        old_perf_counter = reachability_system.kcs.client._client._default_client._perf_counter
+        reachability_system.kcs.client._client._default_client._perf_counter = PerfCounter()
         pattern_domain: IAbstractPatternDomain = build_abstract_pattern_domain(
             reachability_system,
             rests,
@@ -258,6 +261,8 @@ class TestImp(MyTest):
         _LOGGER.warning(f"abstract: {pattern_domain.to_str(result.reachable_configurations, indent=0)}")
         concrete_reachable_configurations = pattern_domain.concretize(result.reachable_configurations)
         _LOGGER.warning(reachability_system.kprint.kore_to_pretty(concrete_reachable_configurations))
+        _LOGGER.warning(f"new counter: {reachability_system.kcs.client._client._default_client._perf_counter}")
+        _LOGGER.warning(f"old counter: {old_perf_counter}")
         return result
     
     def test_finitepd_cooperation(

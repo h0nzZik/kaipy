@@ -3,7 +3,8 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/master";
     flake-utils.url = "github:numtide/flake-utils";
-    pyk.url = "github:runtimeverification/pyk/v0.1.461";
+    #pyk.url = "github:runtimeverification/pyk/v0.1.461";
+    pyk.url = "/home/jan/projects/pyk-profile-rpc-client";
     k-framework.url = "github:runtimeverification/k/v6.0.133";
   };
 
