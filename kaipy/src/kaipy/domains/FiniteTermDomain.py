@@ -25,45 +25,6 @@ class FiniteTerm(IAbstractPattern):
     sort: Kore.Sort
     renaming: T.Mapping[str,str] | None
 
-# class Subsumer:
-#     c: Kore.Pattern
-#     rs: ReachabilitySystem
-
-#     def __init__(self, c: Kore.Pattern, rs: ReachabilitySystem):
-#         self.c = c
-#         self.rs = rs
-    
-#     @functools.cached_property
-#     def c_sort(self) -> Kore.Sort:
-#         return self.rs.kdw.sortof(self.c)
-
-#     def __call__(self, p: Kore.Pattern) -> T.Tuple[bool, T.Dict[str,str] | None]:
-#         kcs: KoreClientServer|None = get_global_kcs()
-#         # This means we are not running in a worker process
-#         # but in the main one.
-#         if kcs is None:
-#             kcs = self.rs.kcs
-
-#         p_sort = self.rs.kdw.sortof(p)
-#         if self.c_sort != p_sort:
-#             return False,{}
-        
-#         ant: Kore.Pattern = self.c
-#         con: Kore.Pattern = p
-
-#         renaming = KoreUtils.compute_renaming0(
-#             vars_to_avoid=list(KoreUtils.free_evars_of_pattern(ant)),
-#             vars_to_rename=list(KoreUtils.free_evars_of_pattern(con))
-#         )
-#         con_renamed: Kore.Pattern = KoreUtils.rename_vars(
-#             renaming,
-#             con,
-#         )
-#         con_eqa = KoreUtils.existentially_quantify_free_variables(self.c_sort, con_renamed)
-#         ir = kcs.client.implies(ant, con_eqa)
-#         return ir.satisfiable, (renaming if ir.satisfiable else None)
-
-
 
 class FiniteTermDomain(IAbstractPatternDomain):
     pl : T.List[Kore.Pattern] # list of terms with free variables
@@ -104,15 +65,18 @@ class FiniteTermDomain(IAbstractPatternDomain):
 
     def _abstract(self, ctx: AbstractionContext, c: Kore.Pattern) -> FiniteTerm:
         csort = self.rs.sortof(c)
+        states_with_matching_sort: T.List[T.Tuple[int, Kore.Pattern]] = [(i,s) for (i,s) in enumerate(self.pl) if self.rs.sortof(s) == csort]
+        mrs: T.List[MatchResult] = parallel_match(rs=self.rs, cfg=c, states=[s for (i,s) in states_with_matching_sort])
         # TODO optimize for the case when the sorts do not match
-        mrs: T.List[MatchResult] = parallel_match(rs=self.rs, cfg=c, states=[(s if self.rs.sortof(s) == csort else Kore.Bottom(csort)) for s in self.pl])
+        #mrs: T.List[MatchResult] = parallel_match(rs=self.rs, cfg=c, states=[(s if self.rs.sortof(s) == csort else Kore.Bottom(csort)) for s in self.pl])
 
-        fpl: T.List[FiniteTerm] = list()
-        for i,mr in enumerate(mrs):
+        fpl: T.List[T.Tuple[FiniteTerm, int]] = list()
+        for i0,mr in enumerate(mrs):
             if len(mr.constraints) == 1 and KoreUtils.is_bottom(mr.constraints[0]):
                 continue
+            i,_ = states_with_matching_sort[i0]
             fp = FiniteTerm(i, csort, mr.renaming or dict())
-            fpl.append(fp)
+            fpl.append((fp, i0))
         if len(fpl) == 0:
             #_LOGGER.warning(f'no nice pattern found for {self.rs.kprint.kore_to_pretty(c)}')
             return FiniteTerm(-1, csort, None)
@@ -126,7 +90,7 @@ class FiniteTermDomain(IAbstractPatternDomain):
         
         fp1 = fpl[0]
         for fp2 in fpl[1:]:
-            if not (fp1.idx,fp2.idx) in self.subsumption_matrix:
+            if not (fp1[0].idx,fp2[0].idx) in self.subsumption_matrix:
                 #_LOGGER.warning(f'Replacing with other (NOT more general)')
                 fp1 = fp2
         #_LOGGER.warning(f"Choosing {fp1.idx}")
@@ -136,7 +100,7 @@ class FiniteTermDomain(IAbstractPatternDomain):
         #}
 
         renaming_2: T.Mapping[str, str] = {
-            v.name: ctx.variable_manager.get_fresh_evar_name() for v in KoreUtils.free_evars_of_pattern(self.pl[fp1.idx])
+            v.name: ctx.variable_manager.get_fresh_evar_name() for v in KoreUtils.free_evars_of_pattern(self.pl[fp1[0].idx])
         }
 
         ## These might contain both renamed and non-renamed variables.
@@ -179,7 +143,7 @@ class FiniteTermDomain(IAbstractPatternDomain):
         #     k:renaming_2[v] for k,v in (fp1.renaming or dict()).items()
         # }
 
-        constraints_all = mrs[fp1.idx].constraints
+        constraints_all = mrs[fp1[1]].constraints
         #_LOGGER.warning(f"Pattern: {c.text}")
         #_LOGGER.warning(f"State: {self.pl[fp1.idx].text}")
         #_LOGGER.warning(f"Constraints_all: {[x.text for x in constraints_all]}")
@@ -190,7 +154,7 @@ class FiniteTermDomain(IAbstractPatternDomain):
 
         constraints: T.List[Kore.Pattern] = list()
         #fvc = set((fp1.renaming or dict()).values())
-        renaming_back = KoreUtils.reverse_renaming(fp1.renaming or dict())
+        renaming_back = KoreUtils.reverse_renaming(fp1[0].renaming or dict())
         #renaming_back: T.Dict[str,str] = dict()
         for x in constraints_all:
             match x:
@@ -208,8 +172,8 @@ class FiniteTermDomain(IAbstractPatternDomain):
             ctx.broadcast_channel.broadcast(constraints) # type: ignore
 
         return FiniteTerm(
-            idx=fp1.idx,
-            sort=fp1.sort,
+            idx=fp1[0].idx,
+            sort=fp1[0].sort,
             renaming=dict(renaming_2)
         )
     
