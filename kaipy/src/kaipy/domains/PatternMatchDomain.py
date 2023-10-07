@@ -84,10 +84,10 @@ class PatternMatchDomain(IAbstractPatternDomain):
         match (head_of_q,head_of_candidate):
             case (_, Kore.And(_, l, r)):
                 rv = self.head_is_a_candidate(head_of_q, l) and self.head_is_a_candidate(head_of_q, r)
-                if not rv:
-                    _LOGGER.warning("Filtered:")
-                    _LOGGER.warning(f'head_of_q: {head_of_q.text}')
-                    _LOGGER.warning(f'head_of_candidate: {head_of_candidate.text}')                    
+                #if not rv:
+                    # _LOGGER.warning("Filtered:")
+                    # _LOGGER.warning(f'head_of_q: {head_of_q.text}')
+                    # _LOGGER.warning(f'head_of_candidate: {head_of_candidate.text}')                    
                 return rv
 
             case (Kore.App('inj', (from1,to1), (q2,)),Kore.App('inj', (from2,to2), (c2,))):
@@ -132,11 +132,11 @@ class PatternMatchDomain(IAbstractPatternDomain):
                 return True
         rv = self.head_is_a_candidate(head_of_q, head_of_candidate)
 
-        if rv:
-            _LOGGER.warning(f"Keeping:")
-            _LOGGER.warning(f'head_of_q: {head_of_q.text}')
-            _LOGGER.warning(f'head_of_candidate: {head_of_candidate.text}')                    
-            _LOGGER.warning(f'candidate: {candidate.text}')
+        # if rv:
+        #     _LOGGER.warning(f"Keeping:")
+        #     _LOGGER.warning(f'head_of_q: {head_of_q.text}')
+        #     _LOGGER.warning(f'head_of_candidate: {head_of_candidate.text}')                    
+        #     _LOGGER.warning(f'candidate: {candidate.text}')
 
         return rv
 
@@ -178,9 +178,9 @@ class PatternMatchDomain(IAbstractPatternDomain):
                 for (i, s) in prefiltered_states_0
                 if self.is_a_candidate(q, s)
             ]
-            _LOGGER.warning(f"Candidates: {len(prefiltered_states)}")
-            if len(prefiltered_states) == 0:
-                _LOGGER.warning(f"Zero candidates for: {q.text}")
+            # _LOGGER.warning(f"Candidates: {len(prefiltered_states)}")
+            # if len(prefiltered_states) == 0:
+            #     _LOGGER.warning(f"Zero candidates for: {q.text}")
 
             mrs: T.List[MatchResult] = parallel_match(
                 rs=self.rs,

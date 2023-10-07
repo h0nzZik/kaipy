@@ -1,4 +1,5 @@
 import dataclasses
+from enum import Enum
 import time
 import typing as T
 import logging
@@ -19,9 +20,13 @@ _LOGGER: T.Final = logging.getLogger(__name__)
 class KResultConstraint(IAbstractConstraint):
     kresult_vars: T.List[Kore.EVar]
 
+SortIsKResult = Enum('SortIsKResult', ['Allways', 'Never', 'Sometimes'])
+
+
 class KResultConstraintDomain(IAbstractConstraintDomain):
     rs: ReachabilitySystem
     abstract_perf_counter: PerfCounter
+    sort_is_kresult: T.Mapping[str, SortIsKResult]
 
     def __init__(
         self,
@@ -29,15 +34,46 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
     ):
         self.rs = rs
         self.abstract_perf_counter = PerfCounter()
+        
+        sorts = self.rs.kdw.user_declared_sorts
+        sort_never_kresults_queries: T.List[Kore.Pattern] = [
+            self._mk_isKResult_pattern(Kore.EVar('X', Kore.SortApp(s, ())), sort=Kore.SortApp(s, ()))
+            for s in sorts
+        ]
+        sort_always_kresults_queries: T.List[Kore.Pattern] = [
+            Kore.Not(Kore.SortApp(s, ()), self._mk_isKResult_pattern(Kore.EVar('X', Kore.SortApp(s, ())), sort=Kore.SortApp(s, ())))
+            for s in sorts
+        ]
+        sort_always_kresults_answers = self.rs.map_simplify(sort_always_kresults_queries)
+        sort_never_kresults_answers = self.rs.map_simplify(sort_never_kresults_queries)
+        
+        sort_is_kresult: T.Dict[str, SortIsKResult] = {}
+        for (i,s) in enumerate(sorts):
+            if KoreUtils.is_bottom(sort_always_kresults_answers[i]):
+                sort_is_kresult[s] = SortIsKResult.Allways
+            elif KoreUtils.is_bottom(sort_never_kresults_answers[i]):
+                sort_is_kresult[s] = SortIsKResult.Never
+            else:
+                sort_is_kresult[s] = SortIsKResult.Sometimes
+        _LOGGER.warning(f"sort_is_kresult: {sort_is_kresult}")
+        self.sort_is_kresult = sort_is_kresult
+        
     
     def _mk_isKResult_pattern(self, e: Kore.EVar, sort: Kore.Sort) -> Kore.MLPred:
         pe = Kore.App('kseq', (), (
-                KorePrelude.inj(e.sort, KorePrelude.SORT_K_ITEM, e),
+                KorePrelude.inj(e.sort, KorePrelude.SORT_K_ITEM, e) if sort != KorePrelude.SORT_K_ITEM else e,
                 KorePrelude.DOTK,
         ))
         iskr = Kore.App('LblisKResult', (), (pe,))
         iskr_true = Kore.Equals(KorePrelude.BOOL, sort, iskr, KorePrelude.TRUE)
         return iskr_true
+    
+    def _swap_equals(self, phi: Kore.Pattern) -> Kore.Pattern:
+        match phi:
+            case Kore.Equals(s1, s2, l, r):
+                return Kore.Equals(s1, s2, r, l)
+            case _:
+                assert False
 
     def free_variables_of(self, a: IAbstractConstraint) -> T.Set[Kore.EVar]:
         assert type(a) is KResultConstraint
@@ -59,15 +95,27 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
             return False
         return True
 
-    def _test_necessary_kresult(self, e: Kore.EVar, phi: Kore.Pattern) -> bool:
+    def _really_test_necessary_kresult(self, e: Kore.EVar, phi: Kore.Pattern) -> bool:
         assert issubclass(type(phi), Kore.WithSort)
         iskr_true = self._mk_isKResult_pattern(e, sort=e.sort)
         not_iskr_true = Kore.Not(e.sort, iskr_true)
-        #conj0 = Kore.And(sort=e.sort, left=e, right=not_iskr_true)
-        #conj = Kore.And(sort=e.sort, left=conj0, right=KoreUtils.let_sort_rec(sort=e.sort, phi=phi)) 
         conj = Kore.And(sort=e.sort, left=not_iskr_true, right=KoreUtils.let_sort_rec(sort=e.sort, phi=phi)) 
+        # TODO this can be parallelized
         conj_simp = self.rs.simplify(conj)
         return KoreUtils.is_bottom(conj_simp)
+
+    def _test_necessary_kresult(self, e: Kore.EVar, phi: Kore.Pattern) -> bool:
+        s = e.sort.name
+        if s not in self.sort_is_kresult:
+            return self._really_test_necessary_kresult(e, phi)
+        
+        match self.sort_is_kresult[s]:
+            case SortIsKResult.Allways:
+                return True
+            case SortIsKResult.Never:
+                return False
+            case _:
+                return self._really_test_necessary_kresult(e, phi)
 
     def abstract(self, ctx: AbstractionContext, over_variables: T.Set[Kore.EVar], constraints: T.List[Kore.Pattern]) -> KResultConstraint:
         old = time.perf_counter()
