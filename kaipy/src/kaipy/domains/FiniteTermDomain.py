@@ -181,10 +181,6 @@ class FiniteTermDomain(IAbstractPatternDomain):
         assert type(a) is FiniteTerm
         return KoreUtils.free_evars_of_pattern(self.concretize(a))
 
-    def refine(self, ctx: AbstractionContext, a: IAbstractPattern, c: Kore.Pattern) -> FiniteTerm:
-        assert type(a) is FiniteTerm
-        return a
-
     def is_top(self, a: IAbstractPattern) -> bool:
         assert type(a) is FiniteTerm
         return a.idx == -1

@@ -21,9 +21,6 @@ class KeepEverythingConstraintDomain(IAbstractConstraintDomain):
         assert type(a) is KeepEverything
         return set(*itertools.chain(*[KoreUtils.free_evars_of_pattern(p) for p in a.everything]))
 
-    def refine(self, ctx: AbstractionContext, a: IAbstractConstraint, constraints: T.List[Kore.Pattern]) -> IAbstractConstraint:
-        return a
-
     def disjunction(self, ctx: AbstractionContext, a1: IAbstractConstraint, a2: IAbstractConstraint) -> IAbstractConstraint:
         raise NotImplementedError()
 

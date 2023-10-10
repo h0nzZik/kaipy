@@ -64,10 +64,6 @@ class SubstitutionListDomain(IAbstractSubstitutionsDomain):
         #_LOGGER.warning(f"disjunction: result_len={len(elements)}")
         return SubstitutionList(elements=elements)
 
-    def refine(self, ctx: AbstractionContext, a: IAbstractSubstitutions, constraints: T.List[Kore.Pattern]) -> SubstitutionList:
-        assert type(a) is SubstitutionList
-        return a
-
     def concretize(self, a: IAbstractSubstitutions) -> T.List[Substitution]:
         assert type(a) is SubstitutionList
         return [

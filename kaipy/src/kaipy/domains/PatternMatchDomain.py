@@ -211,12 +211,6 @@ class PatternMatchDomain(IAbstractPatternDomain):
                     constraints=constraints,
                 )
                 cps[i] = a1
-                #if len(ctx.broadcast_channel.constraints) == 0:
-                #    cps.append(a1)
-                #else:
-                #    a2: IAbstractConstraint = d.refine(ctx=ctx, a=a1, constraints=ctx.broadcast_channel.constraints)
-                #    ctx.broadcast_channel.reset()
-                #    cps.append(a2)
             self.disjunct_abstract_cache[q] = cps
             cpsl[idx] = cps
         
@@ -234,11 +228,6 @@ class PatternMatchDomain(IAbstractPatternDomain):
                 assert fci is not None
                 final_cps[i] = self.underlying_domain.disjunction(ctx, fci, cci)
         return PatternMatchDomainElement(constraint_per_state=final_cps)#, renaming= KoreUtils.reverse_renaming(renaming))
-
-    def refine(self, ctx: AbstractionContext, a: IAbstractPattern, c: Kore.Pattern) -> PatternMatchDomainElement:
-        assert type(a) is PatternMatchDomainElement
-        # no-op so far
-        return a
 
     def disjunction(self, ctx: AbstractionContext, a1: IAbstractPattern, a2: IAbstractPattern) -> IAbstractPattern:
         assert type(a1) is PatternMatchDomainElement

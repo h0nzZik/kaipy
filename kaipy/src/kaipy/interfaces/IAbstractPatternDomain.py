@@ -19,10 +19,6 @@ class IAbstractPatternDomain(abc.ABC):
         ...
 
     @abc.abstractmethod
-    def refine(self, ctx: AbstractionContext, a: IAbstractPattern, c: Kore.Pattern) -> IAbstractPattern:
-        ...
-
-    @abc.abstractmethod
     def disjunction(self, ctx: AbstractionContext, a1: IAbstractPattern, a2: IAbstractPattern) -> IAbstractPattern:
         ...
 

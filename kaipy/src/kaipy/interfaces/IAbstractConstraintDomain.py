@@ -18,10 +18,6 @@ class IAbstractConstraintDomain(abc.ABC):
     def free_variables_of(self, a: IAbstractConstraint) -> T.Set[Kore.EVar]:
         ...
 
-    @abc.abstractmethod
-    def refine(self, ctx: AbstractionContext, a: IAbstractConstraint, constraints: T.List[Kore.Pattern]) -> IAbstractConstraint:
-        ...
-
     # Requirement: FV(concretize(disjunction(ctx, a1, a2))) \subseteq FV(concretize(a1)) \cup FV(concretize(a2)).
     # In other words, disjunction is not allowed to invent variables.
     # Therefore, it shall not use ctx.variable_manager to create any.

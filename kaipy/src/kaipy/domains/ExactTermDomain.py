@@ -51,10 +51,6 @@ class ExactTermDomain(IAbstractPatternDomain):
     def free_variables_of(self, a: IAbstractPattern) -> T.Set[Kore.EVar]:
         assert type(a) is ExactTerm
         return set()
-    
-    def refine(self, ctx: AbstractionContext, a: IAbstractPattern, c: Kore.Pattern) -> ExactTerm:
-        assert type(a) is ExactTerm
-        return a
 
     def is_top(self, a: IAbstractPattern) -> bool:
         assert type(a) is ExactTerm

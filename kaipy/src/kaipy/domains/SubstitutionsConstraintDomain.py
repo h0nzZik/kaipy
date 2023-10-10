@@ -83,15 +83,6 @@ class SubstitutionsConstraintDomain(IAbstractConstraintDomain):
             return set()
         return self.nested.free_variables_of(a.nested)
     
-    def refine(self, ctx: AbstractionContext, a: IAbstractConstraint, constraints: T.List[Kore.Pattern]) -> SubstitutionsConstraint:
-        assert type(a) is SubstitutionsConstraint
-        if a.nested is None:
-            return a
-        
-        new_nested = self.nested.refine(ctx, a.nested, constraints)
-        new_a = SubstitutionsConstraint(new_nested)
-        return new_a
-
     def disjunction(self, ctx: AbstractionContext, a1: IAbstractConstraint, a2: IAbstractConstraint) -> SubstitutionsConstraint:
         assert type(a1) is SubstitutionsConstraint
         assert type(a2) is SubstitutionsConstraint

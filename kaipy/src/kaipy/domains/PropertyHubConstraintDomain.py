@@ -88,9 +88,6 @@ class PropertyHubConstraintDomain(IAbstractConstraintDomain):
                     raise NotImplementedError()
         return evs
 
-    def refine(self, ctx: AbstractionContext, a: IAbstractConstraint, constraints: T.List[Kore.Pattern]) -> IAbstractConstraint:
-        return a
-
     def disjunction(self, ctx: AbstractionContext, a1: IAbstractConstraint, a2: IAbstractConstraint) -> IAbstractConstraint:
         assert type(a1) is PropertyHubElements
         assert type(a2) is PropertyHubElements

@@ -50,10 +50,6 @@ class DisjunctiveConstraintDomain(IAbstractConstraintDomain):
         assert type(a) is Disjunction
         return set(itertools.chain(*[self.underlying.free_variables_of(e) for e in a.elements]))
 
-    def refine(self, ctx: AbstractionContext, a: IAbstractConstraint, constraints: T.List[Kore.Pattern]) -> Disjunction:
-        assert type(a) is Disjunction
-        return a
-
     def disjunction(self, ctx: AbstractionContext, a1: IAbstractConstraint, a2: IAbstractConstraint) -> Disjunction:
         assert type(a1) is Disjunction
         assert type(a2) is Disjunction

@@ -61,33 +61,6 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
             fvs.update(self.pattern_domain.free_variables_of(v))
         return fvs
 
-    def refine(self, ctx: AbstractionContext, a: IAbstractSubstitution, c: T.List[Kore.Pattern]) -> CartesianAbstractSubstitution:
-        assert type(a) is CartesianAbstractSubstitution
-        return a
-        #return self.do_refine(ctx, a, c)
-
-    # I am not sure if this is useful
-    def do_refine(self, ctx: AbstractionContext, a: IAbstractSubstitution, c: T.List[Kore.MLPred]) -> CartesianAbstractSubstitution:
-        assert type(a) is CartesianAbstractSubstitution
-        d = dict(a.mapping)
-        for p in c:
-            match p:
-                case Kore.Equals(_, _, Kore.EVar(_, _), Kore.EVar(_, _)):
-                    continue
-                case Kore.Equals(_, _, Kore.EVar(n, s), right):
-                    if Kore.EVar(n, s) in d.keys():
-                        d[Kore.EVar(n,s)] = self.pattern_domain.refine(ctx, d[Kore.EVar(n, s)], right)
-                    else:
-                        d[Kore.EVar(n,s)] = self.pattern_domain.abstract(ctx, right)
-                    continue
-                case Kore.Equals(_, _, left, Kore.EVar(n, s)):
-                    if Kore.EVar(n, s) in d.keys():
-                        d[Kore.EVar(n,s)] = self.pattern_domain.refine(ctx, d[Kore.EVar(n, s)], left)
-                    else:
-                        d[Kore.EVar(n,s)] = self.pattern_domain.abstract(ctx, left)
-        return CartesianAbstractSubstitution(d)
-
-
     def concretize(self, a: IAbstractSubstitution) -> Substitution:
         assert type(a) is CartesianAbstractSubstitution
         mapping = {
@@ -96,46 +69,7 @@ class CartesianAbstractSubstitutionDomain(IAbstractSubstitutionDomain):
             if not self.pattern_domain.is_top(v)
         }
         s =  Substitution(mapping)
-        #_LOGGER.warning(f"concretize() = {s}")
         return s
-        # # If `v` is top, we do not want to concretize it,
-        # # because the resulting constraint would be something like
-        # # `X = Top()`. But such substitution is useless.
-        # # So, we replace Top() with a free variable of a given sort.
-        # concretes: T.Dict[Kore.EVar, Kore.Pattern] = {
-        #     k : ( Kore.EVar(name="VarDEFAULT", sort=k.sort) if self.pattern_domain.is_top(v) else self.pattern_domain.concretize(v))
-        #     for k,v in a.mapping.items()
-        #     #if not self.pattern_domain.is_top(v)
-        # }
-        # for k in concretes:
-        #     assert not KoreUtils.is_top(concretes[k])
-
-        # # It might happen that there are two evars, e1 and e2,
-        # # that are mapped to patterns p1 and p2, respectively,
-        # # such that p1 and p2 share some variable `v`.
-        # # This is unfortunate, because `v` in `p1` is unrelated
-        # # to `v` in `p2`, but the underlying pattern substitution
-        # # can not do anything about it. So we handle the case here.
-        
-        # # Rename all the variables
-        # vars_to_rename = list(itertools.chain(*[
-        #             list(KoreUtils.free_evars_of_pattern(p))
-        #             for p in concretes.values()
-        #         ]))
-        # vars_to_avoid: T.Set[Kore.EVar] = set()
-        # concretes_renamed: T.Dict[Kore.EVar, Kore.Pattern] = dict()
-        # for k,v in concretes.items():
-        #     # But compute a separate renaming for each component
-        #     renaming = KoreUtils.compute_renaming0(
-        #         vars_to_avoid=list(vars_to_avoid),
-        #         vars_to_rename=vars_to_rename
-        #     )
-        #     v_renamed = KoreUtils.rename_vars(renaming, v)
-        #     concretes_renamed[k] = v_renamed
-        #     vars_to_avoid = vars_to_avoid.union(
-        #         KoreUtils.free_evars_of_pattern(v_renamed)
-        #     )
-        # return Substitution(immutabledict(concretes_renamed))
     
 
     def disjunction(self, ctx: AbstractionContext, a1: IAbstractSubstitution, a2: IAbstractSubstitution) -> IAbstractSubstitution:

@@ -190,49 +190,6 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
         #    _LOGGER.warning(f"Abstracted {[x.text for x in constraints]} into {self.to_str(a2, indent=0)}")
         return a2
 
-    def refine(self, ctx: AbstractionContext, a: IAbstractConstraint, constraints: T.List[Kore.Pattern]) -> KResultConstraint:
-        assert type(a) is KResultConstraint
-        return a
-        #return self.do_refine(ctx, a, constraints)
-
-    # def do_refine(self, ctx: AbstractionContext, a: IAbstractConstraint, constraints: T.List[Kore.Pattern]) -> KResultConstraint:
-    #     assert type(a) is KResultConstraint
-
-    #     monitored_evars: T.Dict[Kore.EVar, Kore.MLPred] = dict()
-    #     equality_pairs: T.List[T.Tuple[Kore.EVar, Kore.EVar]] = list()
-    #     for p in constraints:
-    #         match p:
-    #             case Kore.Equals(_, _, Kore.EVar(n1, s1), Kore.EVar(n2, s2)):
-    #                 equality_pairs.append((Kore.EVar(n1, s1), Kore.EVar(n2, s2)))
-    #                 continue
-    #             case Kore.Equals(_, _, Kore.EVar(n, s), right):
-    #                 monitored_evars[Kore.EVar(n, s)] = p
-    #             case Kore.Equals(_, _, left, Kore.EVar(n, s)):
-    #                 monitored_evars[Kore.EVar(n, s)] = p
-
-    #     _LOGGER.warning(f"refine: equality_pars: {equality_pairs}, a: {self.to_str(a, indent=0)}")
-    #     _LOGGER.warning(f"refine: monitored evars: {set(monitored_evars.keys())}")
-    #     a2 = self._refine_monitored(ctx, a, monitored_evars)
-    #     a3 = self._refine_by_equalities(a2, equality_pairs)
-    #     #_LOGGER.warning(f"refined {self.to_str(a2)}")
-    #     return a3
-
-    def _refine_by_equalities(self, a: KResultConstraint, equality_pairs: T.List[T.Tuple[Kore.EVar, Kore.EVar]]) -> KResultConstraint:
-        # We ignore transitivity of equality for now, because
-        # the only known client (FiniteTermDomain) produces singleton lists only.
-        kresult_vars = a.kresult_vars.copy()
-        #_LOGGER.warning(f"_rbe: kresult_vars = {kresult_vars}")
-        for (e1,e2) in equality_pairs:
-            if e1 in kresult_vars and e2 not in kresult_vars:
-                #_LOGGER.warning(f"Adding {e2}")
-                kresult_vars.append(e2)
-                continue
-            if e2 in kresult_vars and e1 not in kresult_vars:
-                #_LOGGER.warning(f"Adding {e1}")
-                kresult_vars.append(e1)
-                continue
-
-        return KResultConstraint(kresult_vars=kresult_vars)
 
     def _refine_monitored(self, ctx: AbstractionContext, a: KResultConstraint, monitored_evars: T.Mapping[Kore.EVar, Kore.Pattern]) -> KResultConstraint:
         #_LOGGER.warning(f"refining with monitored {monitored_evars}")

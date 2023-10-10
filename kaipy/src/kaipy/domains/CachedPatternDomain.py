@@ -46,9 +46,6 @@ class CachedPatternDomain(IAbstractPatternDomain):
     def free_variables_of(self, a: IAbstractPattern) -> T.Set[Kore.EVar]:
         return self.underlying.free_variables_of(a)
 
-    def refine(self, ctx: AbstractionContext, a: IAbstractPattern, c: Kore.Pattern) -> IAbstractPattern:
-        return self.underlying.refine(ctx, a, c)
-
     def disjunction(self, ctx: AbstractionContext, a1: IAbstractPattern, a2: IAbstractPattern) -> IAbstractPattern:
         return self.underlying.disjunction(ctx, a1, a2)
 

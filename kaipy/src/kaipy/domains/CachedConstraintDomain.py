@@ -42,9 +42,6 @@ class CachedConstraintDomain(IAbstractConstraintDomain):
     def free_variables_of(self, a: IAbstractConstraint) -> T.Set[Kore.EVar]:
         return self.underlying.free_variables_of(a)
 
-    def refine(self, ctx: AbstractionContext, a: IAbstractConstraint, constraints: T.List[Kore.Pattern]) -> IAbstractConstraint:
-        return self.underlying.refine(ctx, a, constraints)
-
     def disjunction(self, ctx: AbstractionContext, a1: IAbstractConstraint, a2: IAbstractConstraint) -> IAbstractConstraint:
         return self.underlying.disjunction(ctx, a1, a2)
 

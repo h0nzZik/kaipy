@@ -50,13 +50,6 @@ class ProductConstraintDomain(IAbstractConstraintDomain):
     def free_variables_of(self, a: IAbstractConstraint) -> T.Set[Kore.EVar]:
         assert type(a) is ProductConstraint
         return set(itertools.chain(*[ud.free_variables_of(ua) for ud,ua in zip(self.underlying_domains, a.underlying)]))
-    
-    def refine(self, ctx: AbstractionContext, a: IAbstractConstraint, constraints: T.List[Kore.Pattern]) -> IAbstractConstraint:
-        assert type(a) is ProductConstraint
-        return ProductConstraint(underlying=[
-            ud.refine(ctx, ua, constraints)
-            for ud,ua in zip(self.underlying_domains, a.underlying)
-        ])
 
     def disjunction(self, ctx: AbstractionContext, a1: IAbstractConstraint, a2: IAbstractConstraint) -> ProductConstraint:
         assert type(a1) is ProductConstraint

@@ -37,9 +37,6 @@ class CastToKItemTermDomain(IAbstractPatternDomain):
             return set()
         return self.underlying.free_variables_of(a.underlying)
 
-    def refine(self, ctx: AbstractionContext, a: IAbstractPattern, c: Kore.Pattern) -> IAbstractPattern:
-        return a
-
     def disjunction(self, ctx: AbstractionContext, a1: IAbstractPattern, a2: IAbstractPattern) -> IAbstractPattern:
         assert type(a1) is CastToKItemTerm
         assert type(a2) is CastToKItemTerm

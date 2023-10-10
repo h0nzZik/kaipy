@@ -25,10 +25,6 @@ class IAbstractSubstitutionDomain(abc.ABC):
         ...
 
     @abc.abstractmethod
-    def refine(self, ctx: AbstractionContext, a: IAbstractSubstitution, c: T.List[Kore.Pattern]) -> IAbstractSubstitution:
-        ...
-
-    @abc.abstractmethod
     def concretize(self, a: IAbstractSubstitution) -> Substitution:
         ...
 
