@@ -27,12 +27,15 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
     rs: ReachabilitySystem
     abstract_perf_counter: PerfCounter
     sort_is_kresult: T.Mapping[str, SortIsKResult]
+    aggressive: bool
 
     def __init__(
         self,
         rs: ReachabilitySystem,
+        aggressive: bool = False,
     ):
         self.rs = rs
+        self.aggressive = aggressive
         self.abstract_perf_counter = PerfCounter()
         
         sorts = self.rs.kdw.user_declared_sorts
@@ -95,15 +98,61 @@ class KResultConstraintDomain(IAbstractConstraintDomain):
             return False
         return True
 
-    def _really_test_necessary_kresult(self, e: Kore.EVar, phi: Kore.Pattern) -> bool:
+    def _strip_equals_to(self, e: Kore.EVar, one_phi: Kore.Pattern) -> Kore.Pattern|None:
+        match one_phi:
+            case Kore.Equals(_, _, x1, x2):
+                if x1 == e:
+                    return x2
+                if x2 == e:
+                    return x1
+        return None
+    
+    def _get_direct_equalities(self, e: Kore.EVar, phis: T.List[Kore.Pattern]) -> T.List[Kore.Pattern]:
+        tmp = [self._strip_equals_to(e, one_phi) for one_phi in phis]
+        return [x for x in tmp if x is not None]
+
+    def _get_inj_equalities_sorts(self, e: Kore.EVar, phis: T.List[Kore.Pattern]) -> T.List[Kore.Sort]:
+        sorts: T.List[Kore.Sort] = list()
+        tmp = self._get_direct_equalities(e, phis)
+        for phi2 in tmp:
+            match phi2:
+                case Kore.App('inj', (fr, to), _):
+                    sorts.append(fr)
+        return sorts
+
+    def _really_really_test_necessary_kresult(self, e: Kore.EVar, phi: Kore.Pattern) -> bool:
         assert issubclass(type(phi), Kore.WithSort)
         iskr_true = self._mk_isKResult_pattern(e, sort=e.sort)
+        #phil = KoreUtils.and_to_list(phi)
+        #_LOGGER.warning(f"e: {e.text}, phil: {[p.text for p in phil]}")
+        #if iskr_true in phil or self._swap_equals(iskr_true) in phil:
+        #    _LOGGER.warning("FOUND")
+        #    return True
         not_iskr_true = Kore.Not(e.sort, iskr_true)
         conj = Kore.And(sort=e.sort, left=not_iskr_true, right=KoreUtils.let_sort_rec(sort=e.sort, phi=phi)) 
         # TODO this can be parallelized
         conj_simp = self.rs.simplify(conj)
         return KoreUtils.is_bottom(conj_simp)
 
+    def _really_test_necessary_kresult(self, e: Kore.EVar, phi: Kore.Pattern) -> bool:
+        phil = KoreUtils.and_to_list(phi)
+        sorts = self._get_inj_equalities_sorts(e, phil)
+        _LOGGER.warning(f"Sorts: {[s.text for s in sorts]}")
+        for s in sorts:
+            if s.name not in self.sort_is_kresult:
+                continue
+            match self.sort_is_kresult[s.name]:
+                case SortIsKResult.Allways:
+                    return True
+                case SortIsKResult.Never:
+                    return False
+
+        if self.aggressive:
+            return self._really_really_test_necessary_kresult(e, phi)
+
+        _LOGGER.warning("Non-aggressive fallback to False")        
+        return False
+    
     def _test_necessary_kresult(self, e: Kore.EVar, phi: Kore.Pattern) -> bool:
         s = e.sort.name
         if s not in self.sort_is_kresult:
