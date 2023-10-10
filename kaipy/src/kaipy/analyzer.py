@@ -69,19 +69,19 @@ def analyze(
             break
         curr_depth = curr_depth + 1
         _LOGGER.warning(f"Iteration {curr_depth}")
-        _LOGGER.warning(f"current_abstract: {pattern_domain.to_str(current_abstract, indent=0)}")
+        #_LOGGER.warning(f"current_abstract: {pattern_domain.to_str(current_abstract, indent=0)}")
         current_concretized = pattern_domain.concretize(current_abstract)
-        _LOGGER.warning(f"concretized.")
+        #_LOGGER.warning(f"concretized.")
         #_LOGGER.warning(f"current_concretized: {rs.kprint.kore_to_pretty(current_concretized)}")
         current_concretized_list: T.List[Kore.Pattern] = KoreUtils.or_to_list(rs.simplify(current_concretized))
-        _LOGGER.warning(f"fbroken into list of lenght {len(current_concretized_list)}.")
+        #_LOGGER.warning(f"fbroken into list of lenght {len(current_concretized_list)}.")
         # Should we cleanup the patterns? I do not know.
         current_concretized_list_normalized = [ KoreUtils.normalize_pattern(KoreUtils.cleanup_pattern_new(c)) for c in current_concretized_list ]
         #current_concretized_list_normalized = [ KoreUtils.normalize_pattern(c) for c in current_concretized_list ]
         diff = [c for c in current_concretized_list_normalized if c not in cfgs_below_current.keys()]
         if len(diff) <= 0:
             break
-        _LOGGER.warning(f'diff: {rs.kprint.kore_to_pretty(RSUtils.make_disjunction(rs, diff))}')
+        #_LOGGER.warning(f'diff: {rs.kprint.kore_to_pretty(RSUtils.make_disjunction(rs, diff))}')
         #_LOGGER.warning(f'diff_raw: {RSUtils.make_disjunction(rs, diff).text}')
         old_timer_value = time.perf_counter()
         diff_step = { c:get_successors(rs, c) for c in diff }
@@ -95,8 +95,9 @@ def analyze(
             #_LOGGER.warning("More than 1 successor")
             #_LOGGER.warning(f'of: {rs.kprint.kore_to_pretty(RSUtils.make_disjunction(rs, diff))}')
             #_LOGGER.warning(f"succs_raw: {rs.kprint.kore_to_pretty(RSUtils.make_disjunction(rs, list(set(itertools.chain(*diff_step.values())))))}")
-            _LOGGER.warning(f"succs_raw: {RSUtils.make_disjunction(rs, list(set(itertools.chain(*diff_step_norm.values())))).text}")
-            _LOGGER.warning(f"succs: {rs.kprint.kore_to_pretty(RSUtils.make_disjunction(rs, list(set(itertools.chain(*diff_step_norm.values())))))}")
+            #_LOGGER.warning(f"succs_raw: {RSUtils.make_disjunction(rs, list(set(itertools.chain(*diff_step_norm.values())))).text}")
+            #_LOGGER.warning(f"succs: {rs.kprint.kore_to_pretty(RSUtils.make_disjunction(rs, list(set(itertools.chain(*diff_step_norm.values())))))}")
+            pass
         unified = cfgs_below_current.copy()
         unified.update(diff_step_norm)
         # We need to make sure that variables in different components have different names

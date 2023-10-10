@@ -229,8 +229,8 @@ class ReachabilitySystem:
     def map_simplify(self, ps: T.List[Kore.Pattern]) -> T.List[Kore.Pattern]:
         try:
             old = time.perf_counter()
-            #rv = self.kcspool.map_simplify(ps)
-            rv = [self.simplify(p) for p in ps]
+            rv = self.kcspool.map_simplify(ps)
+            #rv = [self.simplify(p) for p in ps]
             new = time.perf_counter()
             self.stats.map_simplify.add(new - old, count=len(ps))
             return rv
